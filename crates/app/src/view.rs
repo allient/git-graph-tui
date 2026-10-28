@@ -4,20 +4,32 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 use tgg_model::HeadState;
-use tgg_ui::{GraphView, Theme};
+use tgg_ui::{Gap, GraphView, Theme};
 
 use crate::state::{AppState, Dialog, DialogHits};
 
 /// Key hints shown at the right of the status bar.
-const HINTS: &str = "j/k move  m menu  H head  r refresh  q quit";
+const HINTS: &str = "j/k move  enter details  m menu  H head  r refresh  q quit";
+
+/// Most lines the inline details panel takes.
+const DETAILS_HEIGHT: u16 = 12;
+
+/// Graph lines kept visible above and below an open details panel.
+const MIN_GRAPH_LINES: u16 = 3;
 
 /// Draws the graph, the status bar and the open menu. Updates the viewport
 /// height and stores the hit-maps that mouse events resolve against.
 pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let [graph_area, status_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
-    state.viewport_height = usize::from(graph_area.height).max(1);
+    let gap = state.details_display_index().map(|after| Gap {
+        after,
+        height: DETAILS_HEIGHT.min(graph_area.height.saturating_sub(MIN_GRAPH_LINES)),
+    });
+    let gap_height = gap.map_or(0, |g| g.height);
+    state.viewport_height = usize::from(graph_area.height - gap_height).max(1);
 
     let view = GraphView {
         commits: &state.commits,
@@ -27,10 +39,27 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         uncommitted: state.status.changed_files(),
         offset: state.offset,
         selected: state.selected,
+        gap,
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
+    if let (Some(area), Some(details)) = (state.graph_hits.gap(), &mut state.details) {
+        details.hits = if let Some(view) = &details.view {
+            Some(view.render(area, frame.buffer_mut(), theme))
+        } else {
+            Clear.render(area, frame.buffer_mut());
+            Paragraph::new(" Loading commit details…".dim()).render(area, frame.buffer_mut());
+            None
+        };
+    }
     draw_status(frame, status_area, state, theme);
     let screen = frame.area();
+    if let Some(diff) = &mut state.diff {
+        Clear.render(graph_area, frame.buffer_mut());
+        let block = Block::bordered().title(" diff · esc closes ");
+        let inner = block.inner(graph_area);
+        block.render(graph_area, frame.buffer_mut());
+        diff.hits = Some(diff.view.render(inner, frame.buffer_mut(), theme));
+    }
     if let Some(menu) = &state.menu {
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
     }

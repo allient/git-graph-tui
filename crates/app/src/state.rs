@@ -10,6 +10,7 @@ use crossterm::event::{
 };
 use ratatui::layout::Position;
 use tgg_actions::{CommitTarget, MenuContext, MenuItem, Target, menu_for};
+use tgg_git::show::{self, FileChange};
 use tgg_git::{CancelToken, ExecError, GitCommand, log, refs, status};
 use tgg_graph::Graph;
 use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
@@ -18,9 +19,11 @@ use tgg_ui::{HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
 use crate::git::{JobHandle, JobId, JobResult};
 
 mod actions;
+mod details;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
+pub use details::{Details, DiffPanel};
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
@@ -50,14 +53,14 @@ pub enum Command {
 }
 
 /// What a tracked job is for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Job {
     Read(Request),
     Action,
 }
 
 /// A git read the app needs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
     Head,
     Refs,
@@ -67,19 +70,40 @@ pub enum Request {
         skip: usize,
         max_count: usize,
     },
+    /// Metadata and message of a commit, for the details panel.
+    Details(Oid),
+    /// Files a commit changed, for the details panel.
+    Files(Oid),
+    /// The diff of one file in a commit.
+    Diff(Oid, FileChange),
 }
 
 impl Request {
     /// The git command for this request in `repo`.
-    pub fn command(self, repo: &Path) -> GitCommand {
+    pub fn command(&self, repo: &Path) -> GitCommand {
         match self {
             Self::Head => GitCommand::read(repo, ["rev-parse", "--verify", "--quiet", "HEAD"]),
             Self::Refs => GitCommand::read(repo, refs::args()),
             Self::Status => GitCommand::read(repo, status::args()),
-            Self::Log { skip, max_count } => {
-                GitCommand::read(repo, log::args(&log::LogQuery { max_count, skip }))
-            }
+            Self::Log { skip, max_count } => GitCommand::read(
+                repo,
+                log::args(&log::LogQuery {
+                    max_count: *max_count,
+                    skip: *skip,
+                }),
+            ),
+            Self::Details(id) => GitCommand::read(repo, show::details_args(id)),
+            Self::Files(id) => GitCommand::read(repo, show::files_args(id)),
+            Self::Diff(id, file) => GitCommand::read(repo, show::diff_args(id, file)),
         }
+    }
+
+    /// Part of a refresh (history and status), which a newer refresh replaces.
+    fn is_refresh(&self) -> bool {
+        matches!(
+            self,
+            Self::Head | Self::Refs | Self::Status | Self::Log { .. }
+        )
     }
 }
 
@@ -112,6 +136,10 @@ pub struct AppState {
     /// The open modal dialog (inputs or confirmation), above any menu.
     pub dialog: Option<Dialog>,
     pub dialog_hits: Option<DialogHits>,
+    /// The commit details panel, open below its commit's row.
+    pub details: Option<Details>,
+    /// The diff view, drawn over the whole screen.
+    pub diff: Option<DiffPanel>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -141,6 +169,8 @@ impl AppState {
             menu_hits: None,
             dialog: None,
             dialog_hits: None,
+            details: None,
+            diff: None,
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -197,8 +227,9 @@ impl AppState {
         // Cancel in-flight reads; any result that still arrives is ignored as
         // stale. A running action is never cancelled: stopping git halfway
         // through a merge or rebase would leave the repository in a mess.
+        // Details reads are not part of a refresh and keep going.
         self.pending.retain(|_, (job, cancel)| {
-            let read = matches!(job, Job::Read(_));
+            let read = matches!(job, Job::Read(r) if r.is_refresh());
             if read {
                 cancel.cancel();
             }
@@ -225,6 +256,12 @@ impl AppState {
                 None => Vec::new(),
             };
         }
+        if self.diff.is_some() {
+            return self.on_diff_key(key);
+        }
+        if let Some(commands) = self.on_details_key(key) {
+            return commands;
+        }
         let page = self.viewport_height.max(1);
         let last = self.display_len().saturating_sub(1);
         match (key.code, key.modifiers) {
@@ -243,6 +280,7 @@ impl AppState {
             (KeyCode::Char('k') | KeyCode::Up, _) => self.select(self.selected.saturating_sub(1)),
             (KeyCode::PageDown, _) => self.select(self.selected + page),
             (KeyCode::PageUp, _) => self.select(self.selected.saturating_sub(page)),
+            (KeyCode::Enter, _) => return self.toggle_details(),
             (KeyCode::Char('g') | KeyCode::Home, _) => self.select(0),
             (KeyCode::Char('G') | KeyCode::End, _) => self.select(last),
             (KeyCode::Char('m') | KeyCode::Menu, _) | (KeyCode::F(10), KeyModifiers::SHIFT) => {
@@ -283,14 +321,24 @@ impl AppState {
             }
             return Vec::new();
         }
+        if self.diff.is_some() {
+            return self.on_diff_mouse(mouse);
+        }
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+            && let Some(commands) = self.on_details_click(x, y)
+        {
+            return commands;
+        }
         match mouse.kind {
             MouseEventKind::Down(button @ (MouseButton::Left | MouseButton::Right)) => {
                 let Some(target) = self.graph_hits.hit(x, y).cloned() else {
                     return Vec::new();
                 };
                 self.select(self.display_index(&target));
-                if button == MouseButton::Right {
-                    self.open_menu(&target, Position { x, y });
+                match button {
+                    MouseButton::Right => self.open_menu(&target, Position { x, y }),
+                    _ if target != HitTarget::Uncommitted => return self.toggle_details(),
+                    _ => {}
                 }
                 Vec::new()
             }
@@ -453,6 +501,10 @@ impl AppState {
                 }
                 self.load_more_if_needed()
             }
+            (request @ (Request::Details(_) | Request::Files(_) | Request::Diff(..)), Ok(out)) => {
+                self.on_details_read(request, &out.stdout);
+                Vec::new()
+            }
             (_, Err(err)) => {
                 self.message = Some(format!("{} ({command})", err.user_message()));
                 Vec::new()
@@ -498,6 +550,7 @@ impl AppState {
             self.graph.extend(&self.commits);
             let keep = self.keep_selected.take();
             self.restore_selection(keep.as_ref());
+            self.drop_details_if_gone();
         } else if skip == self.commits.len() {
             self.graph.extend(&page);
             self.commits.extend(page);
@@ -580,6 +633,8 @@ fn menu_key(key: KeyEvent) -> Option<Key> {
 
 #[cfg(test)]
 mod action_tests;
+#[cfg(test)]
+mod details_tests;
 #[cfg(test)]
 mod mouse_tests;
 #[cfg(test)]

@@ -28,6 +28,7 @@ pub enum HitTarget {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HitMap {
     regions: Vec<(Rect, HitTarget)>,
+    gap: Option<Rect>,
 }
 
 impl HitMap {
@@ -40,6 +41,12 @@ impl HitMap {
             .rev()
             .find(|(area, _)| area.contains(point))
             .map(|(_, target)| target)
+    }
+
+    /// Where the [`Gap`] was opened, if its row was on screen.
+    #[must_use]
+    pub fn gap(&self) -> Option<Rect> {
+        self.gap
     }
 
     fn push(&mut self, area: Rect, target: HitTarget) {
@@ -63,6 +70,15 @@ pub struct GraphView<'a> {
     pub uncommitted: usize,
     pub offset: usize,
     pub selected: usize,
+    /// Blank lines opened below one row, for the inline details panel.
+    pub gap: Option<Gap>,
+}
+
+/// Blank lines opened below display row `after`; rows below it move down.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Gap {
+    pub after: usize,
+    pub height: u16,
 }
 
 impl GraphView<'_> {
@@ -82,11 +98,9 @@ impl GraphView<'_> {
         let mut hits = HitMap::default();
         let columns = Columns::for_width(area, self.lane_width(area));
 
-        for (line, y) in (area.top()..area.bottom()).enumerate() {
-            let display = self.offset + line;
-            if display >= self.len() {
-                break;
-            }
+        let mut y = area.top();
+        let mut display = self.offset;
+        while y < area.bottom() && display < self.len() {
             let row_area = Rect::new(area.x, y, area.width, 1);
             if display == self.selected {
                 buf.set_style(row_area, Style::new().bg(theme.selected_bg));
@@ -101,6 +115,13 @@ impl GraphView<'_> {
                     self.draw_commit(buf, &columns, y, index, theme, &mut hits);
                 }
             }
+            y += 1;
+            if let Some(gap) = self.gap.filter(|g| g.after == display) {
+                let height = gap.height.min(area.bottom() - y);
+                hits.gap = Some(Rect::new(area.x, y, area.width, height));
+                y += height;
+            }
+            display += 1;
         }
         hits
     }
