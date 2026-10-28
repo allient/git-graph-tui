@@ -4,3 +4,7 @@
 //! Rendering is a pure function of application state. Every frame also
 //! produces a hit-map (screen cell to target), which the app uses to resolve
 //! mouse clicks and right-clicks against exactly what was drawn.
+
+mod glyphs;
+
+pub use glyphs::{GlyphCell, lane_glyphs};

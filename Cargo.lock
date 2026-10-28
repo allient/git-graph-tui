@@ -1645,6 +1645,10 @@ dependencies = [
 [[package]]
 name = "tgg-ui"
 version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "tgg-graph",
+]
 
 [[package]]
 name = "thiserror"
