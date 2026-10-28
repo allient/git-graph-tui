@@ -16,3 +16,8 @@ pub use glyphs::{GlyphCell, lane_glyphs};
 pub use graph_view::{GraphView, HitMap, HitTarget};
 pub use text::{fit, format_date};
 pub use theme::Theme;
+mod key;
+mod menu;
+
+pub use key::Key;
+pub use menu::{MenuHit, MenuHitMap, MenuOutcome, PopupMenu};
