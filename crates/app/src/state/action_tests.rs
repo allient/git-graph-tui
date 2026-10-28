@@ -262,3 +262,48 @@ fn a_second_action_waits_for_the_first() {
     );
     h.settle(first);
 }
+
+#[test]
+fn a_submenu_entry_names_the_running_action() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let items = menu_for(&Target::Repository, &h.state.menu_context());
+    h.state.menu = Some(PopupMenu::new(items, Position { x: 2, y: 1 }));
+    h.draw(W, H);
+    // "s" jumps to Stash ▸, Right opens it, "a" picks Apply Latest Stash.
+    for code in [KeyCode::Char('s'), KeyCode::Right, KeyCode::Char('a')] {
+        press(&mut h, code);
+    }
+    assert!(h.state.menu.as_ref().is_some_and(PopupMenu::is_child_open));
+    let commands = h.state.update(Event::Key(KeyEvent::new(
+        KeyCode::Enter,
+        KeyModifiers::NONE,
+    )));
+    assert_eq!(h.state.message.as_deref(), Some("Apply Latest Stash…"));
+    h.settle(commands);
+    assert_eq!(h.state.message.as_deref(), Some("✓ Apply Latest Stash"));
+}
+
+#[test]
+fn a_click_outside_every_menu_level_closes_the_menu() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let items = menu_for(&Target::Repository, &h.state.menu_context());
+    h.state.menu = Some(PopupMenu::new(items, Position { x: 2, y: 1 }));
+    h.draw(W, H);
+    for code in [KeyCode::Char('s'), KeyCode::Right] {
+        press(&mut h, code);
+    }
+    // Inside the open submenu: still open.
+    let child = h
+        .state
+        .menu_hits
+        .as_ref()
+        .and_then(|m| m.child())
+        .unwrap()
+        .area();
+    click(&mut h, MouseButton::Left, child.x, child.y);
+    assert!(h.state.menu.is_some());
+    click(&mut h, MouseButton::Left, W - 1, H - 2);
+    assert!(h.state.menu.is_none());
+}

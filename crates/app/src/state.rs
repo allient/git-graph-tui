@@ -314,6 +314,7 @@ impl AppState {
                         menu.handle_hover(&hits, x, y);
                     }
                 }
+                MouseEventKind::Down(_) if !hits.contains(x, y) => self.close_menu(),
                 MouseEventKind::Down(_) => {
                     return self.on_menu_outcome(|menu| menu.handle_click(&hits, x, y));
                 }
@@ -451,12 +452,9 @@ impl AppState {
                 Vec::new()
             }
             MenuOutcome::Chosen(action) => {
+                // The chosen entry at the deepest level (submenus included).
                 let label = menu
-                    .selected()
-                    .and_then(|i| match menu.items().get(i) {
-                        Some(MenuItem::Entry(entry)) => Some(entry.label.clone()),
-                        _ => None,
-                    })
+                    .selected_label()
                     .unwrap_or_default()
                     .trim_end_matches("...")
                     .to_owned();
