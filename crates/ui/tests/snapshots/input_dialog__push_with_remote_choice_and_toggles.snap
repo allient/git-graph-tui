@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 12)"
+---
+
+  ┌ Push Branch ─────────────────────────────────────────────┐
+  │                                                          │
+  │ Remote                                                   │
+  │ < origin >                                               │
+  │                                                          │
+  │ [x] Set upstream                                         │
+  │ [ ] Force push (with lease)                              │
+  │                                                          │
+  │                               [ Push Branch ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘
