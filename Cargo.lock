@@ -1567,6 +1567,10 @@ version = "0.1.0"
 [[package]]
 name = "tgg-model"
 version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "tgg-testkit"
