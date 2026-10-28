@@ -101,7 +101,10 @@ fn results_from_a_superseded_refresh_are_ignored() {
     let mut h = Harness::open(&repo);
     // Start a refresh and let its git commands finish, but hold their results back.
     let stale = h.state.update(Event::Refresh);
-    for Command::Git(request) in stale {
+    for command in stale {
+        let Command::Git(request) = command else {
+            panic!("a refresh only issues reads, got {command:?}");
+        };
         let job = h.runner.submit(request.command(&h.state.repo));
         h.state.track(&job, request);
     }

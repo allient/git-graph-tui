@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span};
 use tgg_model::HeadState;
 use tgg_ui::{GraphView, Theme};
 
-use crate::state::AppState;
+use crate::state::{AppState, Dialog, DialogHits};
 
 /// Key hints shown at the right of the status bar.
 const HINTS: &str = "j/k move  m menu  H head  r refresh  q quit";
@@ -30,9 +30,23 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
     draw_status(frame, status_area, state, theme);
+    let screen = frame.area();
     if let Some(menu) = &state.menu {
-        let screen = frame.area();
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
+    }
+    match &state.dialog {
+        Some(Dialog::Input { view, .. }) => {
+            let hits = view.render(screen, frame.buffer_mut(), theme);
+            if let Some(cursor) = hits.cursor() {
+                frame.set_cursor_position(cursor);
+            }
+            state.dialog_hits = Some(DialogHits::Input(hits));
+        }
+        Some(Dialog::Confirm { view, .. }) => {
+            let hits = view.render(screen, frame.buffer_mut(), theme);
+            state.dialog_hits = Some(DialogHits::Confirm(hits));
+        }
+        None => {}
     }
 }
 

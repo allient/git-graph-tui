@@ -17,6 +17,11 @@ use tgg_ui::{HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
 
 use crate::git::{JobHandle, JobId, JobResult};
 
+mod actions;
+
+use actions::Running;
+pub use actions::{Dialog, DialogHits};
+
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
 
@@ -36,7 +41,19 @@ pub enum Event {
 /// Something for the outside world to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
+    /// A background read (refresh, history page).
     Git(Request),
+    /// One git step of the running action.
+    Run(GitCommand),
+    /// Text to put on the system clipboard.
+    Clipboard(String),
+}
+
+/// What a tracked job is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Job {
+    Read(Request),
+    Action,
 }
 
 /// A git read the app needs.
@@ -92,7 +109,11 @@ pub struct AppState {
     /// What the last frame drew where; mouse events resolve against these.
     pub graph_hits: HitMap,
     pub menu_hits: Option<MenuHitMap>,
-    pending: HashMap<JobId, (Request, CancelToken)>,
+    /// The open modal dialog (inputs or confirmation), above any menu.
+    pub dialog: Option<Dialog>,
+    pub dialog_hits: Option<DialogHits>,
+    running: Option<Running>,
+    pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
     refreshing_head: Option<Oid>,
     /// Commit to keep selected across a refresh (None keeps the uncommitted row).
@@ -118,6 +139,9 @@ impl AppState {
             menu: None,
             graph_hits: HitMap::default(),
             menu_hits: None,
+            dialog: None,
+            dialog_hits: None,
+            running: None,
             pending: HashMap::new(),
             refreshing_head: None,
             keep_selected: None,
@@ -127,7 +151,14 @@ impl AppState {
     /// Records a submitted request so its result can be matched, and so a
     /// newer refresh can cancel it.
     pub fn track(&mut self, job: &JobHandle, request: Request) {
-        self.pending.insert(job.id, (request, job.cancel.clone()));
+        self.pending
+            .insert(job.id, (Job::Read(request), job.cancel.clone()));
+    }
+
+    /// Records a submitted step of the running action.
+    pub fn track_action(&mut self, job: &JobHandle) {
+        self.pending
+            .insert(job.id, (Job::Action, job.cancel.clone()));
     }
 
     pub fn is_loading(&self) -> bool {
@@ -163,10 +194,16 @@ impl AppState {
     }
 
     fn refresh(&mut self) -> Vec<Command> {
-        // Cancel in-flight requests; any result that still arrives is ignored as stale.
-        for (_, (_, cancel)) in self.pending.drain() {
-            cancel.cancel();
-        }
+        // Cancel in-flight reads; any result that still arrives is ignored as
+        // stale. A running action is never cancelled: stopping git halfway
+        // through a merge or rebase would leave the repository in a mess.
+        self.pending.retain(|_, (job, cancel)| {
+            let read = matches!(job, Job::Read(_));
+            if read {
+                cancel.cancel();
+            }
+            !read
+        });
         self.keep_selected = self.selected_commit().map(|c| c.id.clone());
         self.refreshing_head = None;
         [Request::Head, Request::Refs, Request::Status]
@@ -179,11 +216,14 @@ impl AppState {
         if key.kind != KeyEventKind::Press {
             return Vec::new();
         }
+        if self.dialog.is_some() {
+            return self.on_dialog_key(key);
+        }
         if self.menu.is_some() {
-            if let Some(key) = menu_key(key) {
-                self.on_menu_outcome(|menu| menu.handle_key(key));
-            }
-            return Vec::new();
+            return match menu_key(key) {
+                Some(key) => self.on_menu_outcome(|menu| menu.handle_key(key)),
+                None => Vec::new(),
+            };
         }
         let page = self.viewport_height.max(1);
         let last = self.display_len().saturating_sub(1);
@@ -193,7 +233,12 @@ impl AppState {
                 self.should_quit = true;
                 return Vec::new();
             }
-            (KeyCode::Char('r'), _) => return self.refresh(),
+            (KeyCode::Char('r'), _) => {
+                // A manual refresh clears old messages; automatic ones keep the
+                // result of the action that triggered them.
+                self.message = None;
+                return self.refresh();
+            }
             (KeyCode::Char('j') | KeyCode::Down, _) => self.select(self.selected + 1),
             (KeyCode::Char('k') | KeyCode::Up, _) => self.select(self.selected.saturating_sub(1)),
             (KeyCode::PageDown, _) => self.select(self.selected + page),
@@ -215,6 +260,12 @@ impl AppState {
 
     fn on_mouse(&mut self, mouse: MouseEvent) -> Vec<Command> {
         let (x, y) = (mouse.column, mouse.row);
+        if self.dialog.is_some() {
+            return match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => self.on_dialog_click(x, y),
+                _ => Vec::new(),
+            };
+        }
         if self.menu.is_some() {
             let Some(hits) = self.menu_hits.clone() else {
                 return Vec::new();
@@ -226,7 +277,7 @@ impl AppState {
                     }
                 }
                 MouseEventKind::Down(_) => {
-                    self.on_menu_outcome(|menu| menu.handle_click(&hits, x, y));
+                    return self.on_menu_outcome(|menu| menu.handle_click(&hits, x, y));
                 }
                 _ => {}
             }
@@ -334,28 +385,35 @@ impl AppState {
     }
 
     /// Applies a menu outcome: closing, reporting a disabled entry, or a choice.
-    fn on_menu_outcome(&mut self, handle: impl FnOnce(&mut PopupMenu) -> MenuOutcome) {
+    fn on_menu_outcome(
+        &mut self,
+        handle: impl FnOnce(&mut PopupMenu) -> MenuOutcome,
+    ) -> Vec<Command> {
         let Some(menu) = &mut self.menu else {
-            return;
+            return Vec::new();
         };
         match handle(menu) {
-            MenuOutcome::Open => {}
-            MenuOutcome::Disabled(reason) => self.message = Some(reason),
-            MenuOutcome::Closed => self.close_menu(),
-            MenuOutcome::Chosen(_action) => {
+            MenuOutcome::Open => Vec::new(),
+            MenuOutcome::Disabled(reason) => {
+                self.message = Some(reason);
+                Vec::new()
+            }
+            MenuOutcome::Closed => {
+                self.close_menu();
+                Vec::new()
+            }
+            MenuOutcome::Chosen(action) => {
                 let label = menu
                     .selected()
                     .and_then(|i| match menu.items().get(i) {
                         Some(MenuItem::Entry(entry)) => Some(entry.label.clone()),
                         _ => None,
                     })
-                    .unwrap_or_default();
-                // Running actions (dialogs, git, refresh) is the next task (T10).
-                self.message = Some(format!(
-                    "{} — runs in the next step",
-                    label.trim_end_matches("...")
-                ));
+                    .unwrap_or_default()
+                    .trim_end_matches("...")
+                    .to_owned();
                 self.close_menu();
+                self.start_action(action, label)
             }
         }
     }
@@ -366,8 +424,12 @@ impl AppState {
     }
 
     fn on_git(&mut self, result: JobResult) -> Vec<Command> {
-        let Some((request, _)) = self.pending.remove(&result.id) else {
+        let Some((job, _)) = self.pending.remove(&result.id) else {
             return Vec::new(); // Superseded by a newer refresh.
+        };
+        let request = match job {
+            Job::Read(request) => request,
+            Job::Action => return self.on_action_result(result.result),
         };
         let JobResult {
             command, result, ..
@@ -443,7 +505,6 @@ impl AppState {
             return; // A page for a history that has since been reloaded.
         }
         self.history_complete = complete;
-        self.message = None;
     }
 
     fn parsed<T>(
@@ -469,7 +530,7 @@ impl AppState {
         let loading_log = self
             .pending
             .values()
-            .any(|(r, _)| matches!(r, Request::Log { .. }));
+            .any(|(job, _)| matches!(job, Job::Read(Request::Log { .. })));
         let margin = (self.page_size / 2).max(1);
         let bottom = (self.offset + self.viewport_height).max(self.selected);
         let near_end = self
@@ -508,26 +569,17 @@ impl AppState {
     }
 }
 
-/// Maps a terminal key to the widget key set; vim keys move inside menus too.
+/// Maps a terminal key for menus: like dialogs, plus vim keys to move.
 fn menu_key(key: KeyEvent) -> Option<Key> {
-    Some(match key.code {
-        KeyCode::Up | KeyCode::Char('k') => Key::Up,
-        KeyCode::Down | KeyCode::Char('j') => Key::Down,
-        KeyCode::Left => Key::Left,
-        KeyCode::Right => Key::Right,
-        KeyCode::Home => Key::Home,
-        KeyCode::End => Key::End,
-        KeyCode::Enter => Key::Enter,
-        KeyCode::Esc => Key::Esc,
-        KeyCode::Tab => Key::Tab,
-        KeyCode::BackTab => Key::BackTab,
-        KeyCode::Backspace => Key::Backspace,
-        KeyCode::Delete => Key::Delete,
-        KeyCode::Char(c) => Key::Char(c),
-        _ => return None,
-    })
+    match key.code {
+        KeyCode::Char('k') => Some(Key::Up),
+        KeyCode::Char('j') => Some(Key::Down),
+        _ => actions::widget_key(key),
+    }
 }
 
+#[cfg(test)]
+mod action_tests;
 #[cfg(test)]
 mod mouse_tests;
 #[cfg(test)]
