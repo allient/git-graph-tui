@@ -106,24 +106,26 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ## Architecture
 
-A Cargo workspace with a pure core and a thin UI. The core never touches the terminal, and the UI never runs git directly.
+A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure crates never touch the terminal, and the UI never runs git directly.
+
+| Crate | Path | Role | May depend on |
+| --- | --- | --- | --- |
+| `tgg-model` | `crates/model` | Domain types: commit ids, commits, refs, signatures. Pure data. | — |
+| `tgg-git` | `crates/git` | Safe git argv building, process execution behind a trait, output parsers | model |
+| `tgg-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
+| `tgg-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
+| `tgg-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, graph, actions |
+| `tui-git-graph` | `crates/app` | The binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
+| `tgg-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
 
 ```
-crates/
-  core/                 # library: no terminal, no threads; 100% unit-testable
-    git/                # command builder (-C <repo>, safe argv), output parsers (log, refs, status, stash)
-    model/              # Commit, Ref, Repo snapshot, filters, search
-    graph/              # lane layout: commits -> rows of lanes/edges (incremental, stable across pages)
-    actions/            # one type per action: validation, git argv, confirmation text, refresh scope
-  app/                  # binary `tui-git-graph`
-    runner/             # executes core commands on worker threads; cancel; stale-result guard
-    state/              # single AppState; all updates go through an Event -> update() function
-    ui/                 # ratatui widgets: graph, badges, details pane, popup menus, dialogs, toolbar
-    input/              # key + mouse -> Event; hit-testing from the last rendered layout
-integrations/
-  herdr/                # herdr-plugin.toml: opens tui-git-graph in a herdr pane
-  ttt/                  # tiny TTT Lua plugin: "Git Graph: Open" runs tui-git-graph in a terminal tab
-tests/fixtures/         # scripts that build fixture repos (branches, merges, tags, stash, remotes)
+Cargo.toml              # workspace: members, shared package metadata, dependency catalog, lints, profiles
+rust-toolchain.toml     # pinned toolchain (rustfmt, clippy)
+crates/<crate>/         # one package per crate (see table)
+integrations/herdr/     # herdr-plugin.toml: opens tui-git-graph in a herdr pane (planned)
+integrations/ttt/       # tiny TTT plugin that runs tui-git-graph in a terminal tab (planned)
+tests/fixtures/         # scripts/data for fixture repos
+odd/tasks/              # ODD feature documents
 ```
 
 **Data flow (unidirectional):**
@@ -137,6 +139,23 @@ input (key/mouse) ─▶ Event ─▶ update(state) ─▶ Command ─▶ runner
 - **Rendering is a pure function of state.** Each frame records a hit-map (which cell belongs to which row, badge or menu item), so mouse clicks and right-clicks resolve against exactly what was drawn.
 - **Lane layout is incremental.** Loading more commits never changes rows already shown.
 - **Actions are data.** Each action declares its git argv, whether it is destructive, its confirmation text and what to refresh. Menus are built from the selected target (commit, branch, tag, stash, uncommitted row), so the same action list drives mouse menus, keyboard menus and tests.
+
+## Development
+
+Requires Rust (the toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it automatically) and `git`.
+
+```sh
+cargo run-app            # run the TUI (alias for `cargo run -p tui-git-graph --`)
+cargo t                  # run all tests (cargo nextest)
+cargo lint               # clippy on every crate and target, warnings are errors
+cargo fmt --all          # format
+cargo deny check         # licenses, advisories, sources
+cargo machete            # unused dependencies
+```
+
+Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
+
+**Dependencies.** Every version is declared once in `[workspace.dependencies]` in the root `Cargo.toml`. A crate opts in with `dep.workspace = true` (`cargo add -p <crate> <dep>` does this automatically) and declares only what it actually uses; `cargo machete` enforces that in CI.
 
 ## Roadmap
 

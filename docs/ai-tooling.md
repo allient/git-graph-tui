@@ -74,6 +74,9 @@ Installed with `npx skills add <owner/repo@skill>`. Each one is recorded in `ski
 | `git-guardrails-claude-code` | `mattpocock/skills` | Hooks that block destructive git commands (`push`, `reset --hard`, `clean`, `branch -D`) while agents build a git tool. **Inactive until its hooks are set up**: ask the agent to "set up git guardrails". |
 | `git-advanced-workflows` | `wshobson/agents` | Reference for rebase, cherry-pick, bisect, worktrees and reflog: the actions the app implements. |
 | `tui-design` | `hyperb1iss/hyperskills` | Terminal UI layout, keyboard navigation, box-drawing and color guidance for the graph view. |
+| `rust-best-practices` | `apollographql/skills` | Ownership, error handling, clippy and workspace lint setup, API design. |
+| `rust-testing` | `affaan-m/ecc` | Rust TDD, unit/integration test layout, insta snapshots, property tests. |
+| `ratatui-tui` | `blacktop/dotfiles` | ratatui 0.30 patterns: TEA loop, widgets, layout, popups, styling. |
 
 To add a skill, run `npx skills add <owner/repo@skill>`, then `gentle-ai skill-registry refresh --force`, then add a row to this table.
 

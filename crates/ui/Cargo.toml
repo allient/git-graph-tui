@@ -1,0 +1,13 @@
+[package]
+name = "tgg-ui"
+description = "ratatui widgets for tui-git-graph: graph view, badges, menus, dialogs and hit-map."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
