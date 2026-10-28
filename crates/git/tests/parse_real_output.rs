@@ -1,5 +1,7 @@
 //! Parsers run against output from a real git, on a deterministic fixture repo.
 
+#![expect(clippy::unwrap_used, reason = "test helpers")]
+
 use pretty_assertions::assert_eq;
 use tgg_git::{log, refs, stash, status};
 use tgg_model::{HeadState, RefKind};
@@ -18,6 +20,7 @@ fn log_of_the_sample_repo() {
         &log::args(&log::LogQuery {
             max_count: 100,
             skip: 0,
+            revisions: log::Revisions::default(),
         }),
     ))
     .unwrap();
@@ -35,6 +38,7 @@ fn log_pagination_skips_and_limits() {
         &log::args(&log::LogQuery {
             max_count: 100,
             skip: 0,
+            revisions: log::Revisions::default(),
         }),
     ))
     .unwrap();
@@ -43,6 +47,7 @@ fn log_pagination_skips_and_limits() {
         &log::args(&log::LogQuery {
             max_count: 2,
             skip: 1,
+            revisions: log::Revisions::default(),
         }),
     ))
     .unwrap();
@@ -112,4 +117,47 @@ fn stash_list_of_the_sample_repo() {
     let stashes = stash::parse(&run(&repo, &stash::args())).unwrap();
     assert_eq!(stashes.len(), 1);
     assert_eq!(stashes[0].subject, "On main: WIP on docs");
+}
+
+fn subjects(repo: &FixtureRepo, revisions: log::Revisions) -> Vec<String> {
+    let commits = log::parse(&run(
+        repo,
+        &log::args(&log::LogQuery {
+            max_count: 100,
+            skip: 0,
+            revisions,
+        }),
+    ))
+    .unwrap();
+    commits.into_iter().map(|c| c.subject).collect()
+}
+
+#[test]
+fn log_of_only_some_refs_follows_just_their_history() {
+    let repo = FixtureRepo::sample();
+    let only = subjects(
+        &repo,
+        log::Revisions::Only(vec!["refs/heads/main".to_owned()]),
+    );
+    assert_eq!(only[0], "Merge branch 'develop'");
+    assert!(
+        !only
+            .iter()
+            .any(|s| s == "Add login" || s == "Return a value")
+    );
+    assert!(only.iter().any(|s| s == "Initial commit"));
+}
+
+#[test]
+fn log_without_remotes_hides_commits_only_a_remote_has() {
+    let repo = FixtureRepo::sample();
+    repo.checkout("feature/login");
+    repo.push("feature/login");
+    repo.checkout("main");
+    repo.git(&["branch", "--delete", "--force", "feature/login"]);
+
+    let with = subjects(&repo, log::Revisions::All { remotes: true });
+    let without = subjects(&repo, log::Revisions::All { remotes: false });
+    assert!(with.iter().any(|s| s == "Add login"));
+    assert!(!without.iter().any(|s| s == "Add login"));
 }

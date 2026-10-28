@@ -24,24 +24,51 @@ const FIELDS: [&str; 9] = [
 pub struct LogQuery {
     pub max_count: usize,
     pub skip: usize,
+    pub revisions: Revisions,
+}
+
+/// Whose history to load.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Revisions {
+    /// Every local branch, tag and HEAD; `remotes` adds remote-tracking branches.
+    All { remotes: bool },
+    /// Only the history of these refs (full names like `refs/heads/main`).
+    Only(Vec<String>),
+}
+
+impl Default for Revisions {
+    fn default() -> Self {
+        Self::All { remotes: true }
+    }
 }
 
 /// Arguments for `git log` (without `-C <repo>`).
 #[must_use]
 pub fn args(query: &LogQuery) -> Vec<String> {
-    vec![
+    let mut args: Vec<String> = vec![
         "log".into(),
         "--topo-order".into(),
         "-z".into(),
         format!("--format={FORMAT}"),
         format!("--max-count={}", query.max_count),
         format!("--skip={}", query.skip),
-        "--branches".into(),
-        "--remotes".into(),
-        "--tags".into(),
-        "HEAD".into(),
-        "--".into(),
-    ]
+    ];
+    match &query.revisions {
+        Revisions::All { remotes } => {
+            args.push("--branches".into());
+            if *remotes {
+                args.push("--remotes".into());
+            }
+            args.extend(["--tags".into(), "HEAD".into()]);
+        }
+        // `--end-of-options` keeps a ref named like an option from being parsed as one.
+        Revisions::Only(refs) => {
+            args.push("--end-of-options".into());
+            args.extend(refs.iter().cloned());
+        }
+    }
+    args.push("--".into());
+    args
 }
 
 /// Parses NUL-separated records produced with [`FORMAT`].
@@ -106,6 +133,7 @@ mod tests {
         let args = args(&LogQuery {
             max_count: 50,
             skip: 100,
+            revisions: Revisions::default(),
         });
         assert_eq!(args[0], "log");
         assert!(args.contains(&"-z".to_owned()));

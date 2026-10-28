@@ -124,20 +124,15 @@ impl AppState {
                 self.message = Some(format!("Copied to the clipboard: {text}"));
                 vec![Command::Clipboard(text)]
             }
-            Plan::Ui(UiEffect::ToggleBranchFilter { branch }) => {
-                self.message = Some(format!(
-                    "Filtering by {branch} comes with the branch filter (toolbar)."
-                ));
-                Vec::new()
-            }
+            Plan::Ui(UiEffect::ToggleBranchFilter { branch }) => self.toggle_branch_filter(branch),
             Plan::Ui(UiEffect::ShowTag { name }) => self.show_tag(name),
             Plan::Ui(UiEffect::OpenSourceControl) => {
                 self.message =
                     Some("Use `git status` or your editor's source control view.".to_owned());
                 Vec::new()
             }
-            Plan::Ui(UiEffect::PickRef { .. }) => {
-                self.message = Some("Picking a ref comes with the picker (toolbar).".to_owned());
+            Plan::Ui(UiEffect::PickRef { purpose }) => {
+                self.pick_ref(purpose);
                 Vec::new()
             }
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),

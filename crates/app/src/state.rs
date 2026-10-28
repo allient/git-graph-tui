@@ -22,12 +22,14 @@ mod actions;
 mod details;
 mod info;
 mod output;
+mod toolbar;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
 pub use details::{Details, DiffPanel};
 pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
+pub use toolbar::{OpenPicker, ToolbarState};
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
@@ -73,6 +75,7 @@ pub enum Request {
     Log {
         skip: usize,
         max_count: usize,
+        revisions: log::Revisions,
     },
     /// Metadata and message of a commit, for the details panel.
     Details(Oid),
@@ -91,11 +94,16 @@ impl Request {
             Self::Head => GitCommand::read(repo, ["rev-parse", "--verify", "--quiet", "HEAD"]),
             Self::Refs => GitCommand::read(repo, refs::args()),
             Self::Status => GitCommand::read(repo, status::args()),
-            Self::Log { skip, max_count } => GitCommand::read(
+            Self::Log {
+                skip,
+                max_count,
+                revisions,
+            } => GitCommand::read(
                 repo,
                 log::args(&log::LogQuery {
                     max_count: *max_count,
                     skip: *skip,
+                    revisions: revisions.clone(),
                 }),
             ),
             Self::Details(id) => GitCommand::read(repo, show::details_args(id)),
@@ -153,6 +161,10 @@ pub struct AppState {
     pub git_output: GitOutput,
     /// The open git output view, drawn over the graph.
     pub output_view: Option<OutputView>,
+    /// The toolbar's branch filter, remote toggle and keyboard focus.
+    pub toolbar: ToolbarState,
+    /// The open ref picker (branch filter, "Checkout to...", ...), above any menu.
+    pub picker: Option<OpenPicker>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -189,6 +201,8 @@ impl AppState {
             info: None,
             git_output: GitOutput::default(),
             output_view: None,
+            toolbar: ToolbarState::default(),
+            picker: None,
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -272,6 +286,9 @@ impl AppState {
         if self.info.is_some() {
             return self.on_info_key(key);
         }
+        if self.picker.is_some() {
+            return self.on_picker_key(key);
+        }
         if self.menu.is_some() {
             return match menu_key(key) {
                 Some(key) => self.on_menu_outcome(|menu| menu.handle_key(key)),
@@ -283,6 +300,9 @@ impl AppState {
         }
         if self.diff.is_some() {
             return self.on_diff_key(key);
+        }
+        if self.toolbar.focus.is_some() {
+            return self.on_toolbar_key(key);
         }
         if let Some(commands) = self.on_details_key(key) {
             return commands;
@@ -306,6 +326,7 @@ impl AppState {
             (KeyCode::PageDown, _) => self.select(self.selected + page),
             (KeyCode::PageUp, _) => self.select(self.selected.saturating_sub(page)),
             (KeyCode::Enter, _) => return self.toggle_details(),
+            (KeyCode::Tab, _) => self.focus_toolbar(),
             (KeyCode::Char('g') | KeyCode::Home, _) => self.select(0),
             (KeyCode::Char('G') | KeyCode::End, _) => self.select(last),
             (KeyCode::Char('m') | KeyCode::Menu, _) | (KeyCode::F(10), KeyModifiers::SHIFT) => {
@@ -332,6 +353,12 @@ impl AppState {
         if self.info.is_some() {
             return self.on_info_mouse(mouse);
         }
+        if self.picker.is_some() {
+            return match mouse.kind {
+                MouseEventKind::Down(_) => self.on_picker_click(x, y),
+                _ => Vec::new(),
+            };
+        }
         if self.menu.is_some() {
             let Some(hits) = self.menu_hits.clone() else {
                 return Vec::new();
@@ -357,7 +384,9 @@ impl AppState {
             return self.on_diff_mouse(mouse);
         }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left)
-            && let Some(commands) = self.on_details_click(x, y)
+            && let Some(commands) = self
+                .on_toolbar_click(x, y)
+                .or_else(|| self.on_details_click(x, y))
         {
             return commands;
         }
@@ -460,7 +489,7 @@ impl AppState {
             head: self.status.head.clone(),
             head_commit: self.head.clone(),
             remotes,
-            branch_filter: Vec::new(),
+            branch_filter: self.toolbar.branch_filter.clone(),
         }
     }
 
@@ -570,12 +599,13 @@ impl AppState {
     fn on_head(&mut self, head: Option<Oid>) -> Vec<Command> {
         let has_commits = head.is_some();
         self.refreshing_head = head;
-        if has_commits {
-            vec![self.log_request(0)]
-        } else {
-            // No commits yet: nothing to load.
-            self.on_log_page(0, Vec::new());
-            Vec::new()
+        match self.log_request(0) {
+            Some(request) if has_commits => vec![request],
+            // No commits yet, or a branch filter that matches nothing: nothing to load.
+            _ => {
+                self.on_log_page(0, Vec::new());
+                Vec::new()
+            }
         }
     }
 
@@ -610,11 +640,12 @@ impl AppState {
         }
     }
 
-    fn log_request(&self, skip: usize) -> Command {
-        Command::Git(Request::Log {
+    fn log_request(&self, skip: usize) -> Option<Command> {
+        Some(Command::Git(Request::Log {
             skip,
             max_count: self.page_size,
-        })
+            revisions: self.log_revisions()?,
+        }))
     }
 
     /// Asks for the next page when the selection is within half a page of the end.
@@ -631,7 +662,7 @@ impl AppState {
         if self.history_complete || loading_log || self.commits.is_empty() || !near_end {
             return Vec::new();
         }
-        vec![self.log_request(self.commits.len())]
+        self.log_request(self.commits.len()).into_iter().collect()
     }
 
     fn head_display_index(&self) -> Option<usize> {
@@ -684,3 +715,5 @@ mod mouse_tests;
 mod output_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod toolbar_tests;

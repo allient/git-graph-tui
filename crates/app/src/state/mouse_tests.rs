@@ -64,7 +64,8 @@ fn left_click_selects_the_row() {
     let (_, y) = find(&h, "Update docs");
     click(&mut h, MouseButton::Left, 100, y);
     assert_eq!(h.selected_subject(), Some("Update docs"));
-    click(&mut h, MouseButton::Left, 100, 0);
+    let (_, top) = find(&h, "Uncommitted Changes");
+    click(&mut h, MouseButton::Left, 100, top);
     assert_eq!(h.state.selected, 0, "the uncommitted row");
 }
 
@@ -220,5 +221,6 @@ fn clicking_a_menu_item_chooses_it() {
 fn graph_hits_come_from_the_last_frame() {
     let repo = FixtureRepo::sample();
     let h = open(&repo);
-    assert_eq!(h.state.graph_hits.hit(100, 1), Some(&HitTarget::Commit(0)));
+    // Line 0 is the toolbar and line 1 the uncommitted row.
+    assert_eq!(h.state.graph_hits.hit(100, 2), Some(&HitTarget::Commit(0)));
 }

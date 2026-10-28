@@ -28,6 +28,7 @@ fn load(repo: &FixtureRepo) -> Loaded {
     let commits = log::parse(&run(log::args(&log::LogQuery {
         max_count: 100,
         skip: 0,
+        revisions: log::Revisions::default(),
     })))
     .unwrap();
     let refs = refs::parse(&run(refs::args())).unwrap();
