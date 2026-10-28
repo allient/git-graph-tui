@@ -2,6 +2,7 @@
 source: crates/app/src/view.rs
 expression: "graph.join(\"\\n\")"
 ---
+ Branches: [Show All ▾]  [x] Show Remote Branches                                     [Refresh] [Fetch] [...]
   ○ Uncommitted Changes (1)
 ●    feature/login  Add login                                         2026-01-01 00:07 Fixture Author 82f432c
 ●    develop  Return a value                                          2026-01-01 00:06 Fixture Author 6681ca2

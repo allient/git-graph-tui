@@ -11,7 +11,7 @@ use tgg_ui::{Gap, GraphView, Theme};
 use crate::state::{AppState, Dialog, DialogHits};
 
 /// Key hints shown at the right of the status bar.
-const HINTS: &str = "j/k move  enter details  m menu  H head  r refresh  q quit";
+const HINTS: &str = "j/k move  enter details  m menu  tab toolbar  H head  r refresh  q quit";
 
 /// Most lines the inline details panel takes.
 const DETAILS_HEIGHT: u16 = 12;
@@ -22,8 +22,16 @@ const MIN_GRAPH_LINES: u16 = 3;
 /// Draws the graph, the status bar and the open menu. Updates the viewport
 /// height and stores the hit-maps that mouse events resolve against.
 pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
-    let [graph_area, status_area] =
-        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
+    let [toolbar_area, graph_area, status_area] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .areas(frame.area());
+    state.toolbar.hits = state
+        .toolbar
+        .widget()
+        .render(toolbar_area, frame.buffer_mut(), theme);
     let gap = state.details_display_index().map(|after| Gap {
         after,
         height: DETAILS_HEIGHT.min(graph_area.height.saturating_sub(MIN_GRAPH_LINES)),
@@ -31,10 +39,11 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let gap_height = gap.map_or(0, |g| g.height);
     state.viewport_height = usize::from(graph_area.height - gap_height).max(1);
 
+    let refs = state.visible_refs();
     let view = GraphView {
         commits: &state.commits,
         rows: state.graph.rows(),
-        refs: &state.refs,
+        refs: &refs,
         head: state.head.as_ref(),
         uncommitted: state.status.changed_files(),
         offset: state.offset,
@@ -66,6 +75,13 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     }
     if let Some(menu) = &state.menu {
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
+    }
+    if let Some(picker) = &mut state.picker {
+        let hits = picker.view.render(screen, frame.buffer_mut(), theme);
+        if let Some(cursor) = hits.cursor() {
+            frame.set_cursor_position(cursor);
+        }
+        picker.hits = Some(hits);
     }
     if let Some(info) = &state.info {
         crate::panels::draw_info(frame, screen, info, theme);
@@ -175,7 +191,10 @@ mod tests {
                 draw(f, &mut h.state, &Theme::default());
             })
             .unwrap();
-        assert_eq!(h.state.viewport_height, 5, "one line is the status bar");
+        assert_eq!(
+            h.state.viewport_height, 4,
+            "the toolbar and status bar take a line each"
+        );
     }
 
     #[test]
@@ -192,7 +211,7 @@ mod tests {
         terminal
             .draw(|f| draw(f, &mut h.state, &Theme::default()))
             .unwrap();
-        // 3 graph lines; the last commit (index 6) is on the bottom one.
+        // Toolbar, 2 graph lines, status bar; the last commit (index 6) is on the bottom graph line.
         assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(6)));
     }
 

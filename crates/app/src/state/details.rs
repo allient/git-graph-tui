@@ -157,7 +157,7 @@ impl AppState {
         Some(if loading_log {
             Vec::new()
         } else {
-            vec![self.log_request(self.commits.len())]
+            self.log_request(self.commits.len()).into_iter().collect()
         })
     }
 
