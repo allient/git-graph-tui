@@ -1,0 +1,580 @@
+use std::path::Path;
+
+use pretty_assertions::assert_eq;
+use tgg_git::{CommandKind, GitCommand};
+use tgg_model::Oid;
+
+use super::*;
+use crate::{InputError, InputId, InputValue, RefNameError};
+
+const HASH: &str = "0123456789abcdef0123456789abcdef01234567";
+
+fn oid() -> Oid {
+    Oid::parse(HASH).unwrap()
+}
+
+fn repo() -> &'static Path {
+    Path::new("/repo")
+}
+
+/// The single command of a plan, as `(kind, args after the -C/-c prefix)`.
+fn single(action: &Action) -> (CommandKind, Vec<String>) {
+    let Plan::Git(commands) = action.plan(repo()) else {
+        panic!("expected git commands for {action:?}");
+    };
+    assert_eq!(commands.len(), 1, "{action:?}");
+    let command: &GitCommand = &commands[0];
+    (command.kind(), command.argv()[6..].to_vec())
+}
+
+fn args(action: &Action) -> Vec<String> {
+    single(action).1
+}
+
+fn write(argv: &[&str]) -> (CommandKind, Vec<String>) {
+    (
+        CommandKind::Write,
+        argv.iter().map(|a| (*a).to_owned()).collect(),
+    )
+}
+
+fn local(name: &str) -> Rev {
+    Rev::Local(name.into())
+}
+
+// ---- plans ----
+
+#[test]
+fn checkout_branch_switches_to_it() {
+    let action = Action::CheckoutBranch {
+        name: "develop".into(),
+    };
+    assert_eq!(single(&action), write(&["switch", "--", "develop"]));
+}
+
+#[test]
+fn checkout_remote_branch_creates_a_tracking_branch() {
+    let action = Action::CheckoutRemoteBranch {
+        remote: "origin".into(),
+        branch: "feature/x".into(),
+        local_name: "feature/x".into(),
+    };
+    assert_eq!(
+        single(&action),
+        write(&[
+            "switch",
+            "--create",
+            "feature/x",
+            "--track",
+            "--",
+            "origin/feature/x"
+        ])
+    );
+}
+
+#[test]
+fn create_branch_with_and_without_checkout() {
+    let mut action = Action::CreateBranch {
+        at: oid(),
+        name: "topic".into(),
+        checkout: false,
+    };
+    assert_eq!(single(&action), write(&["branch", "--", "topic", HASH]));
+    action
+        .set_input(InputId::Checkout, InputValue::Bool(true))
+        .unwrap();
+    assert_eq!(
+        single(&action),
+        write(&["switch", "--create", "topic", "--", HASH])
+    );
+}
+
+#[test]
+fn rename_branch() {
+    let action = Action::RenameBranch {
+        from: "old".into(),
+        to: "new".into(),
+    };
+    assert_eq!(
+        single(&action),
+        write(&["branch", "--move", "--", "old", "new"])
+    );
+}
+
+#[test]
+fn delete_branch_is_safe_by_default() {
+    let mut action = Action::DeleteBranch {
+        name: "topic".into(),
+        force: false,
+    };
+    assert_eq!(
+        single(&action),
+        write(&["branch", "--delete", "--", "topic"])
+    );
+    action
+        .set_input(InputId::Force, InputValue::Bool(true))
+        .unwrap();
+    assert_eq!(
+        single(&action),
+        write(&["branch", "--delete", "--force", "--", "topic"])
+    );
+}
+
+#[test]
+fn merge_creates_a_merge_commit_unless_fast_forward_is_allowed() {
+    let mut action = Action::MergeIntoCurrent {
+        source: local("develop"),
+        current: Some("main".into()),
+        no_ff: true,
+    };
+    assert_eq!(
+        single(&action),
+        write(&["merge", "--no-edit", "--no-ff", "--", "develop"])
+    );
+    action
+        .set_input(InputId::NoFastForward, InputValue::Bool(false))
+        .unwrap();
+    assert_eq!(
+        single(&action),
+        write(&["merge", "--no-edit", "--", "develop"])
+    );
+}
+
+#[test]
+fn rebase_current_branch() {
+    let action = Action::RebaseCurrentOnto {
+        onto: Rev::Remote {
+            remote: "origin".into(),
+            branch: "main".into(),
+        },
+        current: Some("topic".into()),
+    };
+    assert_eq!(single(&action), write(&["rebase", "--", "origin/main"]));
+}
+
+#[test]
+fn push_is_a_network_command_with_an_explicit_refspec() {
+    let mut action = Action::PushBranch {
+        branch: "topic".into(),
+        remote: "origin".into(),
+        set_upstream: true,
+        force_with_lease: false,
+    };
+    let refspec = "refs/heads/topic:refs/heads/topic";
+    assert_eq!(
+        single(&action),
+        (
+            CommandKind::Network,
+            vec![
+                "push".into(),
+                "--set-upstream".into(),
+                "--".into(),
+                "origin".into(),
+                refspec.into()
+            ]
+        )
+    );
+    action
+        .set_input(InputId::SetUpstream, InputValue::Bool(false))
+        .unwrap();
+    action
+        .set_input(InputId::ForceWithLease, InputValue::Bool(true))
+        .unwrap();
+    assert_eq!(
+        args(&action),
+        ["push", "--force-with-lease", "--", "origin", refspec]
+    );
+}
+
+#[test]
+fn create_archive_lets_git_pick_the_format_from_the_extension() {
+    let action = Action::CreateArchive {
+        rev: local("main"),
+        output: "main.zip".into(),
+    };
+    assert_eq!(
+        single(&action),
+        write(&["archive", "--output=main.zip", "--", "main"])
+    );
+}
+
+#[test]
+fn add_tag_lightweight_or_annotated() {
+    let mut action = Action::AddTag {
+        at: oid(),
+        name: "v1.0".into(),
+        message: String::new(),
+    };
+    assert_eq!(single(&action), write(&["tag", "--", "v1.0", HASH]));
+    action
+        .set_input(InputId::Message, InputValue::Text("Release".into()))
+        .unwrap();
+    assert_eq!(
+        single(&action),
+        write(&[
+            "tag",
+            "--annotate",
+            "--message",
+            "Release",
+            "--",
+            "v1.0",
+            HASH
+        ])
+    );
+}
+
+#[test]
+fn checkout_commit_detaches_head() {
+    let action = Action::CheckoutCommit {
+        commit: oid(),
+        subject: "Fix".into(),
+    };
+    assert_eq!(single(&action), write(&["switch", "--detach", "--", HASH]));
+}
+
+#[test]
+fn cherry_pick_and_revert_use_the_first_parent_for_merges() {
+    let pick = |is_merge| Action::CherryPick {
+        commit: oid(),
+        subject: "s".into(),
+        is_merge,
+    };
+    assert_eq!(single(&pick(false)), write(&["cherry-pick", "--", HASH]));
+    assert_eq!(
+        args(&pick(true)),
+        ["cherry-pick", "--mainline", "1", "--", HASH]
+    );
+
+    let revert = |is_merge| Action::Revert {
+        commit: oid(),
+        subject: "s".into(),
+        is_merge,
+    };
+    assert_eq!(
+        single(&revert(false)),
+        write(&["revert", "--no-edit", "--", HASH])
+    );
+    assert_eq!(
+        args(&revert(true)),
+        ["revert", "--no-edit", "--mainline", "1", "--", HASH]
+    );
+}
+
+#[test]
+fn drop_rebases_the_later_commits_onto_the_parent() {
+    let action = Action::Drop {
+        commit: oid(),
+        subject: "Oops".into(),
+        current: Some("main".into()),
+    };
+    let parent = format!("{HASH}^");
+    assert_eq!(
+        single(&action),
+        write(&["rebase", "--onto", &parent, "--", HASH])
+    );
+}
+
+#[test]
+fn reset_defaults_to_mixed_and_puts_the_commit_before_the_double_dash() {
+    // After a revision, `--` ends the revisions: `reset -- <commit>` would
+    // treat the commit as a path.
+    let mut action = Action::ResetCurrentTo {
+        commit: oid(),
+        subject: "s".into(),
+        current: "main".into(),
+        mode: ResetMode::default(),
+    };
+    assert_eq!(single(&action), write(&["reset", "--mixed", HASH, "--"]));
+    action
+        .set_input(InputId::Mode, InputValue::Text("hard".into()))
+        .unwrap();
+    assert_eq!(args(&action), ["reset", "--hard", HASH, "--"]);
+}
+
+#[test]
+fn copy_actions_plan_clipboard_text() {
+    let copy = |action: Action| action.plan(repo());
+    assert_eq!(
+        copy(Action::CopyBranchName {
+            name: "origin/main".into()
+        }),
+        Plan::Clipboard("origin/main".into())
+    );
+    assert_eq!(
+        copy(Action::CopyCommitHash { commit: oid() }),
+        Plan::Clipboard(HASH.into())
+    );
+    assert_eq!(
+        copy(Action::CopyCommitSubject {
+            subject: "Fix it".into()
+        }),
+        Plan::Clipboard("Fix it".into())
+    );
+}
+
+#[test]
+fn branch_filter_toggle_is_a_ui_effect() {
+    let action = Action::ToggleBranchFilter {
+        branch: "develop".into(),
+        selected: false,
+    };
+    assert_eq!(
+        action.plan(repo()),
+        Plan::Ui(UiEffect::ToggleBranchFilter {
+            branch: "develop".into()
+        })
+    );
+}
+
+#[test]
+fn user_input_never_becomes_an_option() {
+    // Validation rejects it, but even an unvalidated name stays after `--`.
+    let action = Action::DeleteBranch {
+        name: "--force".into(),
+        force: false,
+    };
+    assert_eq!(args(&action), ["branch", "--delete", "--", "--force"]);
+}
+
+// ---- destructive actions and confirmations (S13) ----
+
+fn delete(force: bool) -> Action {
+    Action::DeleteBranch {
+        name: "topic".into(),
+        force,
+    }
+}
+
+fn reset(mode: ResetMode) -> Action {
+    Action::ResetCurrentTo {
+        commit: oid(),
+        subject: "Add lib".into(),
+        current: "main".into(),
+        mode,
+    }
+}
+
+fn push(force_with_lease: bool) -> Action {
+    Action::PushBranch {
+        branch: "topic".into(),
+        remote: "origin".into(),
+        set_upstream: false,
+        force_with_lease,
+    }
+}
+
+#[test]
+fn destructive_actions() {
+    let destructive = [
+        delete(false),
+        delete(true),
+        reset(ResetMode::Hard),
+        push(true),
+        Action::Drop {
+            commit: oid(),
+            subject: "s".into(),
+            current: Some("main".into()),
+        },
+        Action::RebaseCurrentOnto {
+            onto: local("develop"),
+            current: Some("main".into()),
+        },
+    ];
+    for action in &destructive {
+        assert!(action.is_destructive(), "{action:?}");
+        assert!(action.confirmation().is_some(), "{action:?}");
+    }
+    for action in [
+        push(false),
+        reset(ResetMode::Mixed),
+        Action::CheckoutBranch {
+            name: "develop".into(),
+        },
+        Action::CheckoutCommit {
+            commit: oid(),
+            subject: "s".into(),
+        },
+    ] {
+        assert!(!action.is_destructive(), "{action:?}");
+    }
+}
+
+#[test]
+fn safe_actions_need_no_confirmation() {
+    for action in [
+        push(false),
+        Action::CheckoutBranch {
+            name: "develop".into(),
+        },
+        Action::CopyCommitHash { commit: oid() },
+    ] {
+        assert_eq!(action.confirmation(), None, "{action:?}");
+    }
+}
+
+fn message(action: &Action) -> String {
+    action.confirmation().unwrap().message
+}
+
+#[test]
+fn delete_confirmation_names_the_branch_and_the_risk() {
+    assert_eq!(
+        message(&delete(false)),
+        "Delete the local branch 'topic'? git refuses if it isn't fully merged."
+    );
+    assert_eq!(
+        message(&delete(true)),
+        "Force delete the local branch 'topic'? Commits that are only on this branch will be lost."
+    );
+}
+
+#[test]
+fn reset_confirmation_explains_each_mode() {
+    assert_eq!(
+        message(&reset(ResetMode::Soft)),
+        "Reset 'main' to commit 0123456 \"Add lib\" (soft)? Later commits leave 'main'; their changes stay staged."
+    );
+    assert_eq!(
+        message(&reset(ResetMode::Mixed)),
+        "Reset 'main' to commit 0123456 \"Add lib\" (mixed)? Later commits leave 'main'; their changes stay in the working tree, unstaged."
+    );
+    assert_eq!(
+        message(&reset(ResetMode::Hard)),
+        "Hard reset 'main' to commit 0123456 \"Add lib\"? Later commits leave 'main' and ALL uncommitted changes are discarded."
+    );
+}
+
+#[test]
+fn force_push_confirmation_mentions_the_lease() {
+    assert_eq!(
+        message(&push(true)),
+        "Force push 'topic' to 'origin'? Commits on origin/topic that aren't in your 'topic' will be overwritten. The push is refused if origin/topic changed since your last fetch (--force-with-lease)."
+    );
+}
+
+#[test]
+fn detached_checkout_confirmation_explains_detached_head() {
+    let action = Action::CheckoutCommit {
+        commit: oid(),
+        subject: "Fix".into(),
+    };
+    assert_eq!(
+        message(&action),
+        "Check out commit 0123456 \"Fix\"? HEAD will be detached: new commits won't belong to any branch until you create one."
+    );
+}
+
+#[test]
+fn drop_confirmation_says_history_is_rewritten() {
+    let action = Action::Drop {
+        commit: oid(),
+        subject: "Oops".into(),
+        current: Some("main".into()),
+    };
+    assert_eq!(
+        message(&action),
+        "Drop commit 0123456 \"Oops\" from 'main'? The commits after it are rebased onto its parent (git rebase --onto 0123456^ 0123456), which rewrites the history of 'main'."
+    );
+}
+
+#[test]
+fn rebase_confirmation_names_both_sides() {
+    let action = Action::RebaseCurrentOnto {
+        onto: Rev::Commit(oid()),
+        current: Some("main".into()),
+    };
+    assert_eq!(
+        message(&action),
+        "Rebase 'main' on commit 0123456? The commits of 'main' that aren't in commit 0123456 are rewritten on top of it."
+    );
+}
+
+// ---- inputs ----
+
+#[test]
+fn inputs_describe_what_each_dialog_asks() {
+    let ids = |action: Action| -> Vec<InputId> { action.inputs().iter().map(|i| i.id).collect() };
+    assert_eq!(
+        ids(Action::CreateBranch {
+            at: oid(),
+            name: String::new(),
+            checkout: false
+        }),
+        [InputId::Name, InputId::Checkout]
+    );
+    assert_eq!(
+        ids(Action::AddTag {
+            at: oid(),
+            name: String::new(),
+            message: String::new()
+        }),
+        [InputId::Name, InputId::Message]
+    );
+    assert_eq!(
+        ids(push(false)),
+        [
+            InputId::Remote,
+            InputId::SetUpstream,
+            InputId::ForceWithLease
+        ]
+    );
+    assert_eq!(ids(reset(ResetMode::Mixed)), [InputId::Mode]);
+    assert_eq!(ids(delete(false)), [InputId::Force]);
+    assert!(ids(Action::CheckoutBranch { name: "x".into() }).is_empty());
+}
+
+#[test]
+fn input_values_start_from_the_current_fields() {
+    let inputs = reset(ResetMode::Mixed).inputs();
+    assert_eq!(inputs[0].value, InputValue::Text("mixed".into()));
+}
+
+#[test]
+fn names_are_validated_when_set() {
+    let mut action = Action::CreateBranch {
+        at: oid(),
+        name: String::new(),
+        checkout: false,
+    };
+    assert_eq!(
+        action.set_input(InputId::Name, InputValue::Text("bad name".into())),
+        Err(InputError::InvalidName(RefNameError::Whitespace))
+    );
+    assert_eq!(
+        action.validate(),
+        Err(InputError::InvalidName(RefNameError::Empty))
+    );
+    action
+        .set_input(InputId::Name, InputValue::Text("good".into()))
+        .unwrap();
+    assert_eq!(action.validate(), Ok(()));
+}
+
+#[test]
+fn wrong_inputs_are_rejected() {
+    let mut action = reset(ResetMode::Mixed);
+    assert_eq!(
+        action.set_input(InputId::Mode, InputValue::Text("medium".into())),
+        Err(InputError::NotAChoice("medium".into()))
+    );
+    assert_eq!(
+        action.set_input(InputId::Mode, InputValue::Bool(true)),
+        Err(InputError::WrongType(InputId::Mode))
+    );
+    assert_eq!(
+        action.set_input(InputId::Name, InputValue::Text("x".into())),
+        Err(InputError::NotAnInput(InputId::Name))
+    );
+}
+
+#[test]
+fn archive_output_is_required() {
+    let mut action = Action::CreateArchive {
+        rev: local("main"),
+        output: "main.zip".into(),
+    };
+    assert_eq!(
+        action.set_input(InputId::Output, InputValue::Text("  ".into())),
+        Err(InputError::Required(InputId::Output))
+    );
+}

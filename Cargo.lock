@@ -1607,6 +1607,7 @@ name = "tgg-actions"
 version = "0.1.0"
 dependencies = [
  "pretty_assertions",
+ "tgg-git",
  "tgg-model",
  "tgg-testkit",
  "thiserror 2.0.21",
