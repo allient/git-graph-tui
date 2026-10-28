@@ -159,6 +159,8 @@ pub struct AppState {
     refreshing_head: Option<Oid>,
     /// Commit to keep selected across a refresh (None keeps the uncommitted row).
     keep_selected: Option<Oid>,
+    /// A commit to select once history paging reaches it (a parent jump).
+    jump_target: Option<Oid>,
 }
 
 impl AppState {
@@ -191,6 +193,7 @@ impl AppState {
             pending: HashMap::new(),
             refreshing_head: None,
             keep_selected: None,
+            jump_target: None,
         }
     }
 
@@ -525,7 +528,9 @@ impl AppState {
                     Ok(page) => self.on_log_page(skip, page),
                     Err(err) => self.message = Some(format!("Could not read git log: {err}")),
                 }
-                self.load_more_if_needed()
+                // A pending parent jump does its own paging.
+                self.continue_jump()
+                    .unwrap_or_else(|| self.load_more_if_needed())
             }
             (Request::Tag(name), Ok(out)) => {
                 self.on_tag_read(&name, &out.stdout);
@@ -535,7 +540,11 @@ impl AppState {
                 self.on_details_read(request, &out.stdout);
                 Vec::new()
             }
-            (_, Err(err)) => {
+            (request, Err(err)) => {
+                if matches!(request, Request::Log { .. }) {
+                    // Paging stopped: don't jump later, out of the blue.
+                    self.jump_target = None;
+                }
                 self.message = Some(format!("{} ({command})", err.user_message()));
                 Vec::new()
             }
@@ -667,6 +676,8 @@ mod action_tests;
 mod details_tests;
 #[cfg(test)]
 mod info_tests;
+#[cfg(test)]
+mod jump_tests;
 #[cfg(test)]
 mod mouse_tests;
 #[cfg(test)]
