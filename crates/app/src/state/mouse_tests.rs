@@ -38,7 +38,7 @@ fn labels(state: &AppState) -> Vec<String> {
                 .iter()
                 .filter_map(|item| match item {
                     MenuItem::Entry(e) => Some(e.label.clone()),
-                    MenuItem::Separator => None,
+                    MenuItem::Separator | MenuItem::Submenu { .. } => None,
                 })
                 .collect()
         })
