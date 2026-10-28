@@ -10,11 +10,13 @@
 //! Each command lives in its own module that owns both its arguments and its
 //! parser, so the output format and the code that reads it can't drift apart.
 //!
-//! This crate never touches the terminal and never spawns threads; the app
-//! decides where commands run.
+//! This crate never touches the terminal and never spawns threads: it
+//! defines the [`Executor`] trait, and the app provides the implementation
+//! that runs processes on its worker threads.
 
 mod command;
 mod error;
+mod exec;
 mod failure;
 pub mod log;
 pub mod refs;
@@ -23,6 +25,7 @@ pub mod status;
 
 pub use command::{CommandKind, GitCommand};
 pub use error::ParseError;
+pub use exec::{CancelToken, ExecError, Executor, Output};
 pub use failure::Failure;
 
 /// Field separator used in every `--format` string (ASCII unit separator).
