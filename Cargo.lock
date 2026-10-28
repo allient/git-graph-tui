@@ -1646,9 +1646,14 @@ dependencies = [
 name = "tgg-ui"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "pretty_assertions",
+ "ratatui",
+ "tgg-git",
  "tgg-graph",
  "tgg-model",
+ "tgg-testkit",
+ "unicode-width",
 ]
 
 [[package]]
