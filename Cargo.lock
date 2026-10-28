@@ -1648,6 +1648,7 @@ version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "tgg-graph",
+ "tgg-model",
 ]
 
 [[package]]
