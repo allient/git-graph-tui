@@ -13,6 +13,8 @@ use crate::state::{AppState, Command, DEFAULT_PAGE_SIZE, Event};
 pub struct Harness {
     pub state: AppState,
     pub screen: ratatui::buffer::Buffer,
+    /// Texts the app copied to the clipboard.
+    pub clipboard: Vec<String>,
     pub runner: Runner<ProcessExecutor>,
     pub results: Receiver<JobResult>,
 }
@@ -32,6 +34,7 @@ impl Harness {
             runner,
             results,
             screen: ratatui::buffer::Buffer::empty(ratatui::layout::Rect::default()),
+            clipboard: Vec::new(),
         };
         let commands = h.state.update(Event::Refresh);
         h.settle(commands);
@@ -41,9 +44,17 @@ impl Harness {
     pub fn settle(&mut self, mut commands: Vec<Command>) {
         loop {
             for command in commands.drain(..) {
-                let Command::Git(request) = command;
-                let job = self.runner.submit(request.command(&self.state.repo));
-                self.state.track(&job, request);
+                match command {
+                    Command::Git(request) => {
+                        let job = self.runner.submit(request.command(&self.state.repo));
+                        self.state.track(&job, request);
+                    }
+                    Command::Run(git) => {
+                        let job = self.runner.submit(git);
+                        self.state.track_action(&job);
+                    }
+                    Command::Clipboard(text) => self.clipboard.push(text),
+                }
             }
             if !self.state.is_loading() {
                 return;

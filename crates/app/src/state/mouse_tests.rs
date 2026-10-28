@@ -186,8 +186,10 @@ fn keys_go_to_the_open_menu() {
     );
     h.key(KeyCode::Enter);
     assert!(h.state.menu.is_none(), "choosing closes the menu");
-    let message = h.state.message.clone().unwrap_or_default();
-    assert!(message.contains("Create Branch"), "{message}");
+    assert!(
+        matches!(h.state.dialog, Some(Dialog::Input { .. })),
+        "Create Branch asks for a name"
+    );
 }
 
 #[test]
@@ -210,13 +212,8 @@ fn clicking_a_menu_item_chooses_it() {
     let (x, item_y) = find(&h, "Copy Commit Hash to Clipboard");
     click(&mut h, MouseButton::Left, x, item_y);
     assert!(h.state.menu.is_none());
-    assert!(
-        h.state
-            .message
-            .as_deref()
-            .unwrap_or_default()
-            .contains("Copy Commit Hash")
-    );
+    let hash = repo.git(&["log", "--all", "--format=%H", "--grep=Update docs"]);
+    assert_eq!(h.clipboard, vec![hash], "the chosen action ran");
 }
 
 #[test]

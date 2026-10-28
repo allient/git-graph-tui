@@ -1,6 +1,7 @@
 //! `tui-git-graph`: a Git Graph for the terminal.
 
 mod cli;
+mod clipboard;
 mod git;
 mod state;
 #[cfg(test)]
@@ -61,9 +62,22 @@ fn run(terminal: &mut DefaultTerminal, repo: PathBuf) -> Result<()> {
 
 /// Applies an event and starts the git requests it produces.
 fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event) {
-    for Command::Git(request) in state.update(event) {
-        let job = runner.submit(request.command(&state.repo));
-        state.track(&job, request);
+    for command in state.update(event) {
+        match command {
+            Command::Git(request) => {
+                let job = runner.submit(request.command(&state.repo));
+                state.track(&job, request);
+            }
+            Command::Run(git) => {
+                let job = runner.submit(git);
+                state.track_action(&job);
+            }
+            Command::Clipboard(text) => {
+                if let Err(err) = clipboard::copy(&text) {
+                    state.message = Some(format!("Could not copy to the clipboard: {err}"));
+                }
+            }
+        }
     }
 }
 
