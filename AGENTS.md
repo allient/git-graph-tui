@@ -21,7 +21,7 @@ Guidance for AI agents (and humans) working on **tui-git-graph**, a standalone t
 See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `tgg-` except the binary `tui-git-graph`.
 
 Workspace rules:
-- **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`.
+- **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`. **Never use `cargo remove`**: it also deletes the dependency from root `[workspace.dependencies]` when no member uses it anymore, which drops planned catalog entries. Remove a dependency by editing the member's `Cargo.toml` by hand.
 - **Shared metadata and lints** come from `[workspace.package]` and `[workspace.lints]` (`lints.workspace = true` in every member). Don't override lints per crate; use `#[expect(clippy::..., reason = "...")]` locally when justified.
 - **Dependency direction is one-way** (see the table). A new crate needs a clear responsibility and a place in that order; never add a cycle or a dependency from a lower crate to a higher one.
 - `Cargo.lock` is committed (this is an application). CI builds with `--locked`.

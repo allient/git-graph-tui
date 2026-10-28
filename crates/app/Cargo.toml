@@ -24,8 +24,12 @@ crossbeam-channel.workspace = true
 crossterm.workspace = true
 ratatui.workspace = true
 tgg-git.workspace = true
+tgg-graph.workspace = true
+tgg-model.workspace = true
+tgg-ui.workspace = true
 
 [dev-dependencies]
+insta.workspace = true
 pretty_assertions.workspace = true
 tempfile.workspace = true
 tgg-testkit.workspace = true
