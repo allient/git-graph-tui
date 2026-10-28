@@ -1620,6 +1620,11 @@ dependencies = [
 [[package]]
 name = "tgg-graph"
 version = "0.1.0"
+dependencies = [
+ "insta",
+ "pretty_assertions",
+ "tgg-model",
+]
 
 [[package]]
 name = "tgg-model"
