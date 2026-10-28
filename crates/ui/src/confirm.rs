@@ -214,7 +214,7 @@ impl ConfirmDialog {
             ),
             (Button::Cancel, "Cancel", text),
         ];
-        hits.buttons = draw_buttons(buf, area, y, &buttons, self.focus, theme);
+        hits.buttons = draw_buttons(buf, area, y, &buttons, Some(self.focus), theme);
         hits
     }
 }
@@ -256,13 +256,13 @@ pub(crate) fn draw_frame(buf: &mut Buffer, area: Rect, title: &str, style: Style
 }
 
 /// Draws `[ label ]` buttons right-aligned on row `y`, highlighting `focus`,
-/// and returns where each one landed.
+/// (if any), and returns where each one landed.
 pub(crate) fn draw_buttons<B: Copy + PartialEq>(
     buf: &mut Buffer,
     area: Rect,
     y: u16,
     buttons: &[(B, &str, Style)],
-    focus: B,
+    focus: Option<B>,
     theme: &Theme,
 ) -> Vec<(Rect, B)> {
     let labels: Vec<String> = buttons
@@ -286,7 +286,7 @@ pub(crate) fn draw_buttons<B: Copy + PartialEq>(
         if x + width > area.right() - 1 {
             break;
         }
-        let style = if *id == focus {
+        let style = if Some(*id) == focus {
             style.bg(theme.selected_bg)
         } else {
             *style

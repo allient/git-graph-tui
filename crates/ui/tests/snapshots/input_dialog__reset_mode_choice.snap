@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 10)"
+---
+
+  ┌ Reset ───────────────────────────────────────────────────┐
+  │                                                          │
+  │ Mode                                                     │
+  │ < mixed >                                                │
+  │                                                          │
+  │                                                          │
+  │                                     [ Reset ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘
