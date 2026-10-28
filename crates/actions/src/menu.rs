@@ -1,4 +1,9 @@
-use crate::{Action, CommitTarget, MenuContext, ResetMode, Rev, Target};
+use tgg_model::Stash;
+
+use crate::{
+    Action, CommitTarget, MenuContext, ResetMode, Rev, StashAction, TagAction, Target,
+    WorkingTreeAction,
+};
 
 /// One row of a context menu.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,17 +40,18 @@ impl MenuEntry {
 }
 
 /// Builds the context menu for `target`, in the order of VS Code Git Graph
-/// (S8, S9). Entries that can't apply are left out rather than disabled,
-/// except Drop, which explains why it isn't possible.
-///
-/// Tags, stashes and the uncommitted row have no menu yet (not part of S8/S9).
+/// (S8, S9 and its tag, stash and uncommitted-changes menus). Entries that
+/// can't apply are left out rather than disabled, except Drop, which
+/// explains why it isn't possible.
 #[must_use]
 pub fn menu_for(target: &Target, ctx: &MenuContext) -> Vec<MenuItem> {
     let items = match target {
         Target::LocalBranch { name, .. } => local_branch_menu(name, ctx),
         Target::RemoteBranch { remote, branch, .. } => remote_branch_menu(remote, branch, ctx),
         Target::Commit(commit) => commit_menu(commit, ctx),
-        Target::Tag { .. } | Target::Stash(_) | Target::Uncommitted => Vec::new(),
+        Target::Tag { name, .. } => tag_menu(name, ctx),
+        Target::Stash(stash) => stash_menu(stash),
+        Target::Uncommitted => uncommitted_menu(),
     };
     tidy(items)
 }
@@ -256,6 +262,116 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
             Action::CopyCommitSubject {
                 subject: subject.clone(),
             },
+        ),
+    ]
+}
+
+fn tag_menu(name: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let tag = |action| Action::Tag(action);
+    vec![
+        entry(
+            "View Details",
+            tag(TagAction::ShowDetails {
+                name: name.to_owned(),
+            }),
+        ),
+        entry(
+            "Delete Tag...",
+            tag(TagAction::Delete {
+                name: name.to_owned(),
+                remote: ctx.default_remote().map(str::to_owned),
+                on_remote: false,
+            }),
+        ),
+        ctx.default_remote().and_then(|remote| {
+            entry(
+                "Push Tag...",
+                tag(TagAction::Push {
+                    name: name.to_owned(),
+                    remote: remote.to_owned(),
+                }),
+            )
+        }),
+        Some(MenuItem::Separator),
+        entry("Create Archive", archive(Rev::Tag(name.to_owned()), name)),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Tag Name to Clipboard",
+            tag(TagAction::CopyName {
+                name: name.to_owned(),
+            }),
+        ),
+    ]
+}
+
+fn stash_menu(stash: &Stash) -> Vec<Option<MenuItem>> {
+    let action = |action| Action::Stash(action);
+    vec![
+        entry(
+            "Apply Stash...",
+            action(StashAction::Apply {
+                stash: stash.clone(),
+                reinstate_index: false,
+            }),
+        ),
+        entry(
+            "Create Branch from Stash...",
+            action(StashAction::CreateBranch {
+                stash: stash.clone(),
+                name: String::new(),
+            }),
+        ),
+        entry(
+            "Pop Stash...",
+            action(StashAction::Pop {
+                stash: stash.clone(),
+                reinstate_index: false,
+            }),
+        ),
+        entry(
+            "Drop Stash...",
+            action(StashAction::Drop {
+                stash: stash.clone(),
+            }),
+        ),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Stash Name to Clipboard",
+            action(StashAction::CopyName {
+                stash: stash.clone(),
+            }),
+        ),
+        entry(
+            "Copy Stash Hash to Clipboard",
+            Action::CopyCommitHash {
+                commit: stash.id.clone(),
+            },
+        ),
+    ]
+}
+
+fn uncommitted_menu() -> Vec<Option<MenuItem>> {
+    let action = |action| Action::WorkingTree(action);
+    vec![
+        entry(
+            "Stash uncommitted changes...",
+            action(WorkingTreeAction::Stash {
+                message: String::new(),
+                include_untracked: true,
+            }),
+        ),
+        Some(MenuItem::Separator),
+        entry(
+            "Reset uncommitted changes...",
+            action(WorkingTreeAction::Reset {
+                mode: ResetMode::Mixed,
+            }),
+        ),
+        entry("Clean untracked files...", action(WorkingTreeAction::Clean)),
+        Some(MenuItem::Separator),
+        entry(
+            "Open Source Control View",
+            action(WorkingTreeAction::OpenSourceControl),
         ),
     ]
 }
