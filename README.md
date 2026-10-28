@@ -140,9 +140,43 @@ input (key/mouse) ─▶ Event ─▶ update(state) ─▶ Command ─▶ runner
 - **Lane layout is incremental.** Loading more commits never changes rows already shown.
 - **Actions are data.** Each action declares its git argv, whether it is destructive, its confirmation text and what to refresh. Menus are built from the selected target (commit, branch, tag, stash, uncommitted row), so the same action list drives mouse menus, keyboard menus and tests.
 
-## Development
+## Running it
 
-Requires Rust (the toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it automatically) and `git`.
+There are no release binaries yet; run it from a clone. Requires Rust (the toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it automatically) and `git`.
+
+```sh
+git clone https://github.com/allient/tui-git-graph.git
+cd tui-git-graph
+
+cargo run                          # dev build, opens the repository you are in (this one)
+cargo run -- ~/code/my-project     # dev build, opens another repository (any path inside it works)
+cargo run --release -- ~/code/my-project   # optimized build: faster on large histories
+```
+
+Everything after `--` goes to the app. The first build takes a minute or two; later runs start right away. Outside a git repository it exits with an error.
+
+To have the command on your `PATH` (installs to `~/.cargo/bin`):
+
+```sh
+cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
+```
+
+### Keys and mouse
+
+| Key / mouse | Does |
+| --- | --- |
+| `j` `k` / arrows, `PgUp` `PgDn`, `g` `G` | Move the selection (top, bottom) |
+| `H` | Jump to the HEAD commit |
+| `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file and `Enter` opens its diff |
+| `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
+| `Tab` | Move to the toolbar (branch filter, Show Remote Branches, Refresh, Fetch, `...` repository menu); arrows move, `Enter` presses |
+| `r` | Refresh |
+| `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
+| `q` | Quit (closes the diff first when one is open) |
+
+Push, pull and fetch never prompt for a password: use SSH keys or a git credential helper. Without one, the command fails and the status bar shows git's error.
+
+## Development
 
 ```sh
 cargo run-app            # run the TUI (alias for `cargo run -p tui-git-graph --`)
