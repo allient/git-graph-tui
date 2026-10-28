@@ -1656,6 +1656,7 @@ dependencies = [
  "insta",
  "pretty_assertions",
  "ratatui",
+ "tgg-actions",
  "tgg-git",
  "tgg-graph",
  "tgg-model",
