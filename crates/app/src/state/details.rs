@@ -8,7 +8,7 @@ use tgg_ui::{
     DiffView, Key,
 };
 
-use super::{AppState, Command, Request, SCROLL_LINES, actions::widget_key};
+use super::{AppState, Command, Job, Request, SCROLL_LINES, actions::widget_key};
 
 /// The details of one commit, filled in as its two reads arrive.
 #[derive(Debug)]
@@ -114,7 +114,7 @@ impl AppState {
         Some(self.on_details_outcome(outcome))
     }
 
-    fn on_details_outcome(&mut self, outcome: DetailsOutcome) -> Vec<Command> {
+    pub(super) fn on_details_outcome(&mut self, outcome: DetailsOutcome) -> Vec<Command> {
         match outcome {
             DetailsOutcome::Stay => Vec::new(),
             DetailsOutcome::Close => {
@@ -126,17 +126,39 @@ impl AppState {
                 None => Vec::new(),
             },
             DetailsOutcome::JumpTo(id) => {
-                if let Some(index) = self.commits.iter().position(|c| c.id == id) {
-                    self.select(index + usize::from(!self.status.is_clean()));
-                    return self.open_details(id);
-                }
-                self.message = Some(format!(
-                    "{} is not loaded yet; scroll down to load older commits.",
-                    id.short(8)
-                ));
-                Vec::new()
+                self.jump_target = Some(id);
+                self.continue_jump().unwrap_or_default()
             }
         }
+    }
+
+    /// Moves a pending jump forward: selects the target and opens its
+    /// details once it is loaded, otherwise asks for the next history page
+    /// (S10: a parent can be older than everything loaded so far). Returns
+    /// None when no jump is pending, so the caller does its usual paging.
+    pub(super) fn continue_jump(&mut self) -> Option<Vec<Command>> {
+        let id = self.jump_target.clone()?;
+        if let Some(index) = self.commits.iter().position(|c| c.id == id) {
+            self.jump_target = None;
+            self.message = None;
+            self.select(index + usize::from(!self.status.is_clean()));
+            return Some(self.open_details(id));
+        }
+        if self.history_complete {
+            self.jump_target = None;
+            self.message = Some(format!("{} is not in the loaded history.", id.short(8)));
+            return Some(Vec::new());
+        }
+        self.message = Some(format!("Loading older commits to find {}…", id.short(8)));
+        let loading_log = self
+            .pending
+            .values()
+            .any(|(job, _)| matches!(job, Job::Read(Request::Log { .. })));
+        Some(if loading_log {
+            Vec::new()
+        } else {
+            vec![self.log_request(self.commits.len())]
+        })
     }
 
     /// Applies a details read. Results for a panel that has since closed or
