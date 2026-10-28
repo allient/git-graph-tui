@@ -1,0 +1,11 @@
+---
+source: crates/graph/tests/layout.rs
+expression: "describe(&c, &rows)"
+---
+9 lane=0 color=0 top=[] bottom=[0>0:0 0>1:1]
+7 lane=1 color=1 top=[0>0:0 1>1:1] bottom=[0>0:0 1>1:1]
+8 lane=0 color=0 top=[0>0:0 1>1:1] bottom=[0>0:0 1>1:1]
+6 lane=0 color=0 top=[0>0:0 1>0:1] bottom=[0>0:0]
+5 lane=0 color=0 top=[0>0:0] bottom=[0>0:0]
+4 lane=0 color=0 top=[0>0:0] bottom=[0>0:0]
+3 lane=0 color=0 top=[0>0:0] bottom=[]
