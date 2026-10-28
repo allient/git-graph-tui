@@ -1,0 +1,18 @@
+---
+source: crates/ui/tests/confirm.rs
+expression: "render(&action, 34, 14)"
+---
+..................................
+..................................
+┌ Checkout Commit ───────────────┐
+│                                │
+│ Check out commit 0123456 "Fix  │
+│ the login page"? HEAD will be  │
+│ detached: new commits won't    │
+│ belong to any branch until you │
+│ create one.                    │
+│                                │
+│        [ Checkout ] [ Cancel ] │
+└────────────────────────────────┘
+..................................
+..................................

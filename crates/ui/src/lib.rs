@@ -21,3 +21,7 @@ mod menu;
 
 pub use key::Key;
 pub use menu::{MenuHit, MenuHitMap, MenuOutcome, PopupMenu};
+mod confirm;
+pub use confirm::{
+    Button, ConfirmDialog, DialogHit, DialogHitMap, DialogOutcome, DialogStyle, MAX_WIDTH,
+};
