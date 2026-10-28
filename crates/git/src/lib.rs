@@ -13,13 +13,17 @@
 //! This crate never touches the terminal and never spawns threads; the app
 //! decides where commands run.
 
+mod command;
 mod error;
+mod failure;
 pub mod log;
 pub mod refs;
 pub mod stash;
 pub mod status;
 
+pub use command::{CommandKind, GitCommand};
 pub use error::ParseError;
+pub use failure::Failure;
 
 /// Field separator used in every `--format` string (ASCII unit separator).
 pub(crate) const FIELD_SEP: char = '\u{1f}';
