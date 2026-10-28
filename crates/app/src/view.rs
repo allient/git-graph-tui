@@ -63,6 +63,9 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     if let Some(menu) = &state.menu {
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
     }
+    if let Some(info) = &state.info {
+        crate::panels::draw_info(frame, screen, info, theme);
+    }
     match &state.dialog {
         Some(Dialog::Input { view, .. }) => {
             let hits = view.render(screen, frame.buffer_mut(), theme);

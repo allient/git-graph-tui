@@ -3,6 +3,7 @@
 mod cli;
 mod clipboard;
 mod git;
+mod panels;
 mod state;
 #[cfg(test)]
 mod testing;

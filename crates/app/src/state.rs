@@ -20,10 +20,12 @@ use crate::git::{JobHandle, JobId, JobResult};
 
 mod actions;
 mod details;
+mod info;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
 pub use details::{Details, DiffPanel};
+pub use info::Info;
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
@@ -76,6 +78,8 @@ pub enum Request {
     Files(Oid),
     /// The diff of one file in a commit.
     Diff(Oid, FileChange),
+    /// A tag's target and annotation, for its info dialog.
+    Tag(String),
 }
 
 impl Request {
@@ -95,6 +99,7 @@ impl Request {
             Self::Details(id) => GitCommand::read(repo, show::details_args(id)),
             Self::Files(id) => GitCommand::read(repo, show::files_args(id)),
             Self::Diff(id, file) => GitCommand::read(repo, show::diff_args(id, file)),
+            Self::Tag(name) => GitCommand::read(repo, tgg_git::tag::args(name)),
         }
     }
 
@@ -140,6 +145,8 @@ pub struct AppState {
     pub details: Option<Details>,
     /// The diff view, drawn over the whole screen.
     pub diff: Option<DiffPanel>,
+    /// A read-only info dialog (tag details), above everything but dialogs.
+    pub info: Option<Info>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -171,6 +178,7 @@ impl AppState {
             dialog_hits: None,
             details: None,
             diff: None,
+            info: None,
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -250,6 +258,9 @@ impl AppState {
         if self.dialog.is_some() {
             return self.on_dialog_key(key);
         }
+        if self.info.is_some() {
+            return self.on_info_key(key);
+        }
         if self.menu.is_some() {
             return match menu_key(key) {
                 Some(key) => self.on_menu_outcome(|menu| menu.handle_key(key)),
@@ -303,6 +314,9 @@ impl AppState {
                 MouseEventKind::Down(MouseButton::Left) => self.on_dialog_click(x, y),
                 _ => Vec::new(),
             };
+        }
+        if self.info.is_some() {
+            return self.on_info_mouse(mouse);
         }
         if self.menu.is_some() {
             let Some(hits) = self.menu_hits.clone() else {
@@ -499,6 +513,10 @@ impl AppState {
                 }
                 self.load_more_if_needed()
             }
+            (Request::Tag(name), Ok(out)) => {
+                self.on_tag_read(&name, &out.stdout);
+                Vec::new()
+            }
             (request @ (Request::Details(_) | Request::Files(_) | Request::Diff(..)), Ok(out)) => {
                 self.on_details_read(request, &out.stdout);
                 Vec::new()
@@ -633,6 +651,8 @@ fn menu_key(key: KeyEvent) -> Option<Key> {
 mod action_tests;
 #[cfg(test)]
 mod details_tests;
+#[cfg(test)]
+mod info_tests;
 #[cfg(test)]
 mod mouse_tests;
 #[cfg(test)]

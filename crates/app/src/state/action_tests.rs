@@ -196,9 +196,13 @@ fn ui_only_actions_show_a_hint_and_run_no_git() {
 
     let mut h = open(&repo);
     choose(&mut h, "v0.1.0", "View Details");
-    let message = h.state.message.clone().unwrap_or_default();
-    assert!(message.contains("v0.1.0"), "{message}");
+    // A read, not an action: the tag info dialog opens (see info_tests).
+    assert_eq!(
+        h.state.info.as_ref().map(|i| i.title.as_str()),
+        Some("Tag v0.1.0")
+    );
     assert!(h.state.running.is_none());
+    press(&mut h, KeyCode::Esc);
 
     choose(&mut h, "Uncommitted Changes", "Open Source Control View");
     let message = h.state.message.clone().unwrap_or_default();
