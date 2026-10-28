@@ -60,6 +60,10 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         block.render(graph_area, frame.buffer_mut());
         diff.hits = Some(diff.view.render(inner, frame.buffer_mut(), theme));
     }
+    if let Some(view) = &mut state.output_view {
+        view.page =
+            crate::panels::draw_output(frame, graph_area, &state.git_output, view.offset, theme);
+    }
     if let Some(menu) = &state.menu {
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
     }

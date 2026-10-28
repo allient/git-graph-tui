@@ -3,12 +3,12 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
 use tgg_ui::Theme;
 
-use crate::state::Info;
+use crate::state::{GitOutput, Info, OutputLine};
 
 /// Widest the info dialog gets.
 const INFO_WIDTH: u16 = 72;
@@ -36,4 +36,54 @@ pub fn draw_info(frame: &mut Frame<'_>, screen: Rect, info: &Info, theme: &Theme
         .block(block)
         .wrap(Wrap { trim: false })
         .render(area, frame.buffer_mut());
+}
+
+/// The git output view over `area`; returns the rows it shows per page.
+pub fn draw_output(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    output: &GitOutput,
+    offset: usize,
+    theme: &Theme,
+) -> usize {
+    Clear.render(area, frame.buffer_mut());
+    let block = Block::bordered().title(" git output · esc closes ");
+    let inner = block.inner(area);
+    block.render(area, frame.buffer_mut());
+    let page = usize::from(inner.height);
+    let lines = output.lines();
+    let offset = offset.min(lines.len().saturating_sub(page.max(1)));
+    let text: Vec<Line<'_>> = lines
+        .into_iter()
+        .skip(offset)
+        .take(page)
+        .map(|line| match line {
+            OutputLine::Command { command, status } => {
+                let ok = status == "ok";
+                let mark = if ok {
+                    "✓".to_owned()
+                } else {
+                    format!("✗ {status}")
+                };
+                Line::from(vec![
+                    Span::styled(
+                        format!("$ {command}"),
+                        Style::new().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(
+                        mark,
+                        Style::new().fg(if ok { theme.lane(2) } else { theme.lane(5) }),
+                    ),
+                ])
+            }
+            OutputLine::Stdout(text) => Line::from(format!("  {text}")),
+            OutputLine::Stderr(text) => {
+                Line::styled(format!("  {text}"), Style::new().fg(theme.muted))
+            }
+            OutputLine::Note(text) => Line::styled(text, Style::new().fg(theme.muted)),
+        })
+        .collect();
+    Paragraph::new(text).render(inner, frame.buffer_mut());
+    page
 }
