@@ -11,3 +11,11 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+tgg-model.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tgg-testkit.workspace = true

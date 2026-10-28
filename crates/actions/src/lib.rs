@@ -6,3 +6,9 @@
 //! Context menus are built from the selected target (commit, branch, tag,
 //! stash, uncommitted changes), so mouse menus, keyboard menus and tests all
 //! share one source of truth.
+
+mod refname;
+mod target;
+
+pub use refname::{RefNameError, validate_ref_name};
+pub use target::{CommitTarget, MenuContext, Target};

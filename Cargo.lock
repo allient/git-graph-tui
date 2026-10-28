@@ -1605,6 +1605,12 @@ dependencies = [
 [[package]]
 name = "tgg-actions"
 version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "tgg-model",
+ "tgg-testkit",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "tgg-git"
