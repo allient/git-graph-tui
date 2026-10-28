@@ -5,6 +5,8 @@
 //! produces a hit-map (screen cell to target), which the app uses to resolve
 //! mouse clicks and right-clicks against exactly what was drawn.
 
+mod badges;
 mod glyphs;
 
+pub use badges::{Badge, BadgeKind, badges_for};
 pub use glyphs::{GlyphCell, lane_glyphs};
