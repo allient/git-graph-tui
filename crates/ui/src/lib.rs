@@ -33,3 +33,5 @@ pub use confirm::{
 };
 mod input_dialog;
 pub use input_dialog::{Focus, InputDialog, InputHit, InputHitMap, InputOutcome, TextField};
+mod toolbar;
+pub use toolbar::{Toolbar, ToolbarButton, ToolbarHitMap, ToolbarOutcome, filter_summary};
