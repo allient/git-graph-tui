@@ -21,3 +21,7 @@ mod menu;
 
 pub use key::Key;
 pub use menu::{MenuHit, MenuHitMap, MenuOutcome, PopupMenu};
+mod details;
+pub use details::{
+    CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, TreeRow, file_label,
+};

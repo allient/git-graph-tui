@@ -169,8 +169,8 @@ impl PopupMenu {
         match key {
             Key::Up | Key::BackTab => self.select_prev(),
             Key::Down | Key::Tab => self.select_next(),
-            Key::Home => self.select_first(),
-            Key::End => self.select_last(),
+            Key::Home | Key::PageUp => self.select_first(),
+            Key::End | Key::PageDown => self.select_last(),
             Key::Char(letter) => {
                 self.jump_to_letter(letter);
             }

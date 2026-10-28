@@ -11,6 +11,8 @@ pub enum Key {
     Right,
     Home,
     End,
+    PageUp,
+    PageDown,
     Enter,
     Esc,
     Tab,
