@@ -48,7 +48,7 @@ Colored commit graph TUI (Rust + ratatui) with VS Code Git Graph-style context m
 
 | ID | Task | Specs | Route | Status | Commit |
 | --- | --- | --- | --- | --- | --- |
-| T1 | Cargo workspace (`crates/core`, `crates/app`), lints, CI (fmt, clippy, nextest) | — | inline | open | |
+| T1 | Cargo workspace (7 crates), toolchain, lints, deny, nextest, CI | — | inline | done | (this branch) |
 | T2 | Fixture repo builders for tests (branches, merges, tags, stash, bare `origin`) | all | inline | open | |
 | T3 | Git command layer: repo discovery, safe argv, runner on worker threads, timeouts, cancel, stale-result guard | S1, S12 | inline | open | |
 | T4 | Parsers: log (`%x1f` + NUL), refs, status, stash | S3, S5, S6 | inline | open | |
@@ -71,3 +71,4 @@ Colored commit graph TUI (Rust + ratatui) with VS Code Git Graph-style context m
 - **L4** Spike: on v1.9.0, `--plugin FILE` grants every permission *except* `system.exec` and ignores the manifest. E2E tests must install the plugin into a temp `TTT_CONFIG_DIR/plugins/` with a pre-approved `plugins.ttt.json` (same as `ttt-pdf/tests/run.sh`).
 - **L5** S11 vs the README non-goal: the repository menu covers git operations (pull, push, fetch, checkout, branch, remote, stash, tags). Staging and committing stay out of scope (README non-goal).
 - **L6** Pivot (2026-10-28): the project moved from a TTT Lua plugin to a standalone native TUI, **Rust + ratatui + crossterm**, calling the `git` CLI. Reasons: L3 (no panel-relative mouse coordinates in TTT plugins), the table widget limits (L2), the slow Lua 5.1 interpreter, the awkward headless testing (L4), and independence from a young plugin API. herdr and TTT become thin launchers in `integrations/`. The repo was renamed `ttt-git-graph` → `tui-git-graph`. L2–L4 are kept as history. Specs S1–S14 are unchanged, except that S1, S4, S10 and S13 no longer mention TTT.
+- **L7** T1 done: workspace `crates/{model,git,graph,actions,ui,app,testkit}`, dependency catalog in root `[workspace.dependencies]`, pedantic workspace lints, rust-toolchain 1.95 (MSRV 1.88), cargo-deny, nextest, CI (fmt, clippy, machete, tests on Linux + macOS, MSRV, deny). Evidence: `cargo fmt --check`, `cargo lint`, `cargo t` (3 passed), `cargo machete`, `cargo deny check`, and `cargo +1.88 check` all pass locally.

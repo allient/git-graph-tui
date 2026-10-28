@@ -9,8 +9,8 @@ Guidance for AI agents (and humans) working on **tui-git-graph**, a standalone t
 ## 1. Ground rules
 
 - **The only runtime dependency is the `git` CLI.** No libgit2, no editor or multiplexer APIs. herdr and TTT are integrations that launch the binary (`integrations/`). They must never become dependencies of the core or app crates.
-- **Pure core, thin shell.** `crates/core` has no terminal, no threads, no I/O except running git through a trait. Everything that can be a pure function (parsing, lane layout, filtering, search, menu building, action planning) lives there and is unit-tested.
-- **One source of truth.** `AppState` in `crates/app/state` is the only mutable UI state. Input becomes an `Event`, `update(state, event)` changes state and returns `Command`s, and `render(&state)` draws. No widget owns hidden state that affects behavior.
+- **Pure core, thin shell.** The library crates (`tgg-model`, `tgg-git`, `tgg-graph`, `tgg-actions`) have no terminal and no threads; `tgg-git` runs git only through a trait. Everything that can be a pure function (parsing, lane layout, filtering, search, menu building, action planning) lives in those crates and is unit-tested.
+- **One source of truth.** `AppState` in the binary crate (`crates/app`) is the only mutable UI state. Input becomes an `Event`, `update(state, event)` changes state and returns `Command`s, and `render(&state)` draws. No widget owns hidden state that affects behavior.
 - **Never block the UI thread.** Every git call runs on a worker thread through the runner, with a timeout and cancellation. Results come back as `Event::GitResult` tagged with a generation id; stale results are dropped.
 - **Ask before** adding a dependency that pulls a large tree (async runtimes, libgit2, web stacks), changing the CLI surface, or touching release/distribution config.
 
@@ -18,19 +18,17 @@ Guidance for AI agents (and humans) working on **tui-git-graph**, a standalone t
 
 ## 2. Workspace layout
 
-```
-Cargo.toml              # workspace; shared lints, MSRV, profiles
-crates/core/            # lib: git argv + parsers, model, graph layout, actions
-crates/app/             # bin `tui-git-graph`: runner, state, ui, input
-integrations/herdr/     # herdr-plugin.toml (+ scripts)
-integrations/ttt/       # plugin.ttt.json + init.lua that opens the binary in a terminal tab
-tests/fixtures/         # scripts that build fixture repos in temp dirs
-odd/tasks/              # ODD feature documents (specs + tasks + log)
-docs/                   # tooling and design docs
-```
+See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `tgg-` except the binary `tui-git-graph`.
+
+Workspace rules:
+- **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`.
+- **Shared metadata and lints** come from `[workspace.package]` and `[workspace.lints]` (`lints.workspace = true` in every member). Don't override lints per crate; use `#[expect(clippy::..., reason = "...")]` locally when justified.
+- **Dependency direction is one-way** (see the table). A new crate needs a clear responsibility and a place in that order; never add a cycle or a dependency from a lower crate to a higher one.
+- `Cargo.lock` is committed (this is an application). CI builds with `--locked`.
+- MSRV is 1.88 (`rust-version`), checked in CI. Raising it is a deliberate change.
 
 Module rules:
-- `core` never depends on `app`, ratatui or crossterm.
+- `tgg-model`, `tgg-git`, `tgg-graph` and `tgg-actions` never depend on ratatui or crossterm.
 - `app/ui` only reads state and produces frames plus a **hit-map** (cell → target). It never runs git.
 - `app/input` turns crossterm events into `Event`s using the last frame's hit-map. Mouse coordinates are terminal-absolute, and we own the layout, so hit-testing is exact.
 
@@ -87,7 +85,7 @@ Module rules:
 ## 7. Code style
 
 - Rust stable, 2024 edition. `cargo fmt` and `cargo clippy --all-targets -- -D warnings` must pass. `cargo deny check` for licenses and advisories.
-- No `unwrap()` / `expect()` outside tests and truly impossible states (comment why). `thiserror` errors in `core`, `anyhow` with context in `app`.
+- No `unwrap()` / `expect()` outside tests and truly impossible states (comment why). `thiserror` errors in library crates, `anyhow` with context in the binary.
 - Small modules, explicit types at boundaries, no global mutable state. Prefer enums plus `match` for events, commands and actions.
 - Comments explain *why* (git quirks, terminal quirks), not *what*.
 - **No code copied from vscode-git-graph** (its license forbids it). Studying behavior is fine. git-graph, git-igitt and serie (MIT) and git-graph-plus (Apache-2.0) can be read for ideas; credit anything substantial that is adapted.
@@ -101,7 +99,7 @@ This repo is developed with **[Gentle AI](https://github.com/Gentleman-Programmi
 - Substantial work gets one feature document in `odd/tasks/<feature-name>.md`, one per README roadmap stage or large checklist item. Commit it.
 - ODD's test-first step uses **`cargo nextest`** (+ `insta`) with fixture repos. Never invent another runner.
 - Commit in about 400-line work units on a feature branch with Conventional Commits. Use the `chained-pr` skill for larger changes.
-- Before saying a change is done, run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo nextest run`.
+- Before saying a change is done, run `cargo fmt --all --check`, `cargo lint`, `cargo t` and `cargo machete` (and `cargo deny check` when dependencies change).
 
 ---
 
