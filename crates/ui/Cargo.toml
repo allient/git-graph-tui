@@ -11,3 +11,9 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+tgg-graph.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
