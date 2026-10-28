@@ -31,3 +31,4 @@ pub use failure::Failure;
 /// Field separator used in every `--format` string (ASCII unit separator).
 pub(crate) const FIELD_SEP: char = '\u{1f}';
 pub mod show;
+pub mod tag;
