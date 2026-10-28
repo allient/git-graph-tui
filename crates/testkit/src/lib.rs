@@ -100,6 +100,18 @@ impl FixtureRepo {
     /// If git can't be started or exits with a non-zero status.
     pub fn git(&self, args: &[&str]) -> String {
         run_git(self.path(), args, self.clock.get())
+            .trim_end()
+            .to_owned()
+    }
+
+    /// Runs `git` in the repository and returns stdout exactly as printed
+    /// (for parsers that care about trailing separators).
+    ///
+    /// # Panics
+    ///
+    /// If git can't be started or exits with a non-zero status.
+    pub fn git_raw(&self, args: &[&str]) -> String {
+        run_git(self.path(), args, self.clock.get())
     }
 
     /// Writes `contents` to `relative_path` (creating parent directories) without committing.
@@ -222,10 +234,7 @@ fn run_git(dir: &Path, args: &[&str], timestamp: i64) -> String {
         dir.display(),
         String::from_utf8_lossy(&output.stderr)
     );
-    String::from_utf8(output.stdout)
-        .expect("git output is UTF-8")
-        .trim_end()
-        .to_owned()
+    String::from_utf8(output.stdout).expect("git output is UTF-8")
 }
 
 fn null_device() -> &'static str {

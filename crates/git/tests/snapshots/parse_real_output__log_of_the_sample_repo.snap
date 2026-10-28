@@ -1,0 +1,11 @@
+---
+source: crates/git/tests/parse_real_output.rs
+expression: "subjects.join(\"\\n\")"
+---
+Add login
+Return a value
+Merge branch 'develop'
+Add lib
+Update docs
+Add main
+Initial commit

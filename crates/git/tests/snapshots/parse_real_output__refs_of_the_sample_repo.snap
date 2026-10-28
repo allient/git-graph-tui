@@ -1,0 +1,10 @@
+---
+source: crates/git/tests/parse_real_output.rs
+expression: "lines.join(\"\\n\")"
+---
+LocalBranch develop head=false upstream=None
+LocalBranch feature/login head=false upstream=None
+LocalBranch main head=true upstream=Some("refs/remotes/origin/main")
+RemoteBranch origin/main head=false upstream=None
+Stash stash head=false upstream=None
+Tag v0.1.0 head=false upstream=None

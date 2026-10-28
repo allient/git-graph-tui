@@ -7,5 +7,19 @@
 //! - Parses machine-readable output (`-z`, `%x1f` separators) into
 //!   `tgg-model` types.
 //!
+//! Each command lives in its own module that owns both its arguments and its
+//! parser, so the output format and the code that reads it can't drift apart.
+//!
 //! This crate never touches the terminal and never spawns threads; the app
 //! decides where commands run.
+
+mod error;
+pub mod log;
+pub mod refs;
+pub mod stash;
+pub mod status;
+
+pub use error::ParseError;
+
+/// Field separator used in every `--format` string (ASCII unit separator).
+pub(crate) const FIELD_SEP: char = '\u{1f}';
