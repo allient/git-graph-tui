@@ -2,7 +2,10 @@ use pretty_assertions::assert_eq;
 use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
-use crate::{Action, CommitTarget, ResetMode, Rev, StashAction, TagAction, WorkingTreeAction};
+use crate::{
+    Action, CommitTarget, PickPurpose, PullMode, RepoAction, ResetMode, Rev, StashAction,
+    TagAction, UiEffect, WorkingTreeAction,
+};
 
 fn oid(c: char) -> Oid {
     Oid::parse(&c.to_string().repeat(40)).unwrap()
@@ -33,8 +36,18 @@ fn labels(menu: &[MenuItem]) -> Vec<String> {
                 disabled: Some(why),
                 ..
             }) => format!("{label} (disabled: {why})"),
+            MenuItem::Submenu { label, .. } => format!("{label} ▸"),
         })
         .collect()
+}
+
+fn submenu<'m>(menu: &'m [MenuItem], label: &str) -> &'m [MenuItem] {
+    menu.iter()
+        .find_map(|item| match item {
+            MenuItem::Submenu { label: l, items } if l == label => Some(items.as_slice()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no submenu {label:?} in {:?}", labels(menu)))
 }
 
 fn action<'m>(menu: &'m [MenuItem], label: &str) -> &'m Action {
@@ -516,4 +529,144 @@ fn separators_never_lead_trail_or_repeat() {
         MenuItem::Separator,
     ];
     assert_eq!(labels(&tidy(items)), ["A", "---", "B"]);
+}
+
+// ---- repository "..." menu (S11) ----
+
+#[test]
+fn repository_menu_matches_the_vs_code_order() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "Pull...",
+            "Push...",
+            "Checkout to...",
+            "Fetch",
+            "---",
+            "Branch ▸",
+            "Remote ▸",
+            "Stash ▸",
+            "Tags ▸",
+            "---",
+            "Show Git Output",
+        ]
+    );
+    assert_eq!(
+        labels(submenu(&menu, "Branch")),
+        [
+            "Create Branch...",
+            "Rename Current Branch...",
+            "Delete Branch..."
+        ]
+    );
+    assert_eq!(
+        labels(submenu(&menu, "Remote")),
+        ["Add Remote...", "Remove Remote...", "Fetch", "Prune"]
+    );
+    assert_eq!(
+        labels(submenu(&menu, "Stash")),
+        ["Stash Changes...", "Apply Latest Stash", "Pop Latest Stash"]
+    );
+    assert_eq!(
+        labels(submenu(&menu, "Tags")),
+        ["Create Tag...", "Push All Tags"]
+    );
+}
+
+#[test]
+fn repository_actions_are_prefilled() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    assert_eq!(
+        action(&menu, "Pull..."),
+        &Action::Repo(RepoAction::Pull {
+            branch: "main".into(),
+            mode: PullMode::FastForwardOnly
+        })
+    );
+    assert_eq!(
+        action(&menu, "Push..."),
+        &Action::PushBranch {
+            branch: "main".into(),
+            remote: "origin".into(),
+            set_upstream: true,
+            force_with_lease: false
+        }
+    );
+    assert_eq!(
+        action(&menu, "Checkout to..."),
+        &Action::Ui(UiEffect::PickRef {
+            purpose: PickPurpose::Checkout
+        })
+    );
+    let branch = submenu(&menu, "Branch");
+    assert_eq!(
+        action(branch, "Create Branch..."),
+        &Action::CreateBranch {
+            at: oid('a'),
+            name: String::new(),
+            checkout: false
+        }
+    );
+    assert_eq!(
+        action(branch, "Delete Branch..."),
+        &Action::Ui(UiEffect::PickRef {
+            purpose: PickPurpose::DeleteBranch
+        })
+    );
+    assert_eq!(
+        action(submenu(&menu, "Remote"), "Prune"),
+        &Action::Repo(RepoAction::PruneRemotes {
+            remotes: vec!["origin".into()]
+        })
+    );
+    assert_eq!(
+        action(&menu, "Show Git Output"),
+        &Action::Ui(UiEffect::ShowGitOutput)
+    );
+}
+
+#[test]
+fn repository_menu_without_remotes_or_branch() {
+    let ctx = MenuContext {
+        head: HeadState::Detached,
+        remotes: Vec::new(),
+        ..ctx()
+    };
+    let menu = menu_for(&Target::Repository, &ctx);
+    assert_eq!(
+        labels(&menu),
+        [
+            "Checkout to...",
+            "---",
+            "Branch ▸",
+            "Remote ▸",
+            "Stash ▸",
+            "Tags ▸",
+            "---",
+            "Show Git Output",
+        ]
+    );
+    assert_eq!(
+        labels(submenu(&menu, "Branch")),
+        ["Create Branch...", "Delete Branch..."]
+    );
+    assert_eq!(labels(submenu(&menu, "Remote")), ["Add Remote..."]);
+    assert_eq!(labels(submenu(&menu, "Tags")), ["Create Tag..."]);
+}
+
+#[test]
+fn empty_submenus_are_dropped() {
+    let ctx = MenuContext {
+        head: HeadState::Unborn,
+        head_commit: None,
+        remotes: Vec::new(),
+        branch_filter: Vec::new(),
+    };
+    let menu = menu_for(&Target::Repository, &ctx);
+    assert!(
+        !labels(&menu).contains(&"Tags ▸".to_owned()),
+        "{:?}",
+        labels(&menu)
+    );
 }

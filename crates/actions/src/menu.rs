@@ -1,8 +1,8 @@
 use tgg_model::Stash;
 
 use crate::{
-    Action, CommitTarget, MenuContext, ResetMode, Rev, StashAction, TagAction, Target,
-    WorkingTreeAction,
+    Action, CommitTarget, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
+    StashAction, TagAction, Target, UiEffect, WorkingTreeAction,
 };
 
 /// One row of a context menu.
@@ -10,6 +10,11 @@ use crate::{
 pub enum MenuItem {
     Entry(MenuEntry),
     Separator,
+    /// Opens a child menu (`Branch ▸`).
+    Submenu {
+        label: String,
+        items: Vec<MenuItem>,
+    },
 }
 
 /// A selectable menu row. A label ending in `...` opens a dialog
@@ -52,6 +57,7 @@ pub fn menu_for(target: &Target, ctx: &MenuContext) -> Vec<MenuItem> {
         Target::Tag { name, .. } => tag_menu(name, ctx),
         Target::Stash(stash) => stash_menu(stash),
         Target::Uncommitted => uncommitted_menu(),
+        Target::Repository => repository_menu(ctx),
     };
     tidy(items)
 }
@@ -376,6 +382,147 @@ fn uncommitted_menu() -> Vec<Option<MenuItem>> {
     ]
 }
 
+fn submenu(label: &str, items: Vec<Option<MenuItem>>) -> MenuItem {
+    MenuItem::Submenu {
+        label: label.to_owned(),
+        items: tidy(items),
+    }
+}
+
+fn pick(purpose: PickPurpose) -> Action {
+    Action::Ui(UiEffect::PickRef { purpose })
+}
+
+/// The repository "..." menu (S11), without Clone, Commit and Changes
+/// (README non-goals). Remote entries need a remote; current-branch entries
+/// need HEAD on a branch; create entries need a HEAD commit.
+fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let current = ctx.current_branch();
+    let remote = ctx.default_remote();
+    vec![
+        current.filter(|_| remote.is_some()).and_then(|branch| {
+            entry(
+                "Pull...",
+                Action::Repo(RepoAction::Pull {
+                    branch: branch.to_owned(),
+                    mode: PullMode::default(),
+                }),
+            )
+        }),
+        current.zip(remote).and_then(|(branch, remote)| {
+            entry(
+                "Push...",
+                Action::PushBranch {
+                    branch: branch.to_owned(),
+                    remote: remote.to_owned(),
+                    set_upstream: true,
+                    force_with_lease: false,
+                },
+            )
+        }),
+        entry("Checkout to...", pick(PickPurpose::Checkout)),
+        entry_if(remote.is_some(), "Fetch", || {
+            Action::Repo(RepoAction::Fetch { prune: false })
+        }),
+        Some(MenuItem::Separator),
+        Some(submenu("Branch", branch_submenu(ctx))),
+        Some(submenu("Remote", remote_submenu(ctx))),
+        Some(submenu("Stash", stash_submenu())),
+        Some(submenu("Tags", tags_submenu(ctx))),
+        Some(MenuItem::Separator),
+        entry("Show Git Output", Action::Ui(UiEffect::ShowGitOutput)),
+    ]
+}
+
+fn branch_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    vec![
+        ctx.head_commit.as_ref().and_then(|at| {
+            entry(
+                "Create Branch...",
+                Action::CreateBranch {
+                    at: at.clone(),
+                    name: String::new(),
+                    checkout: false,
+                },
+            )
+        }),
+        ctx.current_branch().and_then(|branch| {
+            entry(
+                "Rename Current Branch...",
+                Action::RenameBranch {
+                    from: branch.to_owned(),
+                    to: branch.to_owned(),
+                },
+            )
+        }),
+        entry("Delete Branch...", pick(PickPurpose::DeleteBranch)),
+    ]
+}
+
+fn remote_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let has_remotes = !ctx.remotes.is_empty();
+    vec![
+        entry(
+            "Add Remote...",
+            Action::Repo(RepoAction::AddRemote {
+                name: String::new(),
+                url: String::new(),
+            }),
+        ),
+        entry_if(has_remotes, "Remove Remote...", || {
+            pick(PickPurpose::RemoveRemote)
+        }),
+        entry_if(has_remotes, "Fetch", || {
+            Action::Repo(RepoAction::Fetch { prune: false })
+        }),
+        entry_if(has_remotes, "Prune", || {
+            Action::Repo(RepoAction::PruneRemotes {
+                remotes: ctx.remotes.clone(),
+            })
+        }),
+    ]
+}
+
+fn stash_submenu() -> Vec<Option<MenuItem>> {
+    vec![
+        entry(
+            "Stash Changes...",
+            Action::WorkingTree(WorkingTreeAction::Stash {
+                message: String::new(),
+                include_untracked: true,
+            }),
+        ),
+        entry(
+            "Apply Latest Stash",
+            Action::Repo(RepoAction::ApplyLatestStash),
+        ),
+        entry("Pop Latest Stash", Action::Repo(RepoAction::PopLatestStash)),
+    ]
+}
+
+fn tags_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    vec![
+        ctx.head_commit.as_ref().and_then(|at| {
+            entry(
+                "Create Tag...",
+                Action::AddTag {
+                    at: at.clone(),
+                    name: String::new(),
+                    message: String::new(),
+                },
+            )
+        }),
+        ctx.default_remote().and_then(|remote| {
+            entry(
+                "Push All Tags",
+                Action::Repo(RepoAction::PushTags {
+                    remote: remote.to_owned(),
+                }),
+            )
+        }),
+    ]
+}
+
 /// Drop is `git rebase --onto <commit>^ <commit>`, which needs exactly one
 /// parent and the commit in HEAD's history.
 fn why_not_droppable(commit: &CommitTarget) -> Option<&'static str> {
@@ -415,10 +562,21 @@ fn filter_toggle(branch: &str, ctx: &MenuContext) -> Option<MenuItem> {
     )
 }
 
-/// Drops hidden entries and separators that would lead, trail or repeat.
+/// Drops hidden entries, empty submenus and separators that would lead,
+/// trail or repeat (in submenus too).
 pub(crate) fn tidy(items: impl IntoIterator<Item = impl Into<Option<MenuItem>>>) -> Vec<MenuItem> {
     let mut menu: Vec<MenuItem> = Vec::new();
     for item in items.into_iter().filter_map(Into::into) {
+        let item = match item {
+            MenuItem::Submenu { label, items } => {
+                let items = tidy(items);
+                if items.is_empty() {
+                    continue;
+                }
+                MenuItem::Submenu { label, items }
+            }
+            other => other,
+        };
         let after_separator = matches!(menu.last(), None | Some(MenuItem::Separator));
         if item == MenuItem::Separator && after_separator {
             continue;

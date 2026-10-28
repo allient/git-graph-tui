@@ -46,6 +46,8 @@ pub enum Target {
     Stash(Stash),
     /// The virtual "Uncommitted Changes" row.
     Uncommitted,
+    /// The repository as a whole: the toolbar's "..." menu (S11).
+    Repository,
 }
 
 impl Target {

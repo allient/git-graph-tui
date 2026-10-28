@@ -25,3 +25,5 @@ mod working_tree;
 pub use stash::StashAction;
 pub use tag::TagAction;
 pub use working_tree::WorkingTreeAction;
+mod repo;
+pub use repo::{PickPurpose, PullMode, RepoAction};
