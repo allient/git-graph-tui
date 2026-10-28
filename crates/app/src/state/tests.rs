@@ -126,7 +126,12 @@ fn results_from_a_superseded_refresh_are_ignored() {
 fn more_commits_load_when_the_selection_nears_the_end() {
     let repo = FixtureRepo::sample();
     let mut h = Harness::with_page_size(&repo, 3);
-    assert_eq!(h.state.commits.len(), 3, "first page only");
+    // A 5-row viewport with 3-commit pages loads two pages to fill the screen.
+    assert_eq!(
+        h.state.commits.len(),
+        6,
+        "pages load until the viewport is filled"
+    );
     h.key(KeyCode::Char('G'));
     h.key(KeyCode::Char('G'));
     h.key(KeyCode::Char('G'));
@@ -179,4 +184,33 @@ fn quit_keys() {
         KeyModifiers::CONTROL,
     )));
     assert!(state.should_quit, "ctrl+c");
+}
+
+/// Replays the startup race where the log arrives before the status: the top
+/// row was a commit, then the uncommitted row appears above it.
+#[test]
+fn status_arriving_after_the_log_keeps_the_top_row_selected() {
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    let dirty = h.state.status.clone();
+    h.state.status = WorkingTreeStatus::default();
+    h.state.selected = 0;
+    h.state.offset = 0;
+
+    h.state.apply_status(dirty);
+    assert_eq!(
+        h.state.selected, 0,
+        "the new top row (uncommitted) stays selected"
+    );
+}
+
+#[test]
+fn status_changes_keep_a_selected_commit() {
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    h.key(KeyCode::Char('H'));
+    let selected = h.selected_subject().map(str::to_owned);
+
+    h.state.apply_status(WorkingTreeStatus::default());
+    assert_eq!(h.selected_subject().map(str::to_owned), selected);
 }

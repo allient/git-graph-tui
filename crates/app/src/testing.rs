@@ -12,6 +12,7 @@ use crate::state::{AppState, Command, DEFAULT_PAGE_SIZE, Event};
 /// Runs the app's git requests for real until nothing is pending.
 pub struct Harness {
     pub state: AppState,
+    pub screen: ratatui::buffer::Buffer,
     pub runner: Runner<ProcessExecutor>,
     pub results: Receiver<JobResult>,
 }
@@ -30,6 +31,7 @@ impl Harness {
             state,
             runner,
             results,
+            screen: ratatui::buffer::Buffer::empty(ratatui::layout::Rect::default()),
         };
         let commands = h.state.update(Event::Refresh);
         h.settle(commands);
@@ -63,5 +65,29 @@ impl Harness {
 
     pub fn selected_subject(&self) -> Option<&str> {
         self.state.selected_commit().map(|c| c.subject.as_str())
+    }
+
+    /// Renders the screen, which also refreshes the hit-maps clicks resolve against.
+    pub fn draw(&mut self, width: u16, height: u16) {
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|f| crate::view::draw(f, &mut self.state, &tgg_ui::Theme::default()))
+            .unwrap();
+        self.screen = terminal.backend().buffer().clone();
+    }
+
+    /// Position of the first cell where `text` appears in the last frame.
+    pub fn find_on_screen(&self, text: &str) -> Option<(u16, u16)> {
+        let area = self.screen.area;
+        (area.top()..area.bottom()).find_map(|y| {
+            let cells: Vec<&str> = (area.left()..area.right())
+                .map(|x| self.screen[(x, y)].symbol())
+                .collect();
+            let line: String = cells.concat();
+            let byte = line.find(text)?;
+            let x = line[..byte].chars().count();
+            Some((u16::try_from(x).ok()?, y))
+        })
     }
 }

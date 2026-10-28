@@ -1737,6 +1737,7 @@ dependencies = [
  "pretty_assertions",
  "ratatui",
  "tempfile",
+ "tgg-actions",
  "tgg-git",
  "tgg-graph",
  "tgg-model",
