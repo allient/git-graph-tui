@@ -19,6 +19,12 @@ pub enum InputId {
     Force,
     /// Reset mode: `soft`, `mixed` or `hard`.
     Mode,
+    /// Also delete a tag on the remote.
+    DeleteOnRemote,
+    /// Restore staged changes when applying a stash (`--index`).
+    ReinstateIndex,
+    /// Stash untracked files too.
+    IncludeUntracked,
 }
 
 /// How a dialog should edit a field.

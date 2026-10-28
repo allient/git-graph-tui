@@ -4,6 +4,7 @@ use tgg_git::GitCommand;
 use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
+use crate::{StashAction, TagAction, WorkingTreeAction};
 
 /// Abbreviated hash length in confirmation text (git's default).
 const SHORT: usize = 7;
@@ -174,6 +175,9 @@ pub enum Action {
     CopyCommitSubject {
         subject: String,
     },
+    Tag(TagAction),
+    Stash(StashAction),
+    WorkingTree(WorkingTreeAction),
 }
 
 /// What running an action means.
@@ -188,7 +192,15 @@ pub enum Plan {
 /// Changes to app state that don't involve git.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiEffect {
-    ToggleBranchFilter { branch: String },
+    ToggleBranchFilter {
+        branch: String,
+    },
+    /// Show a tag (and an annotated tag's message).
+    ShowTag {
+        name: String,
+    },
+    /// The VS Code "Open Source Control View" entry; the app shows a hint.
+    OpenSourceControl,
 }
 
 /// The dialog shown before an action runs (S13).
@@ -201,7 +213,7 @@ pub struct Confirmation {
 }
 
 impl Confirmation {
-    fn new(title: &str, message: String, confirm_label: &str) -> Self {
+    pub(crate) fn new(title: &str, message: String, confirm_label: &str) -> Self {
         Self {
             title: title.to_owned(),
             message,
@@ -233,6 +245,9 @@ impl Action {
             Self::CopyCommitHash { commit } => Plan::Clipboard(commit.to_string()),
             Self::CopyCommitSubject { subject } => Plan::Clipboard(subject.clone()),
             Self::PushBranch { .. } => Plan::Git(vec![GitCommand::network(repo, self.git_args())]),
+            Self::Tag(action) => action.plan(repo),
+            Self::Stash(action) => action.plan(repo),
+            Self::WorkingTree(action) => action.plan(repo),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
     }
@@ -335,7 +350,10 @@ impl Action {
             Self::ToggleBranchFilter { .. }
             | Self::CopyBranchName { .. }
             | Self::CopyCommitHash { .. }
-            | Self::CopyCommitSubject { .. } => Vec::new(),
+            | Self::CopyCommitSubject { .. }
+            | Self::Tag(_)
+            | Self::Stash(_)
+            | Self::WorkingTree(_) => Vec::new(),
         }
     }
 
@@ -348,6 +366,9 @@ impl Action {
             Self::PushBranch {
                 force_with_lease, ..
             } => *force_with_lease,
+            Self::Tag(action) => action.is_destructive(),
+            Self::Stash(action) => action.is_destructive(),
+            Self::WorkingTree(action) => action.is_destructive(),
             _ => false,
         }
     }
@@ -436,6 +457,9 @@ impl Action {
                     "Rebase",
                 )
             }
+            Self::Tag(action) => return action.confirmation(),
+            Self::Stash(action) => return action.confirmation(),
+            Self::WorkingTree(action) => return action.confirmation(),
             _ => return None,
         };
         Some(confirmation)
@@ -506,6 +530,9 @@ impl Action {
                 InputKind::Choice(ResetMode::CHOICES),
                 mode.name(),
             )],
+            Self::Tag(action) => action.inputs(),
+            Self::Stash(action) => action.inputs(),
+            Self::WorkingTree(action) => action.inputs(),
             _ => Vec::new(),
         }
     }
@@ -555,6 +582,9 @@ impl Action {
                 let name = input::text(id, value)?;
                 *mode = ResetMode::from_name(&name).ok_or(InputError::NotAChoice(name))?;
             }
+            (Self::Tag(action), _) => return action.set_input(id, value),
+            (Self::Stash(action), _) => return action.set_input(id, value),
+            (Self::WorkingTree(action), _) => return action.set_input(id, value),
             _ => return Err(InputError::NotAnInput(id)),
         }
         Ok(())
@@ -577,7 +607,7 @@ impl Action {
     }
 }
 
-fn strings(items: &[&str]) -> Vec<String> {
+pub(crate) fn strings(items: &[&str]) -> Vec<String> {
     items.iter().map(|s| (*s).to_owned()).collect()
 }
 

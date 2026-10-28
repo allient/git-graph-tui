@@ -18,3 +18,10 @@ pub use input::{InputError, InputId, InputKind, InputSpec, InputValue};
 pub use menu::{MenuEntry, MenuItem, menu_for};
 pub use refname::{RefNameError, validate_ref_name};
 pub use target::{CommitTarget, MenuContext, Target};
+mod stash;
+mod tag;
+mod working_tree;
+
+pub use stash::StashAction;
+pub use tag::TagAction;
+pub use working_tree::WorkingTreeAction;
