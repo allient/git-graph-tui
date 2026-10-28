@@ -1,0 +1,319 @@
+use crate::{Action, CommitTarget, MenuContext, ResetMode, Rev, Target};
+
+/// One row of a context menu.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuItem {
+    Entry(MenuEntry),
+    Separator,
+}
+
+/// A selectable menu row. A label ending in `...` opens a dialog
+/// (inputs or a confirmation) before anything runs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuEntry {
+    pub label: String,
+    pub action: Action,
+    /// Shown but not selectable, with the reason (e.g. why a commit can't be dropped).
+    pub disabled: Option<String>,
+}
+
+impl MenuEntry {
+    #[must_use]
+    pub fn new(label: &str, action: Action) -> Self {
+        Self {
+            label: label.to_owned(),
+            action,
+            disabled: None,
+        }
+    }
+
+    #[must_use]
+    pub fn disabled_because(mut self, reason: Option<&str>) -> Self {
+        self.disabled = reason.map(str::to_owned);
+        self
+    }
+}
+
+/// Builds the context menu for `target`, in the order of VS Code Git Graph
+/// (S8, S9). Entries that can't apply are left out rather than disabled,
+/// except Drop, which explains why it isn't possible.
+///
+/// Tags, stashes and the uncommitted row have no menu yet (not part of S8/S9).
+#[must_use]
+pub fn menu_for(target: &Target, ctx: &MenuContext) -> Vec<MenuItem> {
+    let items = match target {
+        Target::LocalBranch { name, .. } => local_branch_menu(name, ctx),
+        Target::RemoteBranch { remote, branch, .. } => remote_branch_menu(remote, branch, ctx),
+        Target::Commit(commit) => commit_menu(commit, ctx),
+        Target::Tag { .. } | Target::Stash(_) | Target::Uncommitted => Vec::new(),
+    };
+    tidy(items)
+}
+
+/// Adds the entry only when `show` is true.
+fn entry_if(show: bool, label: &str, action: impl FnOnce() -> Action) -> Option<MenuItem> {
+    show.then(|| MenuItem::Entry(MenuEntry::new(label, action())))
+}
+
+/// An entry that is always shown (`Option` so it lines up with [`entry_if`]).
+fn entry(label: &str, action: Action) -> Option<MenuItem> {
+    entry_if(true, label, || action)
+}
+
+fn local_branch_menu(name: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let is_current = ctx.is_current_branch(name);
+    let current = ctx.current_branch().map(str::to_owned);
+    let other_than_current = !is_current && current.is_some();
+    let rev = || Rev::Local(name.to_owned());
+    vec![
+        entry_if(!is_current, "Checkout Branch", || Action::CheckoutBranch {
+            name: name.to_owned(),
+        }),
+        entry(
+            "Rename Branch...",
+            Action::RenameBranch {
+                from: name.to_owned(),
+                to: name.to_owned(),
+            },
+        ),
+        entry_if(!is_current, "Delete Branch...", || Action::DeleteBranch {
+            name: name.to_owned(),
+            force: false,
+        }),
+        entry_if(other_than_current, "Merge into current branch...", || {
+            Action::MergeIntoCurrent {
+                source: rev(),
+                current: current.clone(),
+                no_ff: true,
+            }
+        }),
+        entry_if(
+            other_than_current,
+            "Rebase current branch on Branch...",
+            || Action::RebaseCurrentOnto {
+                onto: rev(),
+                current: current.clone(),
+            },
+        ),
+        ctx.default_remote().and_then(|remote| {
+            entry(
+                "Push Branch...",
+                Action::PushBranch {
+                    branch: name.to_owned(),
+                    remote: remote.to_owned(),
+                    set_upstream: true,
+                    force_with_lease: false,
+                },
+            )
+        }),
+        Some(MenuItem::Separator),
+        entry("Create Archive", archive(rev(), name)),
+        filter_toggle(name, ctx),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Branch Name to Clipboard",
+            Action::CopyBranchName {
+                name: name.to_owned(),
+            },
+        ),
+    ]
+}
+
+fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let full = format!("{remote}/{branch}");
+    let current = ctx.current_branch().map(str::to_owned);
+    let rev = || Rev::Remote {
+        remote: remote.to_owned(),
+        branch: branch.to_owned(),
+    };
+    vec![
+        entry(
+            "Checkout Branch...",
+            Action::CheckoutRemoteBranch {
+                remote: remote.to_owned(),
+                branch: branch.to_owned(),
+                local_name: branch.to_owned(),
+            },
+        ),
+        entry_if(current.is_some(), "Merge into current branch...", || {
+            Action::MergeIntoCurrent {
+                source: rev(),
+                current: current.clone(),
+                no_ff: true,
+            }
+        }),
+        entry_if(
+            current.is_some(),
+            "Rebase current branch on Branch...",
+            || Action::RebaseCurrentOnto {
+                onto: rev(),
+                current: current.clone(),
+            },
+        ),
+        Some(MenuItem::Separator),
+        entry("Create Archive", archive(rev(), &full)),
+        filter_toggle(&full, ctx),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Branch Name to Clipboard",
+            Action::CopyBranchName { name: full.clone() },
+        ),
+    ]
+}
+
+fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let id = &commit.id;
+    let subject = &commit.subject;
+    let is_head = ctx.is_head_commit(id);
+    let current = ctx.current_branch().map(str::to_owned);
+    let detached_here = is_head && current.is_none();
+    let on_branch = current.is_some();
+    vec![
+        entry(
+            "Add Tag...",
+            Action::AddTag {
+                at: id.clone(),
+                name: String::new(),
+                message: String::new(),
+            },
+        ),
+        entry(
+            "Create Branch...",
+            Action::CreateBranch {
+                at: id.clone(),
+                name: String::new(),
+                checkout: false,
+            },
+        ),
+        Some(MenuItem::Separator),
+        entry_if(!detached_here, "Checkout...", || Action::CheckoutCommit {
+            commit: id.clone(),
+            subject: subject.clone(),
+        }),
+        // Already in HEAD's history: picking it again would be empty.
+        entry_if(!commit.is_head_ancestor, "Cherry Pick...", || {
+            Action::CherryPick {
+                commit: id.clone(),
+                subject: subject.clone(),
+                is_merge: commit.is_merge(),
+            }
+        }),
+        entry(
+            "Revert...",
+            Action::Revert {
+                commit: id.clone(),
+                subject: subject.clone(),
+                is_merge: commit.is_merge(),
+            },
+        ),
+        Some(MenuItem::Entry(
+            MenuEntry::new(
+                "Drop...",
+                Action::Drop {
+                    commit: id.clone(),
+                    subject: subject.clone(),
+                    current: current.clone(),
+                },
+            )
+            .disabled_because(why_not_droppable(commit)),
+        )),
+        Some(MenuItem::Separator),
+        entry_if(
+            on_branch && !commit.is_head_ancestor,
+            "Merge into current branch...",
+            || Action::MergeIntoCurrent {
+                source: Rev::Commit(id.clone()),
+                current: current.clone(),
+                no_ff: true,
+            },
+        ),
+        entry_if(
+            on_branch && !is_head,
+            "Rebase current branch on this Commit...",
+            || Action::RebaseCurrentOnto {
+                onto: Rev::Commit(id.clone()),
+                current: current.clone(),
+            },
+        ),
+        current.as_ref().filter(|_| !is_head).and_then(|branch| {
+            entry(
+                "Reset current branch to this Commit...",
+                Action::ResetCurrentTo {
+                    commit: id.clone(),
+                    subject: subject.clone(),
+                    current: branch.clone(),
+                    mode: ResetMode::default(),
+                },
+            )
+        }),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Commit Hash to Clipboard",
+            Action::CopyCommitHash { commit: id.clone() },
+        ),
+        entry(
+            "Copy Commit Subject to Clipboard",
+            Action::CopyCommitSubject {
+                subject: subject.clone(),
+            },
+        ),
+    ]
+}
+
+/// Drop is `git rebase --onto <commit>^ <commit>`, which needs exactly one
+/// parent and the commit in HEAD's history.
+fn why_not_droppable(commit: &CommitTarget) -> Option<&'static str> {
+    if commit.is_merge() {
+        Some("Merge commits can't be dropped.")
+    } else if commit.is_root() {
+        Some("The first commit can't be dropped.")
+    } else if !commit.is_head_ancestor {
+        Some("Only commits on the current branch can be dropped.")
+    } else {
+        None
+    }
+}
+
+fn archive(rev: Rev, name: &str) -> Action {
+    // Default next to the repository so the archive doesn't land in the
+    // working tree as an untracked file.
+    Action::CreateArchive {
+        rev,
+        output: format!("../{}.zip", name.replace('/', "-")),
+    }
+}
+
+fn filter_toggle(branch: &str, ctx: &MenuContext) -> Option<MenuItem> {
+    let selected = ctx.is_filtered(branch);
+    let label = if selected {
+        "Unselect in Branches Dropdown"
+    } else {
+        "Select in Branches Dropdown"
+    };
+    entry(
+        label,
+        Action::ToggleBranchFilter {
+            branch: branch.to_owned(),
+            selected,
+        },
+    )
+}
+
+/// Drops hidden entries and separators that would lead, trail or repeat.
+pub(crate) fn tidy(items: impl IntoIterator<Item = impl Into<Option<MenuItem>>>) -> Vec<MenuItem> {
+    let mut menu: Vec<MenuItem> = Vec::new();
+    for item in items.into_iter().filter_map(Into::into) {
+        let after_separator = matches!(menu.last(), None | Some(MenuItem::Separator));
+        if item == MenuItem::Separator && after_separator {
+            continue;
+        }
+        menu.push(item);
+    }
+    if menu.last() == Some(&MenuItem::Separator) {
+        menu.pop();
+    }
+    menu
+}
+
+#[cfg(test)]
+mod tests;
