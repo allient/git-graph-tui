@@ -1,0 +1,22 @@
+# Gentle AI skill registry: generated, contains machine-specific absolute paths
+# Regenerate with: gentle-ai skill-registry refresh --force
+.atl/
+
+# Claude Code per-user settings (project settings and skills stay tracked)
+.claude/settings.local.json
+
+# Rust build output and pending insta snapshots
+/target/
+*.snap.new
+*.pending-snap
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
