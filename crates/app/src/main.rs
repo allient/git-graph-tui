@@ -2,22 +2,26 @@
 
 mod cli;
 mod git;
+mod state;
+#[cfg(test)]
+mod testing;
+mod view;
 
-use std::path::Path;
+use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{
-    DefaultTerminal,
-    layout::{Constraint, Layout},
-    style::Stylize,
-    text::Line,
-    widgets::{Block, Paragraph},
-};
+use crossterm::event::{self, Event as TermEvent};
+use ratatui::DefaultTerminal;
+use tgg_ui::Theme;
 
 use crate::cli::Cli;
-use crate::git::{ProcessExecutor, discover_repo};
+use crate::git::{ProcessExecutor, Runner, discover_repo};
+use crate::state::{AppState, Command, Event};
+
+/// How long to wait for input before checking for git results.
+const INPUT_POLL: Duration = Duration::from_millis(50);
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -25,31 +29,37 @@ fn main() -> Result<()> {
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    ratatui::run(|terminal| run(terminal, &repo))
+    ratatui::run(|terminal| run(terminal, repo))
 }
 
-/// Placeholder screen until the graph view lands (see `odd/tasks/git-graph-mvp.md`).
-fn run(terminal: &mut DefaultTerminal, repo: &Path) -> Result<()> {
-    let path = repo.display().to_string();
+fn run(terminal: &mut DefaultTerminal, repo: PathBuf) -> Result<()> {
+    let (runner, results) = Runner::new(ProcessExecutor::new());
+    let theme = Theme::default();
+    let mut state = AppState::new(repo);
+    dispatch(&mut state, &runner, Event::Refresh);
+
     loop {
         terminal.draw(|frame| {
-            let [body, footer] =
-                Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
-            let text = Paragraph::new(vec![
-                Line::from("tui-git-graph".bold()),
-                Line::from(format!("Repository: {path}")),
-                Line::from("The graph view is not implemented yet.".dim()),
-            ])
-            .block(Block::bordered().title(" Git Graph "));
-            frame.render_widget(text, body);
-            frame.render_widget(Line::from(" q quit".dim()), footer);
+            view::draw(frame, &mut state, &theme);
         })?;
-
-        if let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-            && matches!(key.code, KeyCode::Char('q') | KeyCode::Esc)
-        {
+        if state.should_quit {
             return Ok(());
         }
+        if event::poll(INPUT_POLL)?
+            && let TermEvent::Key(key) = event::read()?
+        {
+            dispatch(&mut state, &runner, Event::Key(key));
+        }
+        while let Ok(result) = results.try_recv() {
+            dispatch(&mut state, &runner, Event::Git(result));
+        }
+    }
+}
+
+/// Applies an event and starts the git requests it produces.
+fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event) {
+    for Command::Git(request) in state.update(event) {
+        let job = runner.submit(request.command(&state.repo));
+        state.track(&job, request);
     }
 }

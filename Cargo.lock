@@ -1732,11 +1732,15 @@ dependencies = [
  "clap",
  "crossbeam-channel",
  "crossterm",
+ "insta",
  "pretty_assertions",
  "ratatui",
  "tempfile",
  "tgg-git",
+ "tgg-graph",
+ "tgg-model",
  "tgg-testkit",
+ "tgg-ui",
 ]
 
 [[package]]
