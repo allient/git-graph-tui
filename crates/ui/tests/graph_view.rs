@@ -10,7 +10,7 @@ use tgg_git::{log, refs, status};
 use tgg_graph::{Graph, Row};
 use tgg_model::{Commit, Oid, Ref, WorkingTreeStatus};
 use tgg_testkit::FixtureRepo;
-use tgg_ui::{GraphView, HitTarget, Theme};
+use tgg_ui::{Gap, GraphView, HitTarget, Theme};
 
 struct Loaded {
     commits: Vec<Commit>,
@@ -53,6 +53,7 @@ fn view(l: &Loaded) -> GraphView<'_> {
         uncommitted: l.status.changed_files(),
         offset: 0,
         selected: 0,
+        gap: None,
     }
 }
 
@@ -192,4 +193,57 @@ fn commits_outside_head_ancestry_are_muted() {
     let line = screen.lines().nth(y.into()).unwrap();
     let x = u16::try_from(line[..line.find("Add login").unwrap()].chars().count()).unwrap();
     assert_eq!(buf[(x, y)].fg, theme.muted);
+}
+
+#[test]
+fn a_gap_opens_blank_lines_below_its_row() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let plain = view(&loaded);
+    let gapped = GraphView {
+        gap: Some(Gap {
+            after: 1,
+            height: 3,
+        }),
+        ..view(&loaded)
+    };
+    let (plain_buf, _) = render(&plain, 100, 10);
+    let (buf, hits) = render(&gapped, 100, 10);
+    let plain_lines: Vec<String> = text(&plain_buf).lines().map(str::to_owned).collect();
+    let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
+
+    // Rows 0 and 1, three blank lines, then row 2 onwards.
+    assert_eq!(lines[..2], plain_lines[..2]);
+    assert!(lines[2..5].iter().all(String::is_empty), "{lines:#?}");
+    assert_eq!(lines[5..], plain_lines[2..7]);
+    assert_eq!(hits.gap(), Some(Rect::new(0, 2, 100, 3)));
+    // Clicks below the gap resolve to the shifted row (display 2 is commit 1).
+    assert_eq!(hits.hit(40, 5), Some(&HitTarget::Commit(1)));
+    assert_eq!(hits.hit(40, 3), None);
+}
+
+#[test]
+fn a_gap_is_clipped_at_the_bottom_and_skipped_when_its_row_is_off_screen() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let clipped = GraphView {
+        gap: Some(Gap {
+            after: 2,
+            height: 10,
+        }),
+        ..view(&loaded)
+    };
+    let (_, hits) = render(&clipped, 100, 6);
+    assert_eq!(hits.gap(), Some(Rect::new(0, 3, 100, 3)));
+
+    let hidden = GraphView {
+        offset: 3,
+        gap: Some(Gap {
+            after: 1,
+            height: 3,
+        }),
+        ..view(&loaded)
+    };
+    let (_, hits) = render(&hidden, 100, 6);
+    assert_eq!(hits.gap(), None);
 }

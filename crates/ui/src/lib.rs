@@ -13,7 +13,7 @@ mod theme;
 
 pub use badges::{Badge, BadgeKind, badges_for};
 pub use glyphs::{GlyphCell, lane_glyphs};
-pub use graph_view::{GraphView, HitMap, HitTarget};
+pub use graph_view::{Gap, GraphView, HitMap, HitTarget};
 pub use text::{fit, format_date};
 pub use theme::Theme;
 mod key;
