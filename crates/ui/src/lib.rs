@@ -25,3 +25,5 @@ mod details;
 pub use details::{
     CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, TreeRow, file_label,
 };
+mod diff_view;
+pub use diff_view::{DiffHit, DiffHitMap, DiffOutcome, DiffStyle, DiffView};
