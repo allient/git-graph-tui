@@ -141,6 +141,14 @@ impl AppState {
                     Some("Use `git status` or your editor's source control view.".to_owned());
                 Vec::new()
             }
+            Plan::Ui(UiEffect::PickRef { .. }) => {
+                self.message = Some("Picking a ref comes with the picker (toolbar).".to_owned());
+                Vec::new()
+            }
+            Plan::Ui(UiEffect::ShowGitOutput) => {
+                self.message = Some("The git output view comes later.".to_owned());
+                Vec::new()
+            }
         }
     }
 
