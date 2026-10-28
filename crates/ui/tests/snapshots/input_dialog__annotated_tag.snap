@@ -1,0 +1,16 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 13)"
+---
+
+  ┌ Add Tag ─────────────────────────────────────────────────┐
+  │                                                          │
+  │ Tag name                                                 │
+  │ v1.0.0                                                   │
+  │                                                          │
+  │ Message (empty for a lightweight tag)                    │
+  │ First release                                            │
+  │                                                          │
+  │                                                          │
+  │                                   [ Add Tag ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘

@@ -1,0 +1,14 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 11)"
+---
+
+  ┌ Create Branch ───────────────────────────────────────────┐
+  │                                                          │
+  │ Branch name                                              │
+  │ my branch                                                │
+  │ The name can't contain spaces or control characters.     │
+  │ [ ] Check out the new branch                             │
+  │                                                          │
+  │                             [ Create Branch ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘

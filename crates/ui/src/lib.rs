@@ -25,3 +25,5 @@ mod confirm;
 pub use confirm::{
     Button, ConfirmDialog, DialogHit, DialogHitMap, DialogOutcome, DialogStyle, MAX_WIDTH,
 };
+mod input_dialog;
+pub use input_dialog::{Focus, InputDialog, InputHit, InputHitMap, InputOutcome, TextField};
