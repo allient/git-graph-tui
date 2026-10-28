@@ -1,5 +1,7 @@
 [profile.default]
 slow-timeout = { period = "30s", terminate-after = 4 }
+# The 100ms default flags false leaks under load (seen even on tests that spawn nothing).
+leak-timeout = "1s"
 
 [profile.ci]
 fail-fast = false

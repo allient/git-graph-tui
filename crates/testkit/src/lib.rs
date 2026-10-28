@@ -48,6 +48,9 @@ impl FixtureRepo {
             ("commit.gpgsign", "false"),
             ("tag.gpgsign", "false"),
             ("core.autocrlf", "false"),
+            // No detached background work (auto gc / maintenance) outliving a test.
+            ("gc.auto", "0"),
+            ("maintenance.auto", "false"),
         ] {
             repo.git(&["config", key, value]);
         }
@@ -163,6 +166,14 @@ impl FixtureRepo {
             &["init", "--quiet", "--bare", "--initial-branch=main"],
             EPOCH,
         );
+        // A push runs receive-pack here, which would otherwise start a detached auto gc.
+        for (key, value) in [
+            ("receive.autogc", "false"),
+            ("gc.auto", "0"),
+            ("maintenance.auto", "false"),
+        ] {
+            run_git(bare.path(), &["config", key, value], EPOCH);
+        }
         let url = bare.path().to_str().expect("temp path is UTF-8").to_owned();
         self.git(&["remote", "add", "origin", &url]);
         let path = bare.path().to_path_buf();
