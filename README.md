@@ -114,7 +114,7 @@ A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure cra
 | `tgg-git` | `crates/git` | Safe git argv building, process execution behind a trait, output parsers | model |
 | `tgg-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
 | `tgg-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
-| `tgg-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, graph, actions |
+| `tgg-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, git (output types), graph, actions |
 | `tui-git-graph` | `crates/app` | The binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
 | `tgg-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
 

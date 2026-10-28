@@ -1,0 +1,427 @@
+use std::collections::BTreeMap;
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Position, Rect};
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::{Clear, Widget};
+use tgg_git::show::{CommitDetails, FileChange, Numstat};
+use tgg_model::Oid;
+use unicode_width::UnicodeWidthStr;
+
+use crate::{Key, Theme, fit, format_date};
+
+/// Characters of a parent hash shown (and clickable) in the details.
+const PARENT_HASH: usize = 8;
+/// Width of the `Committer: ` label column.
+const LABEL: usize = 11;
+
+/// A row of the changed-files tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TreeRow {
+    /// A folder (one path component), `depth` levels deep.
+    Dir { depth: usize, name: String },
+    /// A file: index into [`CommitDetailsView::files`].
+    File { depth: usize, index: usize },
+}
+
+/// What a key press or click means for the app.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DetailsOutcome {
+    /// Nothing for the app to do (the selection may have moved).
+    Stay,
+    /// Show this file's diff (`show::diff_args`, then a [`crate::DiffView`]).
+    OpenFile(FileChange),
+    /// Select this parent commit in the graph (S10).
+    JumpTo(Oid),
+    /// Collapse the details panel.
+    Close,
+}
+
+/// What is under a screen cell, as of the last render.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DetailsHit {
+    /// A file row (index into [`CommitDetailsView::rows`]).
+    File(usize),
+    Parent(Oid),
+    Frame,
+    Outside,
+}
+
+/// Where the panel, its parent hashes and file rows were drawn.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DetailsHitMap {
+    area: Rect,
+    files: Vec<(Rect, usize)>,
+    parents: Vec<(Rect, Oid)>,
+}
+
+impl DetailsHitMap {
+    #[must_use]
+    pub fn hit(&self, x: u16, y: u16) -> DetailsHit {
+        let point = Position { x, y };
+        if let Some((_, row)) = self.files.iter().find(|(r, _)| r.contains(point)) {
+            DetailsHit::File(*row)
+        } else if let Some((_, id)) = self.parents.iter().find(|(r, _)| r.contains(point)) {
+            DetailsHit::Parent(id.clone())
+        } else if self.area.contains(point) {
+            DetailsHit::Frame
+        } else {
+            DetailsHit::Outside
+        }
+    }
+
+    /// Where tree row `row` was drawn, if it is a visible file.
+    #[must_use]
+    pub fn file_row(&self, row: usize) -> Option<Rect> {
+        self.files.iter().find(|(_, r)| *r == row).map(|(r, _)| *r)
+    }
+
+    /// Where the parent hash `id` was drawn.
+    #[must_use]
+    pub fn parent(&self, id: &Oid) -> Option<Rect> {
+        self.parents.iter().find(|(_, p)| p == id).map(|(r, _)| *r)
+    }
+}
+
+/// The inline commit details panel (S10): metadata and message on the left,
+/// the changed files as a folder tree with `(+a -d)` counts on the right.
+///
+/// The app draws it in the rows under the selected commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommitDetailsView {
+    details: CommitDetails,
+    files: Vec<FileChange>,
+    rows: Vec<TreeRow>,
+    /// Index into `rows`, always a file row.
+    selected: Option<usize>,
+}
+
+impl CommitDetailsView {
+    #[must_use]
+    pub fn new(details: CommitDetails, files: Vec<FileChange>) -> Self {
+        let rows = file_tree(&files);
+        let selected = rows.iter().position(|r| matches!(r, TreeRow::File { .. }));
+        Self {
+            details,
+            files,
+            rows,
+            selected,
+        }
+    }
+
+    #[must_use]
+    pub fn details(&self) -> &CommitDetails {
+        &self.details
+    }
+
+    #[must_use]
+    pub fn files(&self) -> &[FileChange] {
+        &self.files
+    }
+
+    #[must_use]
+    pub fn rows(&self) -> &[TreeRow] {
+        &self.rows
+    }
+
+    #[must_use]
+    pub fn selected_file(&self) -> Option<&FileChange> {
+        match self.rows.get(self.selected?)? {
+            TreeRow::File { index, .. } => self.files.get(*index),
+            TreeRow::Dir { .. } => None,
+        }
+    }
+
+    /// Up/Down/Home/End/PageUp/PageDown move between files, Enter opens the
+    /// selected one, Esc closes the panel.
+    pub fn handle_key(&mut self, key: Key) -> DetailsOutcome {
+        match key {
+            Key::Down => self.step(true),
+            Key::Up => self.step(false),
+            Key::Home | Key::PageUp => {
+                let first = self.file_rows().next();
+                self.selected = first;
+            }
+            Key::End | Key::PageDown => {
+                let last = self.file_rows().next_back();
+                self.selected = last;
+            }
+            Key::Enter => {
+                if let Some(file) = self.selected_file() {
+                    return DetailsOutcome::OpenFile(file.clone());
+                }
+            }
+            Key::Esc => return DetailsOutcome::Close,
+            _ => {}
+        }
+        DetailsOutcome::Stay
+    }
+
+    /// A click on a file selects and opens it; a click on a parent hash
+    /// jumps to that commit.
+    pub fn handle_click(&mut self, hits: &DetailsHitMap, x: u16, y: u16) -> DetailsOutcome {
+        match hits.hit(x, y) {
+            DetailsHit::File(row) => {
+                self.selected = Some(row);
+                self.selected_file()
+                    .cloned()
+                    .map_or(DetailsOutcome::Stay, DetailsOutcome::OpenFile)
+            }
+            DetailsHit::Parent(id) => DetailsOutcome::JumpTo(id),
+            DetailsHit::Frame | DetailsHit::Outside => DetailsOutcome::Stay,
+        }
+    }
+
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) -> DetailsHitMap {
+        let mut hits = DetailsHitMap {
+            area,
+            ..DetailsHitMap::default()
+        };
+        if area.width < 3 || area.height == 0 {
+            return hits;
+        }
+        Clear.render(area, buf);
+        let left = Rect {
+            width: area.width / 2,
+            ..area
+        };
+        let right = Rect {
+            x: left.right() + 1,
+            width: area.width - left.width - 1,
+            ..area
+        };
+        for y in area.top()..area.bottom() {
+            buf.set_string(left.right(), y, "│", Style::default().fg(theme.muted));
+        }
+        self.render_metadata(left, buf, theme, &mut hits);
+        self.render_files(right, buf, theme, &mut hits);
+        hits
+    }
+
+    fn render_metadata(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        hits: &mut DetailsHitMap,
+    ) {
+        let commit = &self.details.commit;
+        let width = usize::from(area.width.saturating_sub(1));
+        let label = Style::default().fg(theme.muted);
+        let text = Style::default().fg(theme.text);
+        let x = area.x + 1;
+        let field = |buf: &mut Buffer, y: u16, name: &str, value: &str, style: Style| {
+            buf.set_string(x, y, fit(name, LABEL.min(width)), label);
+            buf.set_string(
+                x + to_u16(LABEL),
+                y,
+                fit(value, width.saturating_sub(LABEL)),
+                style,
+            );
+        };
+        let signature = |s: &tgg_model::Signature| format!("{} <{}>", s.name, s.email);
+        let mut lines: Vec<(&str, String, Style)> = vec![
+            (
+                "Commit:",
+                commit.id.to_string(),
+                Style::default().fg(theme.hash),
+            ),
+            ("Parents:", String::new(), text),
+            ("Author:", signature(&commit.author), text),
+            ("Committer:", signature(&commit.committer), text),
+            (
+                "Date:",
+                format_date(commit.author.time),
+                Style::default().fg(theme.date),
+            ),
+        ];
+        if commit.parents.is_empty() {
+            lines[1].1 = "(none)".into();
+        }
+        let mut y = area.y;
+        for (name, value, style) in &lines {
+            if y >= area.bottom() {
+                return;
+            }
+            field(buf, y, name, value, *style);
+            if *name == "Parents:" {
+                // One clickable hash per parent, left to right.
+                let mut px = x + to_u16(LABEL);
+                for parent in &commit.parents {
+                    let short = parent.short(PARENT_HASH);
+                    let w = to_u16(short.width());
+                    if px + w > area.right() {
+                        break;
+                    }
+                    let link = Style::default()
+                        .fg(theme.hash)
+                        .add_modifier(Modifier::UNDERLINED);
+                    buf.set_string(px, y, short, link);
+                    hits.parents.push((Rect::new(px, y, w, 1), parent.clone()));
+                    px += w + 1;
+                }
+            }
+            y += 1;
+        }
+        // Blank line, then the message (subject bold, then the body).
+        y += 1;
+        for (i, line) in self.details.message.lines().enumerate() {
+            if y >= area.bottom() {
+                break;
+            }
+            let style = if i == 0 {
+                text.add_modifier(Modifier::BOLD)
+            } else {
+                text
+            };
+            buf.set_string(x, y, fit(&line.replace('\t', "    "), width), style);
+            y += 1;
+        }
+    }
+
+    fn render_files(&self, area: Rect, buf: &mut Buffer, theme: &Theme, hits: &mut DetailsHitMap) {
+        let width = usize::from(area.width.saturating_sub(1));
+        let title = format!("Changed files ({})", self.files.len());
+        buf.set_string(
+            area.x + 1,
+            area.y,
+            fit(&title, width),
+            Style::default().fg(theme.muted),
+        );
+        let visible = usize::from(area.height.saturating_sub(1));
+        // Scroll so the selected file stays visible.
+        let offset = self
+            .selected
+            .map_or(0, |s| s.saturating_sub(visible.saturating_sub(1)));
+        for (n, (row_index, row)) in self
+            .rows
+            .iter()
+            .enumerate()
+            .skip(offset)
+            .take(visible)
+            .enumerate()
+        {
+            let y = area.y + 1 + to_u16(n);
+            let rect = Rect::new(area.x, y, area.width, 1);
+            match row {
+                TreeRow::Dir { depth, name } => {
+                    let label = format!("{}{name}/", "  ".repeat(*depth));
+                    buf.set_string(
+                        area.x + 1,
+                        y,
+                        fit(&label, width),
+                        Style::default().fg(theme.muted),
+                    );
+                }
+                TreeRow::File { depth, index } => {
+                    let Some(file) = self.files.get(*index) else {
+                        continue;
+                    };
+                    let selected = self.selected == Some(row_index);
+                    let style = if selected {
+                        Style::default().fg(theme.text).bg(theme.selected_bg)
+                    } else {
+                        Style::default().fg(theme.text)
+                    };
+                    let (name, counts) = file_label(file);
+                    let indent = "  ".repeat(*depth);
+                    let room = width.saturating_sub(counts.width() + 1);
+                    let line = format!("{}{counts}", fit(&format!("{indent}{name}"), room + 1));
+                    buf.set_string(area.x + 1, y, fit(&line, width), style);
+                    hits.files.push((rect, row_index));
+                }
+            }
+        }
+    }
+
+    fn file_rows(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
+        (0..self.rows.len()).filter(|&i| matches!(self.rows[i], TreeRow::File { .. }))
+    }
+
+    fn step(&mut self, down: bool) {
+        let Some(current) = self.selected else {
+            return;
+        };
+        let next = if down {
+            self.file_rows().find(|&i| i > current)
+        } else {
+            self.file_rows().rev().find(|&i| i < current)
+        };
+        if let Some(next) = next {
+            self.selected = Some(next);
+        }
+    }
+}
+
+/// A file's tree label and its counts: `name` (with rename info) and `(+a -d)`.
+#[must_use]
+pub fn file_label(file: &FileChange) -> (String, String) {
+    let (dir, name) = split_path(&file.path);
+    let label = match file.old_path.as_deref() {
+        None => name.to_owned(),
+        Some(old) => {
+            let (old_dir, old_name) = split_path(old);
+            if old_dir == dir {
+                format!("{old_name} → {name}")
+            } else {
+                format!("{name} ← {old}")
+            }
+        }
+    };
+    let counts = match file.stat {
+        Numstat::Lines { added, deleted } => format!("(+{added} -{deleted})"),
+        Numstat::Binary => "(binary)".to_owned(),
+    };
+    (label, counts)
+}
+
+/// Terminal columns are u16; anything wider is clipped by the buffer anyway.
+fn to_u16(n: usize) -> u16 {
+    u16::try_from(n).unwrap_or(u16::MAX)
+}
+
+fn split_path(path: &str) -> (&str, &str) {
+    path.rsplit_once('/').unwrap_or(("", path))
+}
+
+#[derive(Default)]
+struct Node {
+    dirs: BTreeMap<String, Node>,
+    /// (file name, index into files)
+    files: Vec<(String, usize)>,
+}
+
+/// Groups `files` by folder: folders first (alphabetical), then files.
+fn file_tree(files: &[FileChange]) -> Vec<TreeRow> {
+    let mut root = Node::default();
+    for (index, file) in files.iter().enumerate() {
+        let mut node = &mut root;
+        let mut parts: Vec<&str> = file.path.split('/').collect();
+        let name = parts.pop().unwrap_or_default();
+        for dir in parts {
+            node = node.dirs.entry(dir.to_owned()).or_default();
+        }
+        node.files.push((name.to_owned(), index));
+    }
+    let mut rows = Vec::new();
+    flatten(&mut root, 0, &mut rows);
+    rows
+}
+
+fn flatten(node: &mut Node, depth: usize, rows: &mut Vec<TreeRow>) {
+    for (name, child) in &mut node.dirs {
+        rows.push(TreeRow::Dir {
+            depth,
+            name: name.clone(),
+        });
+        flatten(child, depth + 1, rows);
+    }
+    node.files.sort();
+    rows.extend(node.files.iter().map(|(_, index)| TreeRow::File {
+        depth,
+        index: *index,
+    }));
+}
+
+#[cfg(test)]
+mod tests;

@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 ratatui.workspace = true
 tgg-actions.workspace = true
+tgg-git.workspace = true
 tgg-graph.workspace = true
 tgg-model.workspace = true
 unicode-width.workspace = true
