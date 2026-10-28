@@ -2,7 +2,7 @@ use pretty_assertions::assert_eq;
 use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
-use crate::{Action, CommitTarget, ResetMode, Rev};
+use crate::{Action, CommitTarget, ResetMode, Rev, StashAction, TagAction, WorkingTreeAction};
 
 fn oid(c: char) -> Oid {
     Oid::parse(&c.to_string().repeat(40)).unwrap()
@@ -369,20 +369,129 @@ fn commit_actions_are_prefilled() {
 
 // ---- other targets ----
 
-#[test]
-fn targets_outside_s8_and_s9_have_no_menu_yet() {
-    let stash = Target::Stash(Stash {
+fn stash_target() -> Target {
+    Target::Stash(Stash {
         id: oid('d'),
         index: 0,
         subject: "WIP".into(),
-    });
-    let tag = Target::Tag {
+    })
+}
+
+fn tag_target() -> Target {
+    Target::Tag {
         name: "v1".into(),
         target: oid('a'),
-    };
-    for target in [stash, tag, Target::Uncommitted] {
-        assert_eq!(menu_for(&target, &ctx()), Vec::new(), "{target:?}");
     }
+}
+
+#[test]
+fn tag_menu() {
+    let menu = menu_for(&tag_target(), &ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "View Details",
+            "Delete Tag...",
+            "Push Tag...",
+            "---",
+            "Create Archive",
+            "---",
+            "Copy Tag Name to Clipboard",
+        ]
+    );
+    assert_eq!(
+        action(&menu, "Delete Tag..."),
+        &Action::Tag(TagAction::Delete {
+            name: "v1".into(),
+            remote: Some("origin".into()),
+            on_remote: false
+        })
+    );
+    assert_eq!(
+        action(&menu, "Create Archive"),
+        &Action::CreateArchive {
+            rev: Rev::Tag("v1".into()),
+            output: "../v1.zip".into()
+        }
+    );
+}
+
+#[test]
+fn tag_menu_without_remotes_cannot_push() {
+    let ctx = MenuContext {
+        remotes: Vec::new(),
+        ..ctx()
+    };
+    let menu = menu_for(&tag_target(), &ctx);
+    assert!(!labels(&menu).contains(&"Push Tag...".to_owned()));
+    assert_eq!(
+        action(&menu, "Delete Tag..."),
+        &Action::Tag(TagAction::Delete {
+            name: "v1".into(),
+            remote: None,
+            on_remote: false
+        })
+    );
+}
+
+#[test]
+fn stash_menu() {
+    let menu = menu_for(&stash_target(), &ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "Apply Stash...",
+            "Create Branch from Stash...",
+            "Pop Stash...",
+            "Drop Stash...",
+            "---",
+            "Copy Stash Name to Clipboard",
+            "Copy Stash Hash to Clipboard",
+        ]
+    );
+    let Target::Stash(stash) = stash_target() else {
+        unreachable!()
+    };
+    assert_eq!(
+        action(&menu, "Pop Stash..."),
+        &Action::Stash(StashAction::Pop {
+            stash: stash.clone(),
+            reinstate_index: false
+        })
+    );
+    assert_eq!(
+        action(&menu, "Copy Stash Hash to Clipboard"),
+        &Action::CopyCommitHash { commit: oid('d') }
+    );
+}
+
+#[test]
+fn uncommitted_menu() {
+    let menu = menu_for(&Target::Uncommitted, &ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "Stash uncommitted changes...",
+            "---",
+            "Reset uncommitted changes...",
+            "Clean untracked files...",
+            "---",
+            "Open Source Control View",
+        ]
+    );
+    assert_eq!(
+        action(&menu, "Stash uncommitted changes..."),
+        &Action::WorkingTree(WorkingTreeAction::Stash {
+            message: String::new(),
+            include_untracked: true
+        })
+    );
+    assert_eq!(
+        action(&menu, "Reset uncommitted changes..."),
+        &Action::WorkingTree(WorkingTreeAction::Reset {
+            mode: ResetMode::Mixed
+        })
+    );
 }
 
 #[test]
