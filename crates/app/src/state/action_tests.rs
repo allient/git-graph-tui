@@ -190,6 +190,24 @@ fn copy_actions_go_to_the_clipboard() {
 }
 
 #[test]
+fn ui_only_actions_show_a_hint_and_run_no_git() {
+    let repo = FixtureRepo::sample();
+    let before = repo.git(&["rev-parse", "HEAD"]);
+
+    let mut h = open(&repo);
+    choose(&mut h, "v0.1.0", "View Details");
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.contains("v0.1.0"), "{message}");
+    assert!(h.state.running.is_none());
+
+    choose(&mut h, "Uncommitted Changes", "Open Source Control View");
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.contains("source control"), "{message}");
+    assert!(h.state.running.is_none());
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]), before);
+}
+
+#[test]
 fn git_failures_are_reported_and_the_view_refreshes() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);

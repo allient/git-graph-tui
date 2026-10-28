@@ -130,6 +130,17 @@ impl AppState {
                 ));
                 Vec::new()
             }
+            Plan::Ui(UiEffect::ShowTag { name }) => {
+                self.message = Some(format!(
+                    "Tag details for {name} come with the details view."
+                ));
+                Vec::new()
+            }
+            Plan::Ui(UiEffect::OpenSourceControl) => {
+                self.message =
+                    Some("Use `git status` or your editor's source control view.".to_owned());
+                Vec::new()
+            }
         }
     }
 
