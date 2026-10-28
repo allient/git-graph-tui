@@ -1,0 +1,12 @@
+---
+source: crates/ui/tests/picker.rs
+expression: text(&buf)
+---
+
+  ┌ Checkout to ─────────────────────────────────────────────┐
+  │ > ma                                                     │
+  ├──────────────────────────────────────────────────────────┤
+  │ main                                              branch │
+  │ origin/main                                       remote │
+  │ Enter: choose · Esc: cancel                              │
+  └──────────────────────────────────────────────────────────┘
