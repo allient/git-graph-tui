@@ -229,3 +229,119 @@ fn long_menus_scroll_to_keep_the_selection_visible() {
     );
     assert_eq!(hits.hit(2, 1), MenuHit::Item(6));
 }
+
+// ---- submenus ----
+
+fn submenu(label: &str, items: Vec<MenuItem>) -> MenuItem {
+    MenuItem::Submenu {
+        label: label.into(),
+        items,
+    }
+}
+
+/// `Fetch`, `Branch ▸ [Create, Delete]`, `---`, `Show Git Output`.
+fn nested() -> PopupMenu {
+    PopupMenu::new(
+        vec![
+            entry("Fetch"),
+            submenu("Branch", vec![entry("Create"), entry("Delete")]),
+            MenuItem::Separator,
+            entry("Show Git Output"),
+        ],
+        Position::new(2, 1),
+    )
+}
+
+#[test]
+fn submenu_rows_are_selectable_and_open_with_right_or_enter() {
+    let mut menu = nested();
+    menu.handle_key(Key::Down);
+    assert_eq!(menu.selected(), Some(1));
+    assert!(!menu.is_child_open());
+    assert_eq!(menu.handle_key(Key::Right), MenuOutcome::Open);
+    assert!(menu.is_child_open());
+    assert_eq!(menu.handle_key(Key::Left), MenuOutcome::Open);
+    assert!(!menu.is_child_open(), "Left closes the child");
+    assert_eq!(menu.handle_key(Key::Enter), MenuOutcome::Open);
+    assert!(menu.is_child_open(), "Enter opens it too");
+    assert_eq!(menu.handle_key(Key::Esc), MenuOutcome::Open);
+    assert!(!menu.is_child_open(), "Esc closes only the child");
+    assert_eq!(menu.handle_key(Key::Esc), MenuOutcome::Closed);
+}
+
+#[test]
+fn keys_go_to_the_open_child_and_its_choice_comes_back() {
+    let mut menu = nested();
+    menu.handle_key(Key::Down);
+    menu.handle_key(Key::Right);
+    menu.handle_key(Key::Down);
+    assert_eq!(chosen_label(menu.handle_key(Key::Enter)), "Delete");
+    assert_eq!(menu.selected_label(), Some("Delete"));
+}
+
+#[test]
+fn right_on_a_plain_entry_does_nothing() {
+    let mut menu = nested();
+    assert_eq!(menu.handle_key(Key::Right), MenuOutcome::Open);
+    assert!(!menu.is_child_open());
+    assert_eq!(menu.selected_label(), Some("Fetch"));
+}
+
+#[test]
+fn submenu_rows_show_an_arrow_and_fit_it() {
+    // "Show Git Output" (15) is the widest; "Branch ▸" needs 8.
+    assert_eq!(nested().area(screen()).width, 19);
+    let (buf, _) = render(&nested(), screen());
+    let row: String = (2..21).map(|x| buf[(x, 3)].symbol()).collect::<String>();
+    assert_eq!(row, "│ Branch        ▸ │");
+}
+
+#[test]
+fn the_child_opens_beside_the_parent_row_or_flips_left() {
+    let mut menu = nested();
+    menu.handle_key(Key::Down);
+    menu.handle_key(Key::Right);
+    let (_, hits) = render(&menu, screen());
+    let parent = hits.area();
+    let child = hits.child().unwrap().area();
+    assert_eq!(
+        (child.x, child.y),
+        (parent.right(), 2),
+        "beside the Branch row"
+    );
+
+    let mut near_edge = PopupMenu::new(nested().items().to_vec(), Position::new(38, 1));
+    near_edge.handle_key(Key::Down);
+    near_edge.handle_key(Key::Right);
+    let (_, hits) = render(&near_edge, screen());
+    let parent = hits.area();
+    let child = hits.child().unwrap().area();
+    assert_eq!(child.right(), parent.x, "flipped to the left side");
+}
+
+#[test]
+fn mouse_hover_opens_submenus_and_clicks_reach_the_child() {
+    let mut menu = nested();
+    let (_, hits) = render(&menu, screen());
+    menu.handle_hover(&hits, 4, 3);
+    assert!(menu.is_child_open(), "hovering Branch opens it");
+    let (_, hits) = render(&menu, screen());
+    let child = hits.child().unwrap().area();
+    assert_eq!(
+        chosen_label(menu.handle_click(&hits, child.x + 2, child.y + 2)),
+        "Delete"
+    );
+
+    let (_, hits) = render(&menu, screen());
+    menu.handle_hover(&hits, 4, 2);
+    assert!(!menu.is_child_open(), "hovering another entry closes it");
+    assert_eq!(menu.handle_click(&hits, 30, 10), MenuOutcome::Closed);
+}
+
+#[test]
+fn clicking_a_submenu_row_opens_it() {
+    let mut menu = nested();
+    let (_, hits) = render(&menu, screen());
+    assert_eq!(menu.handle_click(&hits, 4, 3), MenuOutcome::Open);
+    assert!(menu.is_child_open());
+}

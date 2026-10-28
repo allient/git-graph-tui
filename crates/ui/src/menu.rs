@@ -38,6 +38,8 @@ pub enum MenuHit {
 pub struct MenuHitMap {
     area: Rect,
     items: Vec<(Rect, usize)>,
+    /// The open submenu, drawn beside this one.
+    child: Option<Box<MenuHitMap>>,
 }
 
 impl MenuHitMap {
@@ -58,6 +60,18 @@ impl MenuHitMap {
     pub fn area(&self) -> Rect {
         self.area
     }
+
+    /// The open submenu's hit-map, if one is open.
+    #[must_use]
+    pub fn child(&self) -> Option<&MenuHitMap> {
+        self.child.as_deref()
+    }
+
+    /// The cell is inside this menu or any open submenu.
+    #[must_use]
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        self.area.contains(Position { x, y }) || self.child().is_some_and(|c| c.contains(x, y))
+    }
 }
 
 /// A context menu (S8, S9): a bordered box of entries and separators opened
@@ -70,6 +84,8 @@ pub struct PopupMenu {
     items: Vec<MenuItem>,
     selected: Option<usize>,
     anchor: Position,
+    /// The open submenu (of the selected `MenuItem::Submenu`).
+    child: Option<Box<PopupMenu>>,
 }
 
 impl PopupMenu {
@@ -82,6 +98,7 @@ impl PopupMenu {
             items,
             selected: None,
             anchor,
+            child: None,
         };
         menu.select_first();
         menu
@@ -96,6 +113,21 @@ impl PopupMenu {
     #[must_use]
     pub fn selected(&self) -> Option<usize> {
         self.selected
+    }
+
+    /// Label of the highlighted entry at the deepest open level, e.g. the
+    /// entry a `MenuOutcome::Chosen` from a submenu came from.
+    #[must_use]
+    pub fn selected_label(&self) -> Option<&str> {
+        if let Some(label) = self.child.as_ref().and_then(|c| c.selected_label()) {
+            return Some(label);
+        }
+        self.label(self.selected?)
+    }
+
+    #[must_use]
+    pub fn is_child_open(&self) -> bool {
+        self.child.is_some()
     }
 
     #[must_use]
@@ -148,8 +180,8 @@ impl PopupMenu {
     /// (case-insensitive), wrapping. Returns false when none matches.
     pub fn jump_to_letter(&mut self, letter: char) -> bool {
         let matches = |menu: &Self, i: usize| {
-            menu.entry(i)
-                .and_then(|e| e.label.chars().next())
+            menu.label(i)
+                .and_then(|label| label.chars().next())
                 .is_some_and(|first| first.to_lowercase().eq(letter.to_lowercase()))
         };
         let after = self.selected.map_or(0, |i| i + 1);
@@ -164,8 +196,20 @@ impl PopupMenu {
         found.is_some()
     }
 
-    /// Arrows, Home/End and accelerator letters move; Enter chooses; Esc closes.
+    /// Arrows, Home/End and accelerator letters move; Enter chooses (or
+    /// opens a submenu, like Right); Esc closes. With a submenu open, keys go
+    /// to it, and Left or Esc closes just the submenu.
     pub fn handle_key(&mut self, key: Key) -> MenuOutcome {
+        if let Some(child) = self.child.as_mut() {
+            if matches!(key, Key::Left | Key::Esc) && !child.is_child_open() {
+                self.child = None;
+                return MenuOutcome::Open;
+            }
+            return child.handle_key(key);
+        }
+        if matches!(key, Key::Right | Key::Enter) && self.open_child() {
+            return MenuOutcome::Open;
+        }
         match key {
             Key::Up | Key::BackTab => self.select_prev(),
             Key::Down | Key::Tab => self.select_next(),
@@ -185,9 +229,20 @@ impl PopupMenu {
         MenuOutcome::Open
     }
 
-    /// A left click at `(x, y)`, resolved against the last render.
+    /// A left click at `(x, y)`, resolved against the last render. Clicks in
+    /// an open submenu go to it; a click on a submenu row opens it.
     pub fn handle_click(&mut self, hits: &MenuHitMap, x: u16, y: u16) -> MenuOutcome {
+        if let (Some(child), Some(child_hits)) = (self.child.as_mut(), hits.child())
+            && child_hits.contains(x, y)
+        {
+            return child.handle_click(child_hits, x, y);
+        }
         match hits.hit(x, y) {
+            MenuHit::Item(index) if self.is_submenu(index) => {
+                self.selected = Some(index);
+                self.open_child();
+                MenuOutcome::Open
+            }
             MenuHit::Item(index) => match self.entry(index) {
                 Some(MenuEntry {
                     disabled: Some(why),
@@ -205,24 +260,59 @@ impl PopupMenu {
         }
     }
 
-    /// Mouse movement: highlights the enabled entry under the pointer.
+    /// Mouse movement: highlights the enabled entry under the pointer,
+    /// opening a submenu row's child and closing it on any other entry.
     pub fn handle_hover(&mut self, hits: &MenuHitMap, x: u16, y: u16) {
+        if let (Some(child), Some(child_hits)) = (self.child.as_mut(), hits.child())
+            && child_hits.contains(x, y)
+        {
+            return child.handle_hover(child_hits, x, y);
+        }
         if let MenuHit::Item(index) = hits.hit(x, y)
             && self.is_enabled(index)
         {
+            let already_open = self.child.is_some() && self.selected == Some(index);
             self.selected = Some(index);
+            if !already_open {
+                self.child = None;
+                self.open_child();
+            }
         }
+    }
+
+    /// Opens the selected submenu; false when the selection isn't one.
+    fn open_child(&mut self) -> bool {
+        let Some(MenuItem::Submenu { items, .. }) = self.selected.and_then(|i| self.items.get(i))
+        else {
+            return false;
+        };
+        // Placed beside the parent row when drawn; the anchor is unused.
+        self.child = Some(Box::new(Self::new(items.clone(), Position::default())));
+        true
     }
 
     /// Where the menu goes on `screen`: at the anchor, flipped left or up
     /// when it would cross the right or bottom edge, and clamped inside.
     #[must_use]
     pub fn area(&self, screen: Rect) -> Rect {
+        let (width, height) = self.size(screen);
+        Rect::new(
+            place(self.anchor.x, width, screen.x, screen.right()),
+            place(self.anchor.y, height, screen.y, screen.bottom()),
+            width,
+            height,
+        )
+    }
+
+    /// Box size on `screen`: the widest label plus padding and border.
+    fn size(&self, screen: Rect) -> (u16, u16) {
         let label_width = self
             .items
             .iter()
             .filter_map(|item| match item {
                 MenuItem::Entry(entry) => Some(entry.label.width()),
+                // Room for ` ▸`.
+                MenuItem::Submenu { label, .. } => Some(label.width() + 2),
                 MenuItem::Separator => None,
             })
             .max()
@@ -235,20 +325,19 @@ impl PopupMenu {
             .unwrap_or(u16::MAX)
             .saturating_add(2)
             .min(screen.height);
-        Rect::new(
-            place(self.anchor.x, width, screen.x, screen.right()),
-            place(self.anchor.y, height, screen.y, screen.bottom()),
-            width,
-            height,
-        )
+        (width, height)
     }
 
     /// Draws the menu over whatever is on `screen` and records its hit-map.
     pub fn render(&self, screen: Rect, buf: &mut Buffer, theme: &Theme) -> MenuHitMap {
-        let area = self.area(screen);
+        self.draw(self.area(screen), screen, buf, theme)
+    }
+
+    fn draw(&self, area: Rect, screen: Rect, buf: &mut Buffer, theme: &Theme) -> MenuHitMap {
         let mut hits = MenuHitMap {
             area,
             items: Vec::new(),
+            child: None,
         };
         if area.width < 2 || area.height < 2 {
             return hits;
@@ -286,8 +375,9 @@ impl PopupMenu {
                 MenuItem::Separator => {
                     buf.set_string(left, y, border('├', '─', '┤', inner_width), frame);
                 }
-                MenuItem::Entry(entry) => {
-                    let style = if entry.disabled.is_some() {
+                MenuItem::Entry(_) | MenuItem::Submenu { .. } => {
+                    let disabled = self.disabled_reason(index).is_some();
+                    let style = if disabled {
                         Style::default().fg(theme.muted)
                     } else if self.selected == Some(index) {
                         Style::default().fg(theme.text).bg(theme.selected_bg)
@@ -295,35 +385,73 @@ impl PopupMenu {
                         Style::default().fg(theme.text)
                     };
                     let pad = " ".repeat(usize::from(PADDING));
-                    let label = fit(
-                        &entry.label,
-                        inner_width.saturating_sub(2 * usize::from(PADDING)),
-                    );
+                    let room = inner_width.saturating_sub(2 * usize::from(PADDING));
+                    let text = match item {
+                        MenuItem::Submenu { label, .. } => {
+                            format!("{}▸", fit(label, room.saturating_sub(1)))
+                        }
+                        _ => fit(self.label(index).unwrap_or_default(), room),
+                    };
                     buf.set_string(left, y, "│", frame);
-                    buf.set_string(left + 1, y, format!("{pad}{label}{pad}"), style);
+                    buf.set_string(left + 1, y, format!("{pad}{text}{pad}"), style);
                     buf.set_string(right, y, "│", frame);
                     hits.items
                         .push((Rect::new(left + 1, y, area.width - 2, 1), index));
                 }
             }
         }
+        if let Some(child) = &self.child {
+            // Beside the submenu row; if it was scrolled away, beside the top.
+            let row_y = self
+                .selected
+                .and_then(|s| hits.items.iter().find(|(_, i)| *i == s))
+                .map_or(area.y + 1, |(rect, _)| rect.y);
+            let child_area = beside(area, row_y, child.size(screen), screen);
+            hits.child = Some(Box::new(child.draw(child_area, screen, buf, theme)));
+        }
         hits
+    }
+
+    fn label(&self, index: usize) -> Option<&str> {
+        match self.items.get(index)? {
+            MenuItem::Entry(entry) => Some(&entry.label),
+            MenuItem::Submenu { label, .. } => Some(label),
+            MenuItem::Separator => None,
+        }
+    }
+
+    fn is_submenu(&self, index: usize) -> bool {
+        matches!(self.items.get(index), Some(MenuItem::Submenu { .. }))
     }
 
     fn entry(&self, index: usize) -> Option<&MenuEntry> {
         match self.items.get(index)? {
             MenuItem::Entry(entry) => Some(entry),
-            MenuItem::Separator => None,
+            MenuItem::Separator | MenuItem::Submenu { .. } => None,
         }
     }
 
     fn is_enabled(&self, index: usize) -> bool {
-        self.entry(index).is_some_and(|e| e.disabled.is_none())
+        self.is_submenu(index) || self.entry(index).is_some_and(|e| e.disabled.is_none())
     }
 
     fn enabled(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
         (0..self.items.len()).filter(|&i| self.is_enabled(i))
     }
+}
+
+/// A submenu of `size` beside `parent`, its first entry on `row_y`: to the
+/// right when it fits, otherwise to the left, then clamped to `screen`.
+fn beside(parent: Rect, row_y: u16, (width, height): (u16, u16), screen: Rect) -> Rect {
+    let x = if parent.right().saturating_add(width) <= screen.right() {
+        parent.right()
+    } else {
+        parent.x.saturating_sub(width)
+    };
+    let x = x.clamp(screen.x, screen.right().saturating_sub(width).max(screen.x));
+    // The child's top border sits one row above its first entry.
+    let y = place(row_y.saturating_sub(1), height, screen.y, screen.bottom());
+    Rect::new(x, y, width, height)
 }
 
 /// Start of a span of `size` cells anchored at `anchor` within `[low, high)`:

@@ -71,3 +71,18 @@ fn menu_near_the_bottom_right_corner_flips_up_and_left() {
     let menu = PopupMenu::new(menu_for(&target, &ctx()), Position::new(38, 11));
     insta::assert_snapshot!(render(&menu, 40, 12));
 }
+
+#[test]
+fn repository_menu_with_the_branch_submenu_open() {
+    let mut menu = PopupMenu::new(menu_for(&Target::Repository, &ctx()), Position::new(1, 0));
+    for key in [
+        tgg_ui::Key::Down,
+        tgg_ui::Key::Down,
+        tgg_ui::Key::Down,
+        tgg_ui::Key::Down,
+        tgg_ui::Key::Right,
+    ] {
+        menu.handle_key(key);
+    }
+    insta::assert_snapshot!(render(&menu, 60, 16));
+}
