@@ -140,15 +140,17 @@ impl AppState {
                 self.message = Some("Picking a ref comes with the picker (toolbar).".to_owned());
                 Vec::new()
             }
-            Plan::Ui(UiEffect::ShowGitOutput) => {
-                self.message = Some("The git output view comes later.".to_owned());
-                Vec::new()
-            }
+            Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
         }
     }
 
     /// The result of one git step of the running action.
-    pub(super) fn on_action_result(&mut self, result: Result<Output, ExecError>) -> Vec<Command> {
+    pub(super) fn on_action_result(
+        &mut self,
+        command: &GitCommand,
+        result: Result<Output, ExecError>,
+    ) -> Vec<Command> {
+        self.record_output(command, &result);
         let Some(mut running) = self.running.take() else {
             return Vec::new();
         };

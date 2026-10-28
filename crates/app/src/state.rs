@@ -21,11 +21,13 @@ use crate::git::{JobHandle, JobId, JobResult};
 mod actions;
 mod details;
 mod info;
+mod output;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
 pub use details::{Details, DiffPanel};
 pub use info::Info;
+pub use output::{GitOutput, OutputLine, OutputView};
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
@@ -147,6 +149,10 @@ pub struct AppState {
     pub diff: Option<DiffPanel>,
     /// A read-only info dialog (tag details), above everything but dialogs.
     pub info: Option<Info>,
+    /// Git commands actions ran, for "Show Git Output".
+    pub git_output: GitOutput,
+    /// The open git output view, drawn over the graph.
+    pub output_view: Option<OutputView>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -179,6 +185,8 @@ impl AppState {
             details: None,
             diff: None,
             info: None,
+            git_output: GitOutput::default(),
+            output_view: None,
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -267,6 +275,9 @@ impl AppState {
                 None => Vec::new(),
             };
         }
+        if self.output_view.is_some() {
+            return self.on_output_key(key);
+        }
         if self.diff.is_some() {
             return self.on_diff_key(key);
         }
@@ -335,6 +346,9 @@ impl AppState {
                 _ => {}
             }
             return Vec::new();
+        }
+        if self.output_view.is_some() {
+            return self.on_output_mouse(mouse);
         }
         if self.diff.is_some() {
             return self.on_diff_mouse(mouse);
@@ -489,7 +503,7 @@ impl AppState {
         };
         let request = match job {
             Job::Read(request) => request,
-            Job::Action => return self.on_action_result(result.result),
+            Job::Action => return self.on_action_result(&result.command, result.result),
         };
         let JobResult {
             command, result, ..
@@ -655,5 +669,7 @@ mod details_tests;
 mod info_tests;
 #[cfg(test)]
 mod mouse_tests;
+#[cfg(test)]
+mod output_tests;
 #[cfg(test)]
 mod tests;
