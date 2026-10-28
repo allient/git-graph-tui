@@ -27,3 +27,7 @@ pub use details::{
 };
 mod diff_view;
 pub use diff_view::{DiffHit, DiffHitMap, DiffOutcome, DiffStyle, DiffView};
+mod confirm;
+pub use confirm::{
+    Button, ConfirmDialog, DialogHit, DialogHitMap, DialogOutcome, DialogStyle, MAX_WIDTH,
+};
