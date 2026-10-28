@@ -25,6 +25,8 @@ pub enum InputId {
     ReinstateIndex,
     /// Stash untracked files too.
     IncludeUntracked,
+    /// A remote's URL.
+    Url,
 }
 
 /// How a dialog should edit a field.

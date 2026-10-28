@@ -4,7 +4,7 @@ use tgg_git::GitCommand;
 use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
-use crate::{StashAction, TagAction, WorkingTreeAction};
+use crate::{PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction};
 
 /// Abbreviated hash length in confirmation text (git's default).
 const SHORT: usize = 7;
@@ -178,6 +178,9 @@ pub enum Action {
     Tag(TagAction),
     Stash(StashAction),
     WorkingTree(WorkingTreeAction),
+    Repo(RepoAction),
+    /// An app-only effect from a menu (pickers, the git output view).
+    Ui(UiEffect),
 }
 
 /// What running an action means.
@@ -201,6 +204,12 @@ pub enum UiEffect {
     },
     /// The VS Code "Open Source Control View" entry; the app shows a hint.
     OpenSourceControl,
+    /// Open a ref picker; [`PickPurpose::action_for`] turns the pick into an action.
+    PickRef {
+        purpose: PickPurpose,
+    },
+    /// Show the log of git commands and their output.
+    ShowGitOutput,
 }
 
 /// The dialog shown before an action runs (S13).
@@ -248,6 +257,8 @@ impl Action {
             Self::Tag(action) => action.plan(repo),
             Self::Stash(action) => action.plan(repo),
             Self::WorkingTree(action) => action.plan(repo),
+            Self::Repo(action) => action.plan(repo),
+            Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
     }
@@ -353,7 +364,9 @@ impl Action {
             | Self::CopyCommitSubject { .. }
             | Self::Tag(_)
             | Self::Stash(_)
-            | Self::WorkingTree(_) => Vec::new(),
+            | Self::WorkingTree(_)
+            | Self::Repo(_)
+            | Self::Ui(_) => Vec::new(),
         }
     }
 
@@ -369,6 +382,7 @@ impl Action {
             Self::Tag(action) => action.is_destructive(),
             Self::Stash(action) => action.is_destructive(),
             Self::WorkingTree(action) => action.is_destructive(),
+            Self::Repo(action) => action.is_destructive(),
             _ => false,
         }
     }
@@ -460,6 +474,7 @@ impl Action {
             Self::Tag(action) => return action.confirmation(),
             Self::Stash(action) => return action.confirmation(),
             Self::WorkingTree(action) => return action.confirmation(),
+            Self::Repo(action) => return action.confirmation(),
             _ => return None,
         };
         Some(confirmation)
@@ -533,6 +548,7 @@ impl Action {
             Self::Tag(action) => action.inputs(),
             Self::Stash(action) => action.inputs(),
             Self::WorkingTree(action) => action.inputs(),
+            Self::Repo(action) => action.inputs(),
             _ => Vec::new(),
         }
     }
@@ -585,6 +601,7 @@ impl Action {
             (Self::Tag(action), _) => return action.set_input(id, value),
             (Self::Stash(action), _) => return action.set_input(id, value),
             (Self::WorkingTree(action), _) => return action.set_input(id, value),
+            (Self::Repo(action), _) => return action.set_input(id, value),
             _ => return Err(InputError::NotAnInput(id)),
         }
         Ok(())
