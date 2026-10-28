@@ -33,6 +33,7 @@ fn main() -> Result<()> {
 }
 
 fn run(terminal: &mut DefaultTerminal, repo: PathBuf) -> Result<()> {
+    let _mouse = MouseCapture::enable()?;
     let (runner, results) = Runner::new(ProcessExecutor::new());
     let theme = Theme::default();
     let mut state = AppState::new(repo);
@@ -45,10 +46,12 @@ fn run(terminal: &mut DefaultTerminal, repo: PathBuf) -> Result<()> {
         if state.should_quit {
             return Ok(());
         }
-        if event::poll(INPUT_POLL)?
-            && let TermEvent::Key(key) = event::read()?
-        {
-            dispatch(&mut state, &runner, Event::Key(key));
+        if event::poll(INPUT_POLL)? {
+            match event::read()? {
+                TermEvent::Key(key) => dispatch(&mut state, &runner, Event::Key(key)),
+                TermEvent::Mouse(mouse) => dispatch(&mut state, &runner, Event::Mouse(mouse)),
+                _ => {}
+            }
         }
         while let Ok(result) = results.try_recv() {
             dispatch(&mut state, &runner, Event::Git(result));
@@ -61,5 +64,23 @@ fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event
     for Command::Git(request) in state.update(event) {
         let job = runner.submit(request.command(&state.repo));
         state.track(&job, request);
+    }
+}
+
+/// Turns on mouse reporting for the session and turns it off again on drop,
+/// so the shell gets normal mouse behavior back even on an early return.
+struct MouseCapture;
+
+impl MouseCapture {
+    fn enable() -> Result<Self> {
+        crossterm::execute!(std::io::stdout(), event::EnableMouseCapture)?;
+        Ok(Self)
+    }
+}
+
+impl Drop for MouseCapture {
+    fn drop(&mut self) {
+        // Nothing useful to do if the terminal is already gone.
+        let _ = crossterm::execute!(std::io::stdout(), event::DisableMouseCapture);
     }
 }

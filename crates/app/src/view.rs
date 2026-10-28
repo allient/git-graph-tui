@@ -5,16 +5,16 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use tgg_model::HeadState;
-use tgg_ui::{GraphView, HitMap, Theme};
+use tgg_ui::{GraphView, Theme};
 
 use crate::state::AppState;
 
 /// Key hints shown at the right of the status bar.
-const HINTS: &str = "j/k move  g/G top/end  H head  r refresh  q quit";
+const HINTS: &str = "j/k move  m menu  H head  r refresh  q quit";
 
-/// Draws the graph and the status bar. Updates the viewport height so
-/// scrolling matches what fits on screen, and returns the graph's hit-map.
-pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) -> HitMap {
+/// Draws the graph, the status bar and the open menu. Updates the viewport
+/// height and stores the hit-maps that mouse events resolve against.
+pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let [graph_area, status_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
     state.viewport_height = usize::from(graph_area.height).max(1);
@@ -28,9 +28,12 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) -> HitMa
         offset: state.offset,
         selected: state.selected,
     };
-    let hits = view.render(graph_area, frame.buffer_mut(), theme);
+    state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
     draw_status(frame, status_area, state, theme);
-    hits
+    if let Some(menu) = &state.menu {
+        let screen = frame.area();
+        state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
+    }
 }
 
 fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Theme) {
@@ -136,12 +139,11 @@ mod tests {
             })
             .unwrap();
         h.key(crossterm::event::KeyCode::Char('G'));
-        let mut hits = HitMap::default();
         terminal
-            .draw(|f| hits = draw(f, &mut h.state, &Theme::default()))
+            .draw(|f| draw(f, &mut h.state, &Theme::default()))
             .unwrap();
         // 3 graph lines; the last commit (index 6) is on the bottom one.
-        assert_eq!(hits.hit(40, 2), Some(&HitTarget::Commit(6)));
+        assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(6)));
     }
 
     #[test]
