@@ -7,8 +7,12 @@
 //! stash, uncommitted changes), so mouse menus, keyboard menus and tests all
 //! share one source of truth.
 
+mod action;
+mod input;
 mod refname;
 mod target;
 
+pub use action::{Action, Confirmation, Plan, ResetMode, Rev, UiEffect};
+pub use input::{InputError, InputId, InputKind, InputSpec, InputValue};
 pub use refname::{RefNameError, validate_ref_name};
 pub use target::{CommitTarget, MenuContext, Target};

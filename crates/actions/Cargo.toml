@@ -13,6 +13,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+tgg-git.workspace = true
 tgg-model.workspace = true
 thiserror.workspace = true
 
