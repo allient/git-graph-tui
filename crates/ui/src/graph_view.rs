@@ -293,7 +293,7 @@ impl GraphView<'_> {
             // A dotted line from the uncommitted row down to HEAD's lane.
             let x = cols.lanes_x() + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
             if x < cols.graph.right() {
-                buf[(x, y)].set_char('┇').set_fg(theme.muted);
+                buf[(x, y)].set_char('┆').set_fg(theme.muted);
             }
             return;
         };

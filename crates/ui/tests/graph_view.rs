@@ -143,7 +143,7 @@ fn a_line_joins_consecutive_commits() {
         lines[3].starts_with("  ●") && lines[5].starts_with("  ●"),
         "{lines:#?}"
     );
-    assert_eq!(lines[4], "  ┃");
+    assert_eq!(lines[4], "  │");
     // The connector line belongs to the row above it.
     assert_eq!(hits.hit(100, 4), Some(&HitTarget::Commit(0)));
 }
