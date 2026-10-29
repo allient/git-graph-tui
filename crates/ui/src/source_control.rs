@@ -49,6 +49,8 @@ enum Focus {
 enum Item {
     StagedHeader,
     Staged(usize),
+    /// A blank line between the two sections; the keyboard skips it.
+    Gap,
     ChangesHeader,
     Unstaged(usize),
 }
@@ -155,6 +157,9 @@ impl SourceControl {
             items.extend(staged.into_iter().map(Item::Staged));
         }
         if !unstaged.is_empty() {
+            if !items.is_empty() {
+                items.push(Item::Gap);
+            }
             items.push(Item::ChangesHeader);
             items.extend(unstaged.into_iter().map(Item::Unstaged));
         }
@@ -190,11 +195,21 @@ impl SourceControl {
                 _ => {}
             },
             Focus::Files => {
-                let last = self.items().len().saturating_sub(1);
+                let items = self.items();
+                let last = items.len().saturating_sub(1);
+                let gap = |i: usize| items.get(i) == Some(&Item::Gap);
                 match key {
                     Key::Up if self.selected == 0 => self.focus = Focus::Commit,
-                    Key::Up => self.selected -= 1,
-                    Key::Down => self.selected = (self.selected + 1).min(last),
+                    Key::Up => {
+                        self.selected -= 1;
+                        if gap(self.selected) {
+                            self.selected -= 1;
+                        }
+                    }
+                    Key::Down => {
+                        let next = self.selected + 1;
+                        self.selected = (if gap(next) { next + 1 } else { next }).min(last);
+                    }
                     Key::Home => self.selected = 0,
                     Key::End => self.selected = last,
                     Key::Enter | Key::Char(' ') => return self.toggle(self.selected),
@@ -279,7 +294,7 @@ impl SourceControl {
         match self.items().get(item) {
             Some(Item::StagedHeader | Item::Staged(_)) => self.only(item, false),
             Some(Item::ChangesHeader | Item::Unstaged(_)) => self.only(item, true),
-            None => SourceControlOutcome::Stay,
+            Some(Item::Gap) | None => SourceControlOutcome::Stay,
         }
     }
 
@@ -398,6 +413,9 @@ impl SourceControl {
             if focused && self.focus == Focus::Files && index == self.selected {
                 buf.set_style(row_area, Style::new().bg(theme.selected_bg));
             }
+            if *item == Item::Gap {
+                continue;
+            }
             hits.regions.push((row_area, Hit::Row(index)));
             self.draw_item(buf, row_area, index, *item, &items, theme, &mut hits);
         }
@@ -515,6 +533,7 @@ impl SourceControl {
         let icons = theme.icons;
         // Right side, VS Code order: buttons, then the status letter or count.
         let (left, tail, buttons): RowParts<'_> = match item {
+            Item::Gap => return,
             Item::StagedHeader | Item::ChangesHeader => {
                 let staged = item == Item::StagedHeader;
                 let count = items

@@ -225,3 +225,49 @@ fn graph_hits_come_from_the_last_frame() {
     // uncommitted row and its connector.
     assert_eq!(h.state.graph_hits.hit(100, 4), Some(&HitTarget::Commit(0)));
 }
+
+fn double_click(h: &mut Harness, x: u16, y: u16) {
+    click(h, MouseButton::Left, x, y);
+    click(h, MouseButton::Left, x, y);
+}
+
+#[test]
+fn double_clicking_a_branch_checks_it_out() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    // Generous, so a slow machine can't split the two clicks.
+    h.state.double_click = Duration::from_secs(60);
+    let (x, y) = find(&h, "develop");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.contains('✓'), "{message}");
+}
+
+#[test]
+fn a_single_click_on_a_branch_only_opens_the_details() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.double_click = Duration::ZERO;
+    let (x, y) = find(&h, "develop");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "main");
+}
+
+#[test]
+fn double_clicking_a_remote_branch_asks_for_the_local_name() {
+    let repo = FixtureRepo::sample();
+    repo.checkout("feature/login");
+    repo.push("feature/login");
+    repo.checkout("main");
+    repo.git(&["branch", "--delete", "--force", "feature/login"]);
+    let mut h = open(&repo);
+    h.state.double_click = Duration::from_secs(60);
+    let (x, y) = find(&h, "origin/feature/login");
+    double_click(&mut h, x + 1, y);
+    assert!(
+        matches!(h.state.dialog, Some(Dialog::Input { .. })),
+        "{:?}",
+        h.state.message
+    );
+}
