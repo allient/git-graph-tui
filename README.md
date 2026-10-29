@@ -18,10 +18,10 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 **Main goal:** offer the capabilities of the Git Graph extension for VS Code, adapted to a terminal UI.
 
 - **Independent.** A single binary whose only runtime dependency is the `git` CLI. No editor, multiplexer or plugin API required.
-- **Mouse and keyboard.** Click to select, right-click for context menus, scroll with the wheel. Everything also works from the keyboard.
+- **Mouse and keyboard.** Click to select, right-click for context menus, scroll with the wheel. Everything also works from the keyboard. Inside herdr, tui-git-graph routes plain right-click to itself while it runs (`herdr pane input --right-click pane`) and gives it back on exit; set `TUI_GIT_GRAPH_HERDR_RIGHT_CLICK=off` to keep herdr's menu.
 - **Fast** on real repositories (tens of thousands of commits, many branches): incremental loading, background git calls, a UI that never blocks.
 - **Safe.** Every destructive action (reset, delete branch, force push, drop, clean) asks for confirmation and says exactly what will happen.
-- **Works where you work.** Any terminal, tmux, herdr panes (via a herdr plugin) and TTT (via a thin TTT plugin that opens it in a terminal tab).
+- **Works where you work.** Any terminal, tmux, herdr (a [herdr plugin](integrations/herdr/README.md) opens it in a tab; plain right-click works inside herdr) and TTT (via a thin TTT plugin that opens it in a terminal tab).
 - **Maintainable.** A pure, well-tested core (parsing, layout, actions) with a thin UI layer.
 
 ### Non-goals (for now)
@@ -145,7 +145,7 @@ A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure cra
 Cargo.toml              # workspace: members, shared package metadata, dependency catalog, lints, profiles
 rust-toolchain.toml     # pinned toolchain (rustfmt, clippy)
 crates/<crate>/         # one package per crate (see table)
-integrations/herdr/     # herdr-plugin.toml: opens tui-git-graph in a herdr pane (planned)
+integrations/herdr/     # herdr plugin: opens tui-git-graph in a herdr tab
 integrations/ttt/       # tiny TTT plugin that runs tui-git-graph in a terminal tab (planned)
 tests/fixtures/         # scripts/data for fixture repos
 odd/tasks/              # ODD feature documents
@@ -287,12 +287,12 @@ Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
 
 ## Roadmap
 
-Steps 1 to 3 and step 5 are done; step 4 is next.
+Steps 1 to 3 and step 5 are done; step 4 is in progress (the herdr plugin is done).
 
 1. **MVP:** colored graph with badges, uncommitted row, selection, scrolling, mouse + keyboard, branch and commit context menus with checkout / switch branch, create branch, tag, cherry-pick, revert, merge, reset, copy; commit details with file diffs.
 2. **Daily driver:** branch filter, remote toggle, search, repository "..." menu, pull / push / fetch, tags and stashes, config file.
 3. **Parity:** compare commits, archive, remotes management, issue linking, PR creation.
-4. **Integrations and release:** herdr plugin, TTT plugin, Homebrew tap, GitHub Releases.
+4. **Integrations and release:** herdr plugin (done), TTT plugin, Homebrew tap, GitHub Releases.
 5. **Beyond:** interactive rebase, conflict handling, worktrees, reflog.
 
 ## Licensing
