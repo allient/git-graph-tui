@@ -60,6 +60,7 @@ fn view(l: &Loaded) -> GraphView<'_> {
         widths: ColumnWidths::default(),
         matches: &[],
         hidden: &[],
+        detached: false,
     }
 }
 
@@ -559,4 +560,34 @@ fn nerd_badges_have_an_icon_and_rounded_ends() {
         Some(HitTarget::Ref { full_name, .. }) => assert_eq!(full_name, "refs/heads/develop"),
         other => panic!("expected the develop badge, got {other:?}"),
     }
+}
+
+#[test]
+fn a_detached_head_is_marked_on_its_commit() {
+    let repo = FixtureRepo::sample();
+    let develop = repo.git(&["rev-parse", "develop"]);
+    repo.git(&[
+        "switch",
+        "--quiet",
+        "--discard-changes",
+        "--detach",
+        &develop,
+    ]);
+    let loaded = load(&repo);
+    let (buf, hits) = render(
+        &GraphView {
+            detached: true,
+            ..view(&loaded)
+        },
+        110,
+        12,
+    );
+    let (x, y) = find(&buf, " HEAD ");
+    let line: String = (0..110).map(|x| buf[(x, y)].symbol()).collect();
+    assert!(
+        line.contains("○  HEAD ") && line.contains("Return a value"),
+        "{line}"
+    );
+    // The marker is not a ref: clicking it targets the commit.
+    assert!(matches!(hits.hit(x + 2, y), Some(HitTarget::Commit(_))));
 }

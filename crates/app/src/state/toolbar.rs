@@ -218,6 +218,7 @@ impl AppState {
         let item = |value: &str, kind: &str| PickerItem {
             value: value.to_owned(),
             kind: Some(kind.to_owned()),
+            search_kind: false,
         };
         let current = match &self.status.head {
             tgg_model::HeadState::Branch(name) => Some(name.as_str()),
@@ -277,7 +278,10 @@ impl AppState {
             ) => self
                 .stashes
                 .iter()
-                .map(|stash| item(&stash.selector(), &stash.subject))
+                .map(|stash| PickerItem {
+                    search_kind: true,
+                    ..item(&stash.selector(), &stash.subject)
+                })
                 .collect(),
             PickerFor::Ref(PickPurpose::DeleteTag | PickPurpose::DeleteRemoteTag) => self
                 .refs

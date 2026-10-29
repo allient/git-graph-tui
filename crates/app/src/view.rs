@@ -88,6 +88,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         rows: state.graph.rows(),
         refs: &refs,
         head: state.head.as_ref(),
+        detached: state.status.head == HeadState::Detached,
         uncommitted: state.status.changed_files(),
         offset: state.offset,
         selected: state.selected,
@@ -97,6 +98,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         hidden: &state.hidden_columns,
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
+    draw_empty_hint(frame, graph_area, state);
     if let (Some(area), Some(details)) = (state.graph_hits.gap(), &mut state.details) {
         details.hits = if let Some(view) = &details.view {
             Some(view.render(area, frame.buffer_mut(), theme))
@@ -218,6 +220,23 @@ fn draw_find(frame: &mut Frame<'_>, area: Rect, find: &Find, theme: &Theme) {
     frame.set_cursor_position((area.x + u16::try_from(cursor).unwrap_or(u16::MAX), area.y));
 }
 
+/// A repository with no commits says so, once the first reads are done.
+fn draw_empty_hint(frame: &mut Frame<'_>, graph_area: Rect, state: &AppState) {
+    if !state.commits.is_empty() || state.head.is_some() || state.is_loading() {
+        return;
+    }
+    // Below the column header and the uncommitted row.
+    let hint = Rect::new(
+        graph_area.x + 2,
+        graph_area.y + 3,
+        graph_area.width.saturating_sub(2),
+        1,
+    )
+    .intersection(graph_area);
+    Paragraph::new(" No commits yet: commit from Source Control, or with git.".dim())
+        .render(hint, frame.buffer_mut());
+}
+
 fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Theme) {
     if let Some(find) = &state.find {
         draw_find(frame, area, find, theme);
@@ -334,6 +353,29 @@ mod tests {
         // Toolbar, 2 graph lines, status bar; the last row (index 7, after
         // the fixture's stash row) is on the bottom graph line.
         assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(7)));
+    }
+
+    #[test]
+    fn an_empty_repository_says_it_has_no_commits() {
+        let repo = FixtureRepo::new();
+        let mut h = Harness::open(&repo);
+        let mut terminal = Terminal::new(TestBackend::new(110, 10)).unwrap();
+        terminal
+            .draw(|f| draw(f, &mut h.state, &Theme::default()))
+            .unwrap();
+        assert!(
+            screen(&terminal).contains("No commits yet"),
+            "{}",
+            screen(&terminal)
+        );
+
+        // Not once there are commits.
+        let repo = FixtureRepo::sample();
+        let mut h = Harness::open(&repo);
+        terminal
+            .draw(|f| draw(f, &mut h.state, &Theme::default()))
+            .unwrap();
+        assert!(!screen(&terminal).contains("No commits yet"));
     }
 
     #[test]

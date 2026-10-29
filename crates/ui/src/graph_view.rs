@@ -207,6 +207,8 @@ pub struct GraphView<'a> {
     pub matches: &'a [usize],
     /// Columns hidden from the header's menu.
     pub hidden: &'a [GraphColumn],
+    /// HEAD is on no branch: its commit gets a `HEAD` badge instead.
+    pub detached: bool,
 }
 
 /// Blank lines opened below display row `after`; rows below it move down.
@@ -378,11 +380,24 @@ impl GraphView<'_> {
         // Badges, then the subject, clipped to the description column.
         let mut x = cols.description.x;
         let right = cols.description.right();
-        for badge in badges_for(&commit.id, self.refs) {
+        let mut badges = badges_for(&commit.id, self.refs);
+        if self.detached && self.head == Some(&commit.id) {
+            badges.insert(
+                0,
+                Badge {
+                    kind: BadgeKind::Head,
+                    label: "HEAD".into(),
+                    remotes: Vec::new(),
+                    // No ref: a click on it is a click on the commit.
+                    full_name: String::new(),
+                },
+            );
+        }
+        for badge in badges {
             let start = x;
             let remotes;
             (x, remotes) = draw_badge(buf, x, y, right, &badge, lane_color, theme);
-            if x > start {
+            if x > start && !badge.full_name.is_empty() {
                 hits.push(
                     Rect::new(start, y, x - start, 1),
                     HitTarget::Ref {

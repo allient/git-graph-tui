@@ -8,6 +8,7 @@ fn item(value: &str, kind: &str) -> PickerItem {
     PickerItem {
         value: value.into(),
         kind: Some(kind.into()),
+        search_kind: false,
     }
 }
 

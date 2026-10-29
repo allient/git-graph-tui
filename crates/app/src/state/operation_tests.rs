@@ -251,3 +251,22 @@ fn staging_a_resolution_stays_allowed() {
             .is_some()
     );
 }
+
+#[test]
+fn a_merge_that_stops_on_conflicts_says_so() {
+    let repo = diverged();
+    let mut h = open(&repo);
+    click_text(&mut h, MouseButton::Right, "topic");
+    click_text(&mut h, MouseButton::Left, "Merge into current branch...");
+    press(&mut h, KeyCode::Enter); // the merge dialog's defaults
+    if matches!(h.state.dialog, Some(Dialog::Confirm { .. })) {
+        press(&mut h, KeyCode::Enter);
+    }
+    assert!(merge_head(&repo), "git stopped mid-merge");
+    assert!(
+        message(&h).contains("Conflicts found. Resolve them, then continue or abort."),
+        "{:?}",
+        message(&h)
+    );
+    assert_eq!(h.state.operation, Some(Operation::Merge));
+}

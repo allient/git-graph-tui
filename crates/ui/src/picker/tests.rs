@@ -9,6 +9,7 @@ fn item(value: &str, kind: &str) -> PickerItem {
     PickerItem {
         value: value.into(),
         kind: Some(kind.into()),
+        search_kind: false,
     }
 }
 
@@ -64,6 +65,33 @@ fn glob_patterns_match_like_branch_filters() {
 }
 
 // ---- single choice ----
+
+#[test]
+fn descriptions_are_searched_only_when_they_are_text() {
+    let stash = |value: &str, message: &str| PickerItem {
+        value: value.into(),
+        kind: Some(message.into()),
+        search_kind: true,
+    };
+    let mut picker = Picker::single(
+        "Apply Stash",
+        vec![
+            stash("stash@{0}", "On main: second"),
+            stash("stash@{1}", "On main: first"),
+        ],
+    );
+    type_text(&mut picker, "FIRST");
+    assert_eq!(picker.visible_values(), ["stash@{1}"]);
+
+    // A ref's kind ("remote") is a label, not text to search.
+    let mut picker = single();
+    type_text(&mut picker, "remote");
+    assert!(
+        picker.visible_values().is_empty(),
+        "{:?}",
+        picker.visible_values()
+    );
+}
 
 #[test]
 fn typing_filters_by_substring_ignoring_case() {
