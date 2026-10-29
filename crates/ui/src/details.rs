@@ -39,6 +39,8 @@ pub enum DetailsOutcome {
     ViewFile(FileChange),
     /// Select this parent commit in the graph (S10).
     JumpTo(Oid),
+    /// Open the page of the issue with this number (`#123` in the message).
+    OpenIssue(String),
     /// Collapse the details panel.
     Close,
 }
@@ -49,6 +51,8 @@ pub enum DetailsHit {
     /// A file row (index into [`CommitDetailsView::rows`]).
     File(usize),
     Parent(Oid),
+    /// An issue reference in the message: its number.
+    Issue(String),
     Frame,
     Outside,
 }
@@ -59,6 +63,7 @@ pub struct DetailsHitMap {
     area: Rect,
     files: Vec<(Rect, usize)>,
     parents: Vec<(Rect, Oid)>,
+    issues: Vec<(Rect, String)>,
 }
 
 impl DetailsHitMap {
@@ -69,6 +74,8 @@ impl DetailsHitMap {
             DetailsHit::File(*row)
         } else if let Some((_, id)) = self.parents.iter().find(|(r, _)| r.contains(point)) {
             DetailsHit::Parent(id.clone())
+        } else if let Some((_, number)) = self.issues.iter().find(|(r, _)| r.contains(point)) {
+            DetailsHit::Issue(number.clone())
         } else if self.area.contains(point) {
             DetailsHit::Frame
         } else {
@@ -110,6 +117,8 @@ pub struct CommitDetailsView {
     rows: Vec<TreeRow>,
     /// Index into `rows`, always a file row.
     selected: Option<usize>,
+    /// What starts an issue reference in the message (`#` in `#123`).
+    issue_prefix: String,
 }
 
 impl CommitDetailsView {
@@ -134,7 +143,16 @@ impl CommitDetailsView {
             files,
             rows,
             selected,
+            issue_prefix: "#".into(),
         }
+    }
+
+    /// Links issue references that start with `prefix` (such as `PROJ-`)
+    /// instead of `#`.
+    #[must_use]
+    pub fn with_issue_prefix(mut self, prefix: &str) -> Self {
+        prefix.clone_into(&mut self.issue_prefix);
+        self
     }
 
     /// The commit shown, or None for a comparison.
@@ -195,7 +213,7 @@ impl CommitDetailsView {
     }
 
     /// A click on a file selects and opens it; a click on a parent hash
-    /// jumps to that commit.
+    /// jumps to that commit; a click on an issue reference opens it.
     pub fn handle_click(&mut self, hits: &DetailsHitMap, x: u16, y: u16) -> DetailsOutcome {
         match hits.hit(x, y) {
             DetailsHit::File(row) => {
@@ -205,6 +223,7 @@ impl CommitDetailsView {
                     .map_or(DetailsOutcome::Stay, DetailsOutcome::OpenFile)
             }
             DetailsHit::Parent(id) => DetailsOutcome::JumpTo(id),
+            DetailsHit::Issue(number) => DetailsOutcome::OpenIssue(number),
             DetailsHit::Frame | DetailsHit::Outside => DetailsOutcome::Stay,
         }
     }
@@ -234,18 +253,25 @@ impl CommitDetailsView {
         for y in area.top()..area.bottom() {
             buf.set_string(left.right(), y, "│", Style::default().fg(theme.muted));
         }
-        Self::render_metadata(details, left, buf, theme, &mut hits);
+        let message_y = Self::render_metadata(details, left, buf, theme, &mut hits);
+        let message = Rect {
+            y: message_y,
+            height: left.bottom().saturating_sub(message_y),
+            ..left
+        };
+        self.render_message(&details.message, message, buf, theme, &mut hits);
         self.render_files(right, buf, theme, &mut hits);
         hits
     }
 
+    /// Draws the commit's fields; returns the line its message starts on.
     fn render_metadata(
         details: &CommitDetails,
         area: Rect,
         buf: &mut Buffer,
         theme: &Theme,
         hits: &mut DetailsHitMap,
-    ) {
+    ) -> u16 {
         let commit = &details.commit;
         let width = usize::from(area.width.saturating_sub(1));
         let label = Style::default().fg(theme.muted);
@@ -282,7 +308,7 @@ impl CommitDetailsView {
         let mut y = area.y;
         for (name, value, style) in &lines {
             if y >= area.bottom() {
-                return;
+                return y;
             }
             field(buf, y, name, value, *style);
             if *name == "Parents:" {
@@ -304,19 +330,51 @@ impl CommitDetailsView {
             }
             y += 1;
         }
-        // Blank line, then the message (subject bold, then the body).
-        y += 1;
-        for (i, line) in details.message.lines().enumerate() {
-            if y >= area.bottom() {
-                break;
-            }
+        // A blank line before the message.
+        y + 1
+    }
+
+    /// The message in `area`: the subject bold, then the body. Issue
+    /// references are underlined and clickable where they fit.
+    fn render_message(
+        &self,
+        message: &str,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        hits: &mut DetailsHitMap,
+    ) {
+        let width = usize::from(area.width.saturating_sub(1));
+        let text = Style::default().fg(theme.text);
+        let link_style = Style::default()
+            .fg(theme.tag)
+            .add_modifier(Modifier::UNDERLINED);
+        let x = area.x + 1;
+        for (y, (i, line)) in (area.top()..area.bottom()).zip(message.lines().enumerate()) {
             let style = if i == 0 {
                 text.add_modifier(Modifier::BOLD)
             } else {
                 text
             };
-            buf.set_string(x, y, fit(&line.replace('\t', "    "), width), style);
-            y += 1;
+            let line = line.replace('\t', "    ");
+            buf.set_string(x, y, fit(&line, width), style);
+            // A cut line ends in an ellipsis.
+            let room = if line.width() <= width {
+                width
+            } else {
+                width.saturating_sub(1)
+            };
+            for issue in tgg_actions::issue_refs(&line, &self.issue_prefix) {
+                let start = line[..issue.range.start].width();
+                let end = line[..issue.range.end].width();
+                if end > room {
+                    break;
+                }
+                let at = x + to_u16(start);
+                buf.set_string(at, y, &line[issue.range], style.patch(link_style));
+                hits.issues
+                    .push((Rect::new(at, y, to_u16(end - start), 1), issue.number));
+            }
         }
     }
 

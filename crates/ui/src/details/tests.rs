@@ -259,3 +259,75 @@ fn a_comparison_lists_its_files_across_the_whole_panel() {
     let (buf, _) = render(&one, Rect::new(0, 0, 80, 3));
     assert!(line(&buf, 0).starts_with(" Comparing a..b (1 changed file) "));
 }
+
+// ---- issue links (S20) ----
+
+fn with_message(message: &str) -> CommitDetailsView {
+    let mut info = details(vec![oid('b')]);
+    info.message = message.into();
+    CommitDetailsView::new(info, files())
+}
+
+/// Where `text` starts in the rendered buffer.
+fn position(buf: &Buffer, text: &str) -> (u16, u16) {
+    (buf.area.top()..buf.area.bottom())
+        .find_map(|y| {
+            let row = line(buf, y);
+            let byte = row.find(text)?;
+            Some((u16::try_from(row[..byte].chars().count()).unwrap(), y))
+        })
+        .unwrap_or_else(|| panic!("{text:?} not drawn"))
+}
+
+#[test]
+fn issue_references_in_the_message_are_underlined_links() {
+    let mut view = with_message("Fix login (#12)\n\nabc#34 is not one, but #5 is.");
+    let (buf, hits) = render(&view, Rect::new(0, 0, 100, 12));
+    let (x, y) = position(&buf, "#12");
+    for dx in 0..3 {
+        let cell = &buf[(x + dx, y)];
+        assert!(cell.modifier.contains(Modifier::UNDERLINED), "x={}", x + dx);
+        assert_eq!(cell.fg, Theme::default().tag);
+    }
+    assert!(!buf[(x + 3, y)].modifier.contains(Modifier::UNDERLINED));
+    assert_eq!(
+        view.handle_click(&hits, x + 1, y),
+        DetailsOutcome::OpenIssue("12".into())
+    );
+    let (x, y) = position(&buf, "#5");
+    assert_eq!(
+        view.handle_click(&hits, x, y),
+        DetailsOutcome::OpenIssue("5".into())
+    );
+    let (x, y) = position(&buf, "#34");
+    assert!(!buf[(x, y)].modifier.contains(Modifier::UNDERLINED));
+    assert_eq!(view.handle_click(&hits, x + 1, y), DetailsOutcome::Stay);
+}
+
+#[test]
+fn a_configured_prefix_links_its_own_references() {
+    let mut view = with_message("PROJ-7: Fix login #12").with_issue_prefix("PROJ-");
+    let (buf, hits) = render(&view, Rect::new(0, 0, 100, 12));
+    let (x, y) = position(&buf, "PROJ-7");
+    assert_eq!(
+        view.handle_click(&hits, x + 5, y),
+        DetailsOutcome::OpenIssue("7".into())
+    );
+    let (x, y) = position(&buf, "#12");
+    assert_eq!(view.handle_click(&hits, x, y), DetailsOutcome::Stay);
+}
+
+#[test]
+fn a_link_cut_off_by_the_panel_edge_is_not_clickable() {
+    let mut view = with_message("A long subject that ends with #12345");
+    // The metadata half is 20 columns: the reference doesn't fit.
+    let (buf, hits) = render(&view, Rect::new(0, 0, 40, 12));
+    let y = position(&buf, "A long").1;
+    for x in 0..20 {
+        assert_eq!(
+            view.handle_click(&hits, x, y),
+            DetailsOutcome::Stay,
+            "x={x}"
+        );
+    }
+}

@@ -113,6 +113,10 @@ pub enum Request {
         remote: String,
         branch: String,
     },
+    /// The origin's URL, to open the page of issue `number` (S20).
+    IssueUrl {
+        number: String,
+    },
 }
 
 impl Request {
@@ -144,6 +148,7 @@ impl Request {
             Self::RemoteUrl { remote, .. } => {
                 GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
             }
+            Self::IssueUrl { .. } => GitCommand::read(repo, ["remote", "get-url", "origin"]),
         }
     }
 
@@ -215,6 +220,8 @@ pub struct AppState {
     pub compare_base: Option<Oid>,
     /// Shell command the diffs are piped into (S12); None uses the built-in view.
     pub pager: Option<String>,
+    /// Where issue references in commit messages link to (S20).
+    pub issues: crate::config::Issues,
     drag: Option<resize::Drag>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
@@ -262,6 +269,7 @@ impl AppState {
             hidden_columns: Vec::new(),
             compare_base: None,
             pager: None,
+            issues: crate::config::Issues::default(),
             drag: None,
             running: None,
             pending: HashMap::new(),
@@ -678,6 +686,10 @@ impl AppState {
             }
             (Request::RemoteUrl { remote, branch }, Ok(out)) => {
                 self.on_remote_url(&remote, &branch, &out.stdout)
+            }
+            (Request::IssueUrl { number }, result) => {
+                let origin = result.ok().map(|out| out.stdout);
+                self.on_issue_remote_url(&number, origin.as_deref())
             }
             (
                 request @ (Request::Details(_)

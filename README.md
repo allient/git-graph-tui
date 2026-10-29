@@ -88,7 +88,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ### Repository settings
 - [x] Manage remotes (add, remove, fetch, prune)
-- [ ] Issue linking (turn `#123` into links that open in the browser)
+- [x] Issue linking (turn `#123` into links that open in the browser)
 
 ### Stretch goals (inspired by Git Graph+)
 - [ ] Interactive rebase UI (reorder, squash, fixup, drop)
@@ -176,6 +176,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `j` `k` / arrows, `PgUp` `PgDn`, `g` `G` | Move the selection (top, bottom) |
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
+| Click `#123` (in the details) | Issue references in the commit message are underlined; clicking one opens the issue in the browser: on origin's GitHub, GitLab or Bitbucket page, or the page set by `[issues] url` in the config file. `abc#12` is not a reference |
 | `t` (in the details) | Open the selected file in your configured `git difftool` (against the commit's first parent, or between the two sides of a comparison). The app steps aside until the tool exits |
 | Diff pager | With a pager configured (`[diff] pager` in the config file, or `TUI_GIT_GRAPH_PAGER`), `Enter` on a file pipes its colored diff into it, for example `delta`, instead of the built-in diff view. The app steps aside until the pager exits; if it fails, the status bar says so |
 | Double click a branch | Check the branch out (a remote branch asks for the local branch's name), like VS Code Git Graph |
@@ -231,7 +232,13 @@ hidden_columns = ["author"] # hidden from the header's right-click menu: "date",
 
 [diff]
 pager = "delta"           # pipe file diffs into this command; unset or "" uses the built-in view
+
+[issues]                  # where issue references in commit messages link to
+url = "https://jira.example.com/browse/PROJ-$1"   # $1 is replaced by the number
+prefix = "PROJ-"          # what starts a reference; default "#"
 ```
+
+Without `[issues] url`, `#123` opens issue 123 on origin's GitHub (`/issues/123`), GitLab (`/-/issues/123`) or Bitbucket (`/issues/123`) page; for any other origin, clicking a reference says how to set `url`. With `prefix = "PROJ-"`, `PROJ-123` is the reference and `#123` is plain text.
 
 `pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `TUI_GIT_GRAPH_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 
@@ -254,7 +261,7 @@ Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
 
 ## Roadmap
 
-Steps 1 to 3 are done except issue linking; step 5 is next.
+Steps 1 to 3 are done; step 5 is next.
 
 1. **MVP:** colored graph with badges, uncommitted row, selection, scrolling, mouse + keyboard, branch and commit context menus with checkout / switch branch, create branch, tag, cherry-pick, revert, merge, reset, copy; commit details with file diffs.
 2. **Daily driver:** branch filter, remote toggle, search, repository "..." menu, pull / push / fetch, tags and stashes, config file.

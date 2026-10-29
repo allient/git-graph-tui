@@ -16,6 +16,10 @@
 //! [diff]
 //! pager = "delta"         # pipe file diffs into this command; "" or unset:
 //!                         # the built-in view ($TUI_GIT_GRAPH_PAGER wins)
+//!
+//! [issues]                # `#123` in commit messages opens this page;
+//! url = "https://jira.example.com/browse/PROJ-$1"   # $1 is the number
+//! prefix = "PROJ-"        # what starts a reference; default "#"
 //! ```
 
 use std::fs;
@@ -37,6 +41,36 @@ pub struct Config {
     pub icons: Option<IconStyle>,
     pub layout: Layout,
     pub diff: Diff,
+    pub issues: Issues,
+}
+
+/// Issue links in commit messages (S20). Unset, `#123` opens issue 123 on
+/// the origin's GitHub, GitLab or Bitbucket page.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Issues {
+    /// The issue page, with `$1` where the number goes.
+    pub url: Option<String>,
+    /// What starts a reference, such as `PROJ-`; None is `#`.
+    pub prefix: Option<String>,
+}
+
+impl Issues {
+    /// What starts an issue reference.
+    pub fn prefix(&self) -> &str {
+        self.prefix
+            .as_deref()
+            .filter(|p| !p.is_empty())
+            .unwrap_or("#")
+    }
+
+    /// The configured page of issue `number`, if a URL is configured.
+    pub fn url_for(&self, number: &str) -> Option<String> {
+        self.url
+            .as_deref()
+            .filter(|url| !url.is_empty())
+            .map(|url| url.replace("$1", number))
+    }
 }
 
 /// How file diffs are shown.
@@ -211,6 +245,7 @@ mod tests {
                     ..Layout::default()
                 },
                 diff: Diff::default(),
+                issues: Issues::default(),
             }
         );
     }
@@ -227,6 +262,37 @@ mod tests {
         fs::write(&file, "[diff]\nviewer = \"delta\"\n").unwrap();
         let err = format!("{:#}", load(&file).unwrap_err());
         assert!(err.contains("unknown field `viewer`"), "{err}");
+    }
+
+    #[test]
+    fn reads_the_issue_links() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(
+            &file,
+            "[issues]\nurl = \"https://jira.example.com/browse/PROJ-$1\"\nprefix = \"PROJ-\"\n",
+        )
+        .unwrap();
+        let issues = load(&file).unwrap().issues;
+        assert_eq!(issues.prefix(), "PROJ-");
+        assert_eq!(
+            issues.url_for("42").as_deref(),
+            Some("https://jira.example.com/browse/PROJ-42")
+        );
+        let unset = Issues::default();
+        assert_eq!((unset.prefix(), unset.url_for("1")), ("#", None));
+        fs::write(&file, "[issues]\nlink = \"x\"\n").unwrap();
+        let err = format!("{:#}", load(&file).unwrap_err());
+        assert!(err.contains("unknown field `link`"), "{err}");
+    }
+
+    #[test]
+    fn saving_the_layout_keeps_the_issue_links() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(&file, "[issues]\nprefix = \"GH-\"\n").unwrap();
+        save_layout(&file, Layout::default()).unwrap();
+        assert_eq!(load(&file).unwrap().issues.prefix(), "GH-");
     }
 
     #[test]
