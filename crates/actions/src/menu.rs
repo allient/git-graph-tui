@@ -514,7 +514,51 @@ fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
         Some(submenu("Tags", tags_submenu(ctx))),
         Some(MenuItem::Separator),
         entry("Show Git Output", Action::Ui(UiEffect::ShowGitOutput)),
+        entry("Show Reflog", Action::Ui(UiEffect::ShowReflog)),
     ]
+}
+
+/// The menu of an entry in the reflog view (S20 4): ways to get back to its
+/// commit, which may be on no branch any more (a reset or deleted branch).
+/// `subject` is the commit's subject, for the confirmations.
+#[must_use]
+pub fn reflog_menu(id: &Oid, subject: &str, ctx: &MenuContext) -> Vec<MenuItem> {
+    let is_head = ctx.is_head_commit(id);
+    let current = ctx.current_branch();
+    tidy([
+        entry(
+            "Create Branch Here...",
+            Action::CreateBranch {
+                at: id.clone(),
+                name: String::new(),
+                checkout: false,
+            },
+        ),
+        entry_if(
+            !(is_head && current.is_none()),
+            "Checkout (detached)...",
+            || Action::CheckoutCommit {
+                commit: id.clone(),
+                subject: subject.to_owned(),
+            },
+        ),
+        current.filter(|_| !is_head).and_then(|branch| {
+            entry(
+                "Reset current branch to here...",
+                Action::ResetCurrentTo {
+                    commit: id.clone(),
+                    subject: subject.to_owned(),
+                    current: branch.to_owned(),
+                    mode: ResetMode::default(),
+                },
+            )
+        }),
+        Some(MenuItem::Separator),
+        entry(
+            "Copy Commit Hash to Clipboard",
+            Action::CopyCommitHash { commit: id.clone() },
+        ),
+    ])
 }
 
 fn branch_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {

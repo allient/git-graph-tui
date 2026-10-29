@@ -26,6 +26,7 @@ mod details;
 mod find;
 mod info;
 mod output;
+mod reflog;
 mod resize;
 mod source_control;
 pub use find::Find;
@@ -38,10 +39,14 @@ pub use compare::Comparison;
 pub use details::{Details, DiffPanel};
 pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
+pub use reflog::ReflogView;
 pub use toolbar::{OpenPicker, ToolbarState};
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
+
+/// Reflog entries the reflog view loads.
+pub const REFLOG_ENTRIES: usize = tgg_git::reflog::DEFAULT_MAX_COUNT;
 
 /// Lines scrolled per mouse-wheel step.
 pub const SCROLL_LINES: usize = 3;
@@ -117,6 +122,8 @@ pub enum Request {
     IssueUrl {
         number: String,
     },
+    /// HEAD's newest reflog entries, for the reflog view (S20).
+    Reflog,
 }
 
 impl Request {
@@ -149,6 +156,7 @@ impl Request {
                 GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
             }
             Self::IssueUrl { .. } => GitCommand::read(repo, ["remote", "get-url", "origin"]),
+            Self::Reflog => GitCommand::read(repo, tgg_git::reflog::args(REFLOG_ENTRIES)),
         }
     }
 
@@ -200,6 +208,8 @@ pub struct AppState {
     pub git_output: GitOutput,
     /// The open git output view, drawn over the graph.
     pub output_view: Option<OutputView>,
+    /// The open reflog view, drawn over the graph.
+    pub reflog: Option<ReflogView>,
     /// The toolbar's branch filter, remote toggle and keyboard focus.
     pub toolbar: ToolbarState,
     /// The open ref picker (branch filter, "Checkout to...", ...), above any menu.
@@ -259,6 +269,7 @@ impl AppState {
             info: None,
             git_output: GitOutput::default(),
             output_view: None,
+            reflog: None,
             toolbar: ToolbarState::default(),
             picker: None,
             source_control: SourceControlState::default(),
@@ -338,8 +349,11 @@ impl AppState {
         });
         self.keep_selected = self.selected_commit().map(|c| c.id.clone());
         self.refreshing_head = None;
+        // An open reflog view reloads too: actions add entries to it.
+        let reflog = self.reflog.is_some().then_some(Request::Reflog);
         [Request::Head, Request::Refs, Request::Status]
             .into_iter()
+            .chain(reflog)
             .map(Command::Git)
             .collect()
     }
@@ -362,6 +376,9 @@ impl AppState {
                 Some(key) => self.on_menu_outcome(|menu| menu.handle_key(key)),
                 None => Vec::new(),
             };
+        }
+        if self.reflog.is_some() {
+            return self.on_reflog_key(key);
         }
         if self.output_view.is_some() {
             return self.on_output_key(key);
@@ -452,6 +469,9 @@ impl AppState {
                 _ => {}
             }
             return Vec::new();
+        }
+        if self.reflog.is_some() {
+            return self.on_reflog_mouse(mouse);
         }
         if self.output_view.is_some() {
             return self.on_output_mouse(mouse);
@@ -680,6 +700,10 @@ impl AppState {
                 self.continue_jump()
                     .unwrap_or_else(|| self.load_more_if_needed())
             }
+            (Request::Reflog, Ok(out)) => {
+                self.on_reflog_read(&out.stdout);
+                Vec::new()
+            }
             (Request::Tag(name), Ok(out)) => {
                 self.on_tag_read(&name, &out.stdout);
                 Vec::new()
@@ -857,6 +881,8 @@ mod mouse_tests;
 mod output_tests;
 #[cfg(test)]
 mod pager_tests;
+#[cfg(test)]
+mod reflog_tests;
 #[cfg(test)]
 mod resize_tests;
 #[cfg(test)]
