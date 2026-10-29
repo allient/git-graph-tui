@@ -58,7 +58,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 ### Actions on branches (right-click a branch badge)
 - [x] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
 - [x] Merge into current branch, rebase current branch onto it, reset
-- [ ] Pull, push, fetch into local branch
+- [x] Pull, push, fetch into local branch
 - [x] Create archive, copy branch name
 - [x] Create a pull request (GitHub / GitLab / Bitbucket, opens the browser)
 
@@ -180,6 +180,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | Diff pager | With a pager configured (`[diff] pager` in the config file, or `TUI_GIT_GRAPH_PAGER`), `Enter` on a file pipes its colored diff into it, for example `delta`, instead of the built-in diff view. The app steps aside until the pager exits; if it fails, the status bar says so |
 | Double click a branch | Check the branch out (a remote branch asks for the local branch's name), like VS Code Git Graph |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
+| Fetch into local branch (remote branch menu) | Updates a local branch from the remote one without checking it out (`git fetch <remote> refs/heads/<branch>:refs/heads/<local>`). The dialog asks for the local branch's name (the remote branch's name by default; a new name creates the branch) and has a "Force fetch" toggle, which overwrites local commits after asking. Without force, only a fast-forward is allowed. Disabled for the current branch, which git can't fetch into: use Pull |
 | Compare (commit menu) | "Select for Compare" marks a commit; on another commit, "Compare with Selected" lists the files changed from the marked one to it, and "Compare with Working Tree" lists what changed since the commit, uncommitted edits included. `Enter` opens a file's diff, `Esc` closes the comparison |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |
 | `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |

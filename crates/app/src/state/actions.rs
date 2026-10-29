@@ -201,7 +201,9 @@ impl AppState {
                         return self.confirm_or_run(forced, "Force Delete Branch".into());
                     }
                 }
-                self.message = Some(format!("{} failed: {}", running.label, err.user_message()));
+                let why =
+                    fetch_rejected(&err, &running.action).unwrap_or_else(|| err.user_message());
+                self.message = Some(format!("{} failed: {why}", running.label));
                 // Earlier steps may have changed the repository.
                 self.refresh()
             }
@@ -260,6 +262,29 @@ impl AppState {
             }
         }
     }
+}
+
+/// Git's non-fast-forward wording is about pushing; a fetch into a local
+/// branch is refused the other way round.
+fn fetch_rejected(err: &ExecError, action: &Action) -> Option<String> {
+    let (
+        ExecError::Failed {
+            failure: Failure::NonFastForward,
+            ..
+        },
+        Action::FetchIntoLocal {
+            remote,
+            branch,
+            local_name,
+            ..
+        },
+    ) = (err, action)
+    else {
+        return None;
+    };
+    Some(format!(
+        "'{local_name}' has commits that aren't on {remote}/{branch}. Turn on Force fetch to overwrite them."
+    ))
 }
 
 fn input_step(outcome: InputOutcome) -> Step {

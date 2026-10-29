@@ -5,7 +5,7 @@ use tgg_git::{CommandKind, GitCommand};
 use tgg_model::Oid;
 
 use super::*;
-use crate::{InputError, InputId, InputValue, RefNameError};
+use crate::{InputError, InputId, InputKind, InputSpec, InputValue, RefNameError};
 
 const HASH: &str = "0123456789abcdef0123456789abcdef01234567";
 
@@ -183,6 +183,76 @@ fn push_is_a_network_command_with_an_explicit_refspec() {
     assert_eq!(
         args(&action),
         ["push", "--force-with-lease", "--", "origin", refspec]
+    );
+}
+
+fn fetch_into(force: bool) -> Action {
+    Action::FetchIntoLocal {
+        remote: "origin".into(),
+        branch: "feature/x".into(),
+        local_name: "feature/x".into(),
+        force,
+    }
+}
+
+#[test]
+fn fetch_into_a_local_branch_is_a_network_command_with_an_explicit_refspec() {
+    let mut action = fetch_into(false);
+    assert_eq!(
+        single(&action),
+        (
+            CommandKind::Network,
+            vec![
+                "fetch".into(),
+                "--".into(),
+                "origin".into(),
+                "refs/heads/feature/x:refs/heads/feature/x".into()
+            ]
+        )
+    );
+    assert_eq!(
+        action.inputs(),
+        [
+            InputSpec::text(
+                InputId::Name,
+                "Name of the local branch",
+                InputKind::RefName,
+                "feature/x"
+            ),
+            InputSpec::toggle(InputId::Force, "Force fetch", false),
+        ]
+    );
+    action
+        .set_input(InputId::Name, InputValue::Text("mine".into()))
+        .unwrap();
+    action
+        .set_input(InputId::Force, InputValue::Bool(true))
+        .unwrap();
+    assert_eq!(
+        args(&action),
+        [
+            "fetch",
+            "--force",
+            "--",
+            "origin",
+            "refs/heads/feature/x:refs/heads/mine"
+        ]
+    );
+    assert_eq!(
+        action.set_input(InputId::Name, InputValue::Text("bad name".into())),
+        Err(InputError::InvalidName(RefNameError::Whitespace))
+    );
+}
+
+#[test]
+fn a_forced_fetch_into_a_local_branch_asks_first() {
+    assert!(!fetch_into(false).is_destructive());
+    assert_eq!(fetch_into(false).confirmation(), None);
+    let forced = fetch_into(true);
+    assert!(forced.is_destructive());
+    assert_eq!(
+        forced.confirmation().unwrap().message,
+        "Force fetch origin/feature/x into the local branch 'feature/x'? Commits on 'feature/x' that aren't on origin/feature/x will be lost."
     );
 }
 

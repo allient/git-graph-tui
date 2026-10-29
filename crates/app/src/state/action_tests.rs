@@ -345,3 +345,36 @@ fn create_pull_request_explains_unsupported_remotes() {
     );
     assert!(message.contains("GitHub, GitLab or Bitbucket"), "{message}");
 }
+
+#[test]
+fn fetch_into_local_branch_from_a_remote_badge() {
+    let repo = FixtureRepo::sample();
+    repo.push("develop");
+    let remote = repo.git(&["rev-parse", "origin/develop"]);
+    let login = repo.git(&["rev-parse", "feature/login"]);
+    // develop ahead of origin/develop: a plain fetch can't rewind it.
+    repo.git(&["branch", "--force", "develop", &login]);
+    let mut h = open(&repo);
+    choose(&mut h, "origin/develop", "Fetch into local branch...");
+    assert!(matches!(h.state.dialog, Some(Dialog::Input { .. })));
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(repo.git(&["rev-parse", "develop"]), login, "not rewound");
+    let message = h.state.message.clone().unwrap_or_default();
+    assert_eq!(
+        message,
+        "Fetch into local branch failed: 'develop' has commits that aren't on origin/develop. Turn on Force fetch to overwrite them."
+    );
+
+    repo.git(&["branch", "--force", "develop", "develop~2"]);
+    choose(&mut h, "origin/develop", "Fetch into local branch...");
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(
+        repo.git(&["rev-parse", "develop"]),
+        remote,
+        "fast-forwarded"
+    );
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some("✓ Fetch into local branch")
+    );
+}
