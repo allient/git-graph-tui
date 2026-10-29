@@ -1,17 +1,20 @@
-//! The Source Control pane: a commit message, a Commit button, and the
-//! changed files split into "Staged Changes" and "Changes", like VS Code.
+//! The Source Control pane: a header with commit, refresh and more-actions
+//! buttons, a multi-line commit message, a Commit button, and the changed
+//! files split into "Staged Changes" and "Changes", like VS Code.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use tgg_model::{Change, ChangedFile};
+use unicode_width::UnicodeWidthChar;
 
-use crate::input_dialog::window;
 use crate::text::fit;
-use crate::{Key, TextField, Theme};
+use crate::{Glyph, Key, TextField, Theme};
 
-/// Lines above the file list: title, message, Commit button, blank.
-const TOP_LINES: u16 = 4;
+/// Lines the commit message shows; longer messages scroll.
+const MESSAGE_LINES: u16 = 3;
+/// Lines above the file list: header, message, Commit button, blank.
+const TOP_LINES: u16 = 1 + MESSAGE_LINES + 2;
 
 /// What a key or click asks the app to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +25,14 @@ pub enum SourceControlOutcome {
     Commit(String),
     Stage(Vec<String>),
     Unstage(Vec<String>),
+    /// Throw away unstaged changes: restore tracked `paths`, delete `untracked`.
+    Discard {
+        paths: Vec<String>,
+        untracked: Vec<String>,
+    },
+    Refresh,
+    /// Open the repository menu ("..."), anchored below the header button.
+    More(Position),
 }
 
 /// Where the keyboard is inside the pane.
@@ -45,12 +56,17 @@ enum Item {
 /// What is under a cell of the pane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Hit {
+    HeaderCommit,
+    HeaderRefresh,
+    HeaderMore,
     Message,
     Commit,
     /// An item of the list.
     Row(usize),
     /// The `+` or `−` button of an item.
     Toggle(usize),
+    /// The discard button of an item.
+    Discard(usize),
 }
 
 /// The pane's regions from the last frame.
@@ -94,6 +110,12 @@ pub struct SourceControl {
     selected: usize,
     /// First item shown.
     offset: usize,
+    /// First message line shown.
+    message_offset: usize,
+    /// Width of the message box in the last frame, for moving between lines.
+    message_width: usize,
+    /// Below the header's "..." button in the last frame.
+    more_at: Position,
 }
 
 impl SourceControl {
@@ -112,6 +134,7 @@ impl SourceControl {
     /// Empties the message, after a commit.
     pub fn clear_message(&mut self) {
         self.message = TextField::default();
+        self.message_offset = 0;
     }
 
     /// Puts the keyboard in the message box.
@@ -142,7 +165,12 @@ impl SourceControl {
         match self.focus {
             Focus::Message => match key {
                 Key::Enter => return self.commit(),
-                Key::Down | Key::Tab => self.focus = Focus::Commit,
+                Key::Up => {
+                    self.move_line(false);
+                }
+                // Down moves within the message, then on to the Commit button.
+                Key::Down if !self.move_line(true) => self.focus = Focus::Commit,
+                Key::Tab => self.focus = Focus::Commit,
                 Key::Esc => return SourceControlOutcome::Leave,
                 Key::Char(ch) => self.message.insert(ch),
                 Key::Backspace => self.message.backspace(),
@@ -155,6 +183,7 @@ impl SourceControl {
             },
             Focus::Commit => match key {
                 Key::Enter | Key::Char(' ') => return self.commit(),
+                Key::Char('m') => return SourceControlOutcome::More(self.more_at),
                 Key::Up | Key::BackTab => self.focus = Focus::Message,
                 Key::Down | Key::Tab if !self.items().is_empty() => self.focus = Focus::Files,
                 Key::Esc => return SourceControlOutcome::Leave,
@@ -171,6 +200,8 @@ impl SourceControl {
                     Key::Enter | Key::Char(' ') => return self.toggle(self.selected),
                     Key::Char('+' | 's') => return self.only(self.selected, true),
                     Key::Char('-' | 'u') => return self.only(self.selected, false),
+                    Key::Char('d') | Key::Delete => return self.discard(self.selected),
+                    Key::Char('m') => return SourceControlOutcome::More(self.more_at),
                     Key::BackTab => self.focus = Focus::Commit,
                     Key::Esc | Key::Tab => return SourceControlOutcome::Leave,
                     _ => {}
@@ -187,27 +218,60 @@ impl SourceControl {
         y: u16,
     ) -> SourceControlOutcome {
         match hits.hit(x, y) {
+            Some(Hit::HeaderCommit) => return self.commit(),
+            Some(Hit::HeaderRefresh) => return SourceControlOutcome::Refresh,
+            Some(Hit::HeaderMore) => return SourceControlOutcome::More(self.more_at),
             Some(Hit::Message) => self.focus = Focus::Message,
             Some(Hit::Commit) => {
                 self.focus = Focus::Commit;
                 return self.commit();
             }
-            Some(Hit::Row(item)) => {
-                self.focus = Focus::Files;
-                self.selected = item;
-            }
+            Some(Hit::Row(item)) => self.select(item),
             Some(Hit::Toggle(item)) => {
-                self.focus = Focus::Files;
-                self.selected = item;
+                self.select(item);
                 return self.toggle(item);
+            }
+            Some(Hit::Discard(item)) => {
+                self.select(item);
+                return self.discard(item);
             }
             None => {}
         }
         SourceControlOutcome::Stay
     }
 
+    fn select(&mut self, item: usize) {
+        self.focus = Focus::Files;
+        self.selected = item;
+    }
+
     fn commit(&self) -> SourceControlOutcome {
         SourceControlOutcome::Commit(self.message.text().to_owned())
+    }
+
+    /// Moves the message cursor one line up or down, keeping its column.
+    /// False when there is no line that way.
+    fn move_line(&mut self, down: bool) -> bool {
+        let chars: Vec<char> = self.message.text().chars().collect();
+        // Before the first frame there is no width yet: newlines only.
+        let room = if self.message_width == 0 {
+            usize::MAX
+        } else {
+            self.message_width
+        };
+        let lines = wrap(&chars, room);
+        let row = cursor_row(&lines, self.message.cursor());
+        let target = if down { row + 1 } else { row.wrapping_sub(1) };
+        let Some(&(start, end)) = lines.get(target) else {
+            return false;
+        };
+        let column = width(&chars[lines[row].0..self.message.cursor()]);
+        let mut cursor = start;
+        while cursor < end && width(&chars[start..=cursor]) <= column {
+            cursor += 1;
+        }
+        self.message.set_cursor(cursor);
+        true
     }
 
     /// Stages an unstaged item, unstages a staged one.
@@ -219,27 +283,32 @@ impl SourceControl {
         }
     }
 
+    /// The changes (`Item::Unstaged`) or staged files (`Item::Staged`) an item
+    /// stands for: itself, or its whole section for a header.
+    fn files_of(&self, item: usize, staged: bool) -> Option<Vec<usize>> {
+        let items = self.items();
+        let section = |want_staged: bool| -> Vec<usize> {
+            items
+                .iter()
+                .filter_map(|it| match (it, want_staged) {
+                    (Item::Staged(i), true) | (Item::Unstaged(i), false) => Some(*i),
+                    _ => None,
+                })
+                .collect()
+        };
+        match (items.get(item)?, staged) {
+            (Item::Unstaged(i), false) | (Item::Staged(i), true) => Some(vec![*i]),
+            (Item::ChangesHeader, false) => Some(section(false)),
+            (Item::StagedHeader, true) => Some(section(true)),
+            _ => None,
+        }
+    }
+
     /// Stages (`stage`) or unstages the files of an item; Stay when the item
     /// is in the other section.
     fn only(&self, item: usize, stage: bool) -> SourceControlOutcome {
-        let items = self.items();
-        let files: Vec<usize> = match (items.get(item), stage) {
-            (Some(Item::Unstaged(i)), true) | (Some(Item::Staged(i)), false) => vec![*i],
-            (Some(Item::ChangesHeader), true) => items
-                .iter()
-                .filter_map(|it| match it {
-                    Item::Unstaged(i) => Some(*i),
-                    _ => None,
-                })
-                .collect(),
-            (Some(Item::StagedHeader), false) => items
-                .iter()
-                .filter_map(|it| match it {
-                    Item::Staged(i) => Some(*i),
-                    _ => None,
-                })
-                .collect(),
-            _ => return SourceControlOutcome::Stay,
+        let Some(files) = self.files_of(item, !stage) else {
+            return SourceControlOutcome::Stay;
         };
         if stage {
             let paths = files
@@ -260,6 +329,22 @@ impl SourceControl {
         }
     }
 
+    /// Discards the unstaged changes of an item; Stay for staged items.
+    fn discard(&self, item: usize) -> SourceControlOutcome {
+        let Some(files) = self.files_of(item, false) else {
+            return SourceControlOutcome::Stay;
+        };
+        let (untracked, tracked): (Vec<usize>, Vec<usize>) = files
+            .into_iter()
+            .partition(|&i| self.changes[i].unstaged == Some(Change::Untracked));
+        let paths_of =
+            |list: Vec<usize>| list.iter().map(|&i| self.changes[i].path.clone()).collect();
+        SourceControlOutcome::Discard {
+            paths: paths_of(tracked),
+            untracked: paths_of(untracked),
+        }
+    }
+
     /// Draws the pane; `focused` when it has the keyboard.
     pub fn render(
         &mut self,
@@ -272,61 +357,23 @@ impl SourceControl {
             area,
             ..SourceControlHitMap::default()
         };
-        if area.width < 4 || area.height == 0 {
+        if area.width < 10 || area.height == 0 {
             return hits;
         }
-        let width = usize::from(area.width);
-        let line = |y: u16| Rect::new(area.x, area.y + y, area.width, 1);
-
-        // Title.
-        let title = Style::new()
-            .fg(theme.text)
-            .bg(theme.header_bg)
-            .add_modifier(Modifier::BOLD);
-        buf.set_style(line(0), title);
-        buf.set_stringn(area.x, area.y, " SOURCE CONTROL", width, title);
+        self.render_header(area, buf, theme, &mut hits);
         if area.height < TOP_LINES {
             return hits;
         }
-
-        // Message box.
-        let input = line(1);
-        let text_x = area.x + 1;
-        let room = width - 1;
-        buf.set_style(input, Style::new().bg(theme.selected_bg));
-        if self.message.text().is_empty() {
-            let branch = self
-                .branch
-                .as_deref()
-                .map_or_else(String::new, |b| format!(" on \"{b}\""));
-            let hint = fit(&format!("Message (Enter to commit{branch})"), room);
-            buf.set_stringn(
-                text_x,
-                input.y,
-                hint.trim_end(),
-                room,
-                Style::new().fg(theme.muted),
-            );
-        } else {
-            let (visible, cursor) = window(&self.message, room);
-            buf.set_stringn(text_x, input.y, visible, room, Style::new().fg(theme.text));
-            if focused && self.focus == Focus::Message {
-                hits.cursor = Some(Position::new(text_x + cursor, input.y));
-            }
-        }
-        if focused && self.focus == Focus::Message && self.message.text().is_empty() {
-            hits.cursor = Some(Position::new(text_x, input.y));
-        }
-        hits.regions.push((input, Hit::Message));
+        self.render_message(area, buf, theme, focused, &mut hits);
 
         // Commit button, across the pane but the margins.
-        let button = Rect::new(area.x + 1, area.y + 2, area.width - 2, 1);
+        let button = Rect::new(area.x + 1, area.y + 1 + MESSAGE_LINES, area.width - 2, 1);
         let mut style = Style::new().fg(theme.badge_fg).bg(theme.lane(0));
         if focused && self.focus == Focus::Commit {
             style = style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
         }
         buf.set_style(button, style);
-        let label = "✓ Commit";
+        let label = format!("{} Commit", theme.icons.glyph(Glyph::Check));
         let x = button.x + (button.width.saturating_sub(8)) / 2;
         buf.set_stringn(x, button.y, label, usize::from(button.width), style);
         hits.regions.push((button, Hit::Commit));
@@ -351,19 +398,123 @@ impl SourceControl {
             if focused && self.focus == Focus::Files && index == self.selected {
                 buf.set_style(row_area, Style::new().bg(theme.selected_bg));
             }
-            self.draw_item(buf, row_area, *item, &items, theme);
             hits.regions.push((row_area, Hit::Row(index)));
-            hits.regions
-                .push((Rect::new(row_area.right() - 1, y, 1, 1), Hit::Toggle(index)));
+            self.draw_item(buf, row_area, index, *item, &items, theme, &mut hits);
         }
         hits
     }
 
-    fn draw_item(&self, buf: &mut Buffer, area: Rect, item: Item, items: &[Item], theme: &Theme) {
+    /// `SOURCE CONTROL` with the commit, refresh and "..." buttons.
+    fn render_header(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        hits: &mut SourceControlHitMap,
+    ) {
+        let style = Style::new()
+            .fg(theme.text)
+            .bg(theme.header_bg)
+            .add_modifier(Modifier::BOLD);
+        buf.set_style(Rect::new(area.x, area.y, area.width, 1), style);
+        buf.set_stringn(
+            area.x,
+            area.y,
+            " SOURCE CONTROL",
+            usize::from(area.width),
+            style,
+        );
+        let right = area.right();
+        for (offset, glyph, hit) in [
+            (6, Glyph::Check, Hit::HeaderCommit),
+            (4, Glyph::Refresh, Hit::HeaderRefresh),
+            (2, Glyph::More, Hit::HeaderMore),
+        ] {
+            let x = right - offset;
+            buf[(x, area.y)].set_char(theme.icons.glyph(glyph));
+            hits.regions.push((Rect::new(x, area.y, 1, 1), hit));
+        }
+        self.more_at = Position::new(right - 2, area.y + 1);
+    }
+
+    /// The multi-line commit message, or its placeholder.
+    fn render_message(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        focused: bool,
+        hits: &mut SourceControlHitMap,
+    ) {
+        let input = Rect::new(area.x, area.y + 1, area.width, MESSAGE_LINES);
+        let text_x = area.x + 1;
+        let room = usize::from(area.width - 2);
+        self.message_width = room;
+        buf.set_style(input, Style::new().bg(theme.selected_bg));
+        hits.regions.push((input, Hit::Message));
+        let typing = focused && self.focus == Focus::Message;
+
+        if self.message.text().is_empty() {
+            let branch = self
+                .branch
+                .as_deref()
+                .map_or_else(String::new, |b| format!(" on \"{b}\""));
+            let muted = Style::new().fg(theme.muted);
+            let hint = fit(&format!("Message (Enter commits{branch})"), room);
+            buf.set_stringn(text_x, input.y, hint.trim_end(), room, muted);
+            buf.set_stringn(text_x, input.y + 1, "Alt+Enter: new line", room, muted);
+            if typing {
+                hits.cursor = Some(Position::new(text_x, input.y));
+            }
+            return;
+        }
+
+        let chars: Vec<char> = self.message.text().chars().collect();
+        let lines = wrap(&chars, room);
+        let row = cursor_row(&lines, self.message.cursor());
+        let shown = usize::from(MESSAGE_LINES);
+        if row < self.message_offset {
+            self.message_offset = row;
+        } else if row >= self.message_offset + shown {
+            self.message_offset = row + 1 - shown;
+        }
+        let style = Style::new().fg(theme.text);
+        for (i, &(start, end)) in lines
+            .iter()
+            .skip(self.message_offset)
+            .take(shown)
+            .enumerate()
+        {
+            let y = input.y + u16::try_from(i).unwrap_or(u16::MAX);
+            let line: String = chars[start..end].iter().collect();
+            buf.set_stringn(text_x, y, line, room, style);
+        }
+        if typing {
+            let column = width(&chars[lines[row].0..self.message.cursor()]);
+            let y = input.y + u16::try_from(row - self.message_offset).unwrap_or(0);
+            hits.cursor = Some(Position::new(
+                text_x + u16::try_from(column).unwrap_or(u16::MAX),
+                y,
+            ));
+        }
+    }
+
+    #[expect(clippy::too_many_arguments, reason = "one row's drawing context")]
+    fn draw_item(
+        &self,
+        buf: &mut Buffer,
+        area: Rect,
+        index: usize,
+        item: Item,
+        items: &[Item],
+        theme: &Theme,
+        hits: &mut SourceControlHitMap,
+    ) {
         let text = Style::new().fg(theme.text);
         let muted = Style::new().fg(theme.muted);
-        let right = area.right();
-        let (left, letter, button) = match item {
+        let icons = theme.icons;
+        // Right side, VS Code order: buttons, then the status letter or count.
+        let (left, tail, buttons): RowParts<'_> = match item {
             Item::StagedHeader | Item::ChangesHeader => {
                 let staged = item == Item::StagedHeader;
                 let count = items
@@ -387,58 +538,113 @@ impl SourceControl {
                     usize::from(area.width),
                     text.add_modifier(Modifier::BOLD),
                 );
-                (
-                    None,
-                    Some((count.to_string(), muted)),
-                    if staged { '−' } else { '+' },
-                )
+                let buttons = if staged {
+                    vec![(Glyph::Remove, Hit::Toggle(index))]
+                } else {
+                    vec![
+                        (Glyph::Discard, Hit::Discard(index)),
+                        (Glyph::Add, Hit::Toggle(index)),
+                    ]
+                };
+                (None, (count.to_string(), muted), buttons)
             }
             Item::Staged(i) | Item::Unstaged(i) => {
                 let file = &self.changes[i];
-                let change = if matches!(item, Item::Staged(_)) {
-                    file.staged
-                } else {
-                    file.unstaged
-                };
+                let staged = matches!(item, Item::Staged(_));
+                let change = if staged { file.staged } else { file.unstaged };
                 let (name, dir) = match file.path.rsplit_once('/') {
                     Some((dir, name)) => (name, dir),
                     None => (file.path.as_str(), ""),
                 };
-                let letter = change.map(|c| {
-                    (
-                        c.letter().to_string(),
-                        Style::new().fg(change_color(c, theme)),
-                    )
-                });
-                (
-                    Some((name, dir)),
-                    letter,
-                    if matches!(item, Item::Staged(_)) {
-                        '−'
-                    } else {
-                        '+'
+                let letter = change.map_or_else(
+                    || (String::new(), muted),
+                    |c| {
+                        (
+                            c.letter().to_string(),
+                            Style::new().fg(change_color(c, theme)),
+                        )
                     },
-                )
+                );
+                let buttons = if staged {
+                    vec![(Glyph::Remove, Hit::Toggle(index))]
+                } else {
+                    vec![
+                        (Glyph::Discard, Hit::Discard(index)),
+                        (Glyph::Add, Hit::Toggle(index)),
+                    ]
+                };
+                (Some((name, dir)), letter, buttons)
             }
         };
-        // Right side: `<letter or count> <button>`.
-        let tail = 4;
+
+        // Lay the right side out from the right edge, one blank column in.
+        let tail_width = u16::try_from(unicode_width::UnicodeWidthStr::width(tail.0.as_str()))
+            .unwrap_or(1)
+            .max(1);
+        let mut x = area.right().saturating_sub(1 + tail_width);
+        buf.set_string(x, area.y, &tail.0, tail.1);
+        for (glyph, hit) in buttons.iter().rev() {
+            x = x.saturating_sub(2);
+            buf[(x, area.y)]
+                .set_char(icons.glyph(*glyph))
+                .set_fg(theme.text);
+            hits.regions.push((Rect::new(x, area.y, 1, 1), *hit));
+        }
+
         if let Some((name, dir)) = left {
-            let room = usize::from(area.width).saturating_sub(2 + tail);
-            let mut x = area.x + 2;
-            let name_fit = fit(name, room.min(unicode_width::UnicodeWidthStr::width(name)));
-            x = buf.set_stringn(x, area.y, &name_fit, room, text).0;
-            let used = usize::from(x - area.x - 2);
+            let room = usize::from(x.saturating_sub(area.x + 3));
+            let mut cx = area.x + 2;
+            let name_width = unicode_width::UnicodeWidthStr::width(name);
+            let name_fit = fit(name, room.min(name_width));
+            cx = buf.set_stringn(cx, area.y, &name_fit, room, text).0;
+            let used = usize::from(cx - area.x - 2);
             if !dir.is_empty() && used + 1 < room {
-                buf.set_stringn(x + 1, area.y, dir, room - used - 1, muted);
+                buf.set_stringn(cx + 1, area.y, dir, room - used - 1, muted);
             }
         }
-        if let Some((label, style)) = letter {
-            let width = u16::try_from(label.len()).unwrap_or(u16::MAX);
-            buf.set_string(right.saturating_sub(2 + width), area.y, label, style);
-        }
-        buf[(right - 1, area.y)].set_char(button).set_fg(theme.text);
     }
+}
+
+/// A list row's file name and folder (none for headers), its status letter
+/// or count with its style, and its buttons.
+type RowParts<'a> = (
+    Option<(&'a str, &'a str)>,
+    (String, Style),
+    Vec<(Glyph, Hit)>,
+);
+
+/// Splits text into the lines a `width`-column box shows: at newlines, and
+/// wherever a line runs out of room. Each line is a char range, newline excluded.
+fn wrap(chars: &[char], width: usize) -> Vec<(usize, usize)> {
+    let mut lines = Vec::new();
+    let (mut start, mut column) = (0, 0);
+    for (i, &ch) in chars.iter().enumerate() {
+        if ch == '\n' {
+            lines.push((start, i));
+            (start, column) = (i + 1, 0);
+            continue;
+        }
+        let w = ch.width().unwrap_or(0);
+        if column + w > width && column > 0 {
+            lines.push((start, i));
+            (start, column) = (i, 0);
+        }
+        column += w;
+    }
+    lines.push((start, chars.len()));
+    lines
+}
+
+/// The line the cursor (a char index) is on.
+fn cursor_row(lines: &[(usize, usize)], cursor: usize) -> usize {
+    lines
+        .iter()
+        .rposition(|&(start, _)| start <= cursor)
+        .unwrap_or(0)
+}
+
+fn width(chars: &[char]) -> usize {
+    chars.iter().map(|c| c.width().unwrap_or(0)).sum()
 }
 
 fn change_color(change: Change, theme: &Theme) -> Color {

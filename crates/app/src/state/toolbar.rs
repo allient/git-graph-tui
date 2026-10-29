@@ -39,6 +39,8 @@ pub struct ToolbarState {
     /// The focused button while the toolbar has the keyboard.
     pub focus: Option<ToolbarButton>,
     pub hits: ToolbarHitMap,
+    /// Whether the toolbar shows "..." (not while the Source Control pane does).
+    pub more: bool,
 }
 
 impl Default for ToolbarState {
@@ -48,6 +50,7 @@ impl Default for ToolbarState {
             show_remotes: true,
             focus: None,
             hits: ToolbarHitMap::default(),
+            more: true,
         }
     }
 }
@@ -55,6 +58,9 @@ impl Default for ToolbarState {
 impl ToolbarState {
     pub fn widget(&self) -> Toolbar {
         let mut toolbar = Toolbar::new(&self.branch_filter, self.show_remotes);
+        if !self.more {
+            toolbar = toolbar.without_more();
+        }
         toolbar.set_focus(self.focus);
         toolbar
     }

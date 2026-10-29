@@ -63,6 +63,13 @@ fn find_below(h: &Harness, text: &str, min_y: u16) -> (u16, u16) {
         .unwrap_or_else(|| panic!("{text:?} not below line {min_y}"))
 }
 
+/// Clicks "..." in the Source Control pane's header (the toolbar has none
+/// while the pane shows).
+fn open_repo_menu(h: &mut Harness) {
+    let (x, y) = find(h, "✓ ↻ …");
+    mouse(h, MouseEventKind::Down(MouseButton::Left), x + 4, y);
+}
+
 fn subjects(h: &Harness) -> Vec<&str> {
     h.state.commits.iter().map(|c| c.subject.as_str()).collect()
 }
@@ -145,7 +152,7 @@ fn hiding_remote_branches_hides_their_badges_and_history() {
 fn checkout_to_picks_any_branch_and_switches_to_it() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    click_text(&mut h, "[...]");
+    open_repo_menu(&mut h);
     click_text(&mut h, "Checkout to...");
     assert!(h.state.picker.is_some());
     type_text(&mut h, "develop");
@@ -164,7 +171,7 @@ fn delete_branch_from_the_repository_menu_picks_the_branch() {
     let repo = FixtureRepo::sample();
     repo.git(&["branch", "old", "main"]);
     let mut h = open(&repo);
-    click_text(&mut h, "[...]");
+    open_repo_menu(&mut h);
     // The "Branch" submenu row, below "Checkout to..." (the toolbar also says "Branches").
     let (_, below) = find(&h, "Checkout to...");
     let (x, y) = find_below(&h, "Branch", below);
@@ -187,7 +194,7 @@ fn delete_branch_from_the_repository_menu_picks_the_branch() {
 fn escape_closes_the_picker_without_changes() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    click_text(&mut h, "[...]");
+    open_repo_menu(&mut h);
     click_text(&mut h, "Checkout to...");
     press(&mut h, KeyCode::Esc);
     assert!(h.state.picker.is_none());
@@ -222,4 +229,14 @@ fn a_filter_that_matches_no_branch_shows_no_commits() {
     press(&mut h, KeyCode::Char('r'));
     assert!(h.state.commits.is_empty());
     assert!(h.state.history_complete);
+}
+
+#[test]
+fn the_repository_menu_button_moves_to_the_toolbar_on_narrow_terminals() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    assert!(h.find_on_screen("[...]").is_none(), "the pane has it");
+    h.draw(80, H);
+    click_text(&mut h, "[...]");
+    assert!(h.state.menu.is_some());
 }

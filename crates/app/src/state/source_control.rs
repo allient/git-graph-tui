@@ -1,9 +1,9 @@
 //! The Source Control pane (S3): focus, keys, clicks and the git actions it runs.
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tgg_actions::{Action, WorkingTreeAction};
 use tgg_model::HeadState;
-use tgg_ui::{SourceControl, SourceControlHitMap, SourceControlOutcome};
+use tgg_ui::{Key, SourceControl, SourceControlHitMap, SourceControlOutcome};
 
 use super::{AppState, Command, actions::widget_key};
 
@@ -52,8 +52,22 @@ impl AppState {
     }
 
     pub(super) fn on_source_control_key(&mut self, key: KeyEvent) -> Vec<Command> {
-        let Some(key) = widget_key(key) else {
-            return Vec::new();
+        // Alt+Enter, Shift+Enter (where the terminal reports it) and Ctrl+J
+        // start a new line in the message; a plain Enter commits.
+        let newline = match key.code {
+            KeyCode::Enter => key
+                .modifiers
+                .intersects(KeyModifiers::ALT | KeyModifiers::SHIFT),
+            KeyCode::Char('j') => key.modifiers.contains(KeyModifiers::CONTROL),
+            _ => false,
+        };
+        let key = if newline {
+            Key::Char('\n')
+        } else {
+            let Some(key) = widget_key(key) else {
+                return Vec::new();
+            };
+            key
         };
         let outcome = self.source_control.view.handle_key(key);
         self.on_source_control_outcome(outcome)
@@ -79,6 +93,17 @@ impl AppState {
             SourceControlOutcome::Leave => {
                 self.source_control.focus = false;
                 return Vec::new();
+            }
+            SourceControlOutcome::Refresh => {
+                self.message = None;
+                return self.refresh();
+            }
+            SourceControlOutcome::More(anchor) => {
+                self.open_repo_menu(anchor);
+                return Vec::new();
+            }
+            SourceControlOutcome::Discard { paths, untracked } => {
+                ("Discard", WorkingTreeAction::Discard { paths, untracked })
             }
             SourceControlOutcome::Stage(paths) => ("Stage", WorkingTreeAction::Stage { paths }),
             SourceControlOutcome::Unstage(paths) => {

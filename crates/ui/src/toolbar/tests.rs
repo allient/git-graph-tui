@@ -179,3 +179,15 @@ fn plain_icons_are_the_default() {
     let (line, _) = render(&toolbar(), 100);
     assert!(line.ends_with("[↻] [⇣] [...]"), "{line:?}");
 }
+
+#[test]
+fn the_more_button_can_live_elsewhere() {
+    let mut toolbar = toolbar().without_more();
+    let (line, hits) = render(&toolbar, 100);
+    assert!(line.ends_with("[↻] [⇣]"), "{line:?}");
+    assert!(hits.button(ToolbarButton::RepoMenu).is_none());
+    // Arrows skip the missing button: Fetch wraps around to the branch filter.
+    toolbar.set_focus(Some(ToolbarButton::Fetch));
+    toolbar.handle_key(Key::Right, &hits);
+    assert_eq!(toolbar.focus(), Some(ToolbarButton::BranchFilter));
+}

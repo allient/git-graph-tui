@@ -36,6 +36,11 @@ impl TextField {
         self.cursor
     }
 
+    /// Moves the cursor to char index `cursor` (clamped to the text).
+    pub fn set_cursor(&mut self, cursor: usize) {
+        self.cursor = cursor.min(self.text.chars().count());
+    }
+
     /// Display columns before the cursor (wide characters count twice).
     #[must_use]
     pub fn width_before_cursor(&self) -> usize {
