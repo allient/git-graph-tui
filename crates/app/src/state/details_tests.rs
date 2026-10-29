@@ -162,7 +162,11 @@ fn v_shows_the_selected_file_as_it_was_in_that_commit() {
     let mut h = open(&repo);
     select(&mut h, "Add lib");
     press(&mut h, KeyCode::Enter);
-    assert!(h.find_on_screen("v view file").is_some(), "key hint");
+    assert!(
+        h.find_on_screen("enter diff  v view file  t difftool")
+            .is_some(),
+        "key hint"
+    );
     press(&mut h, KeyCode::Char('v'));
 
     let short = &hash(&repo, "Add lib")[..7];

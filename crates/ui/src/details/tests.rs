@@ -237,7 +237,10 @@ fn a_comparison_lists_its_files_across_the_whole_panel() {
         title.starts_with(" Comparing aaaaaaa..bbbbbbb (5 changed files) "),
         "{title:?}"
     );
-    assert!(title.ends_with(" enter diff  esc close"), "{title:?}");
+    assert!(
+        title.ends_with(" enter diff  t difftool  esc close"),
+        "{title:?}"
+    );
     assert_eq!(line(&buf, 1), " apps/");
     assert!(
         line(&buf, 3).starts_with("     a.rs"),

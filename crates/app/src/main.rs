@@ -4,6 +4,7 @@ mod browser;
 mod cli;
 mod clipboard;
 mod config;
+mod external;
 mod git;
 mod panels;
 mod state;
@@ -21,6 +22,7 @@ use ratatui::DefaultTerminal;
 use tgg_ui::{Icons, Theme};
 
 use crate::cli::Cli;
+use crate::external::External;
 use crate::git::{ProcessExecutor, Runner, discover_repo};
 use crate::state::{AppState, Command, Event};
 
@@ -36,11 +38,13 @@ fn main() -> Result<()> {
         None => config::Config::default(),
     };
     let icons = cli.icons(&env, config.icons)?;
+    let pager = external::pager(&env, config.diff.pager);
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    let (before, after) = ratatui::run(|terminal| run(terminal, repo, icons, config.layout))?;
+    let (before, after) =
+        ratatui::run(|terminal| run(terminal, repo, icons, config.layout, pager))?;
     // Remember resized panes and columns for next time.
     if let Some(path) = config_path.filter(|_| after != before) {
         save_layout(&path, after);
@@ -67,6 +71,7 @@ fn run(
     repo: PathBuf,
     icons: Icons,
     layout: config::Layout,
+    pager: Option<String>,
 ) -> Result<(config::Layout, config::Layout)> {
     let _mouse = MouseCapture::enable()?;
     let (runner, results) = Runner::new(ProcessExecutor::new());
@@ -75,6 +80,7 @@ fn run(
         ..Theme::default()
     };
     let mut state = AppState::new(repo);
+    state.pager = pager;
     let before = state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
 
@@ -85,11 +91,19 @@ fn run(
         if state.should_quit {
             return Ok((before, state.layout()));
         }
+        let mut external = Vec::new();
         if event::poll(INPUT_POLL)? {
             match event::read()? {
-                TermEvent::Key(key) => dispatch(&mut state, &runner, Event::Key(key)),
-                TermEvent::Mouse(mouse) => dispatch(&mut state, &runner, Event::Mouse(mouse)),
+                TermEvent::Key(key) => external = dispatch(&mut state, &runner, Event::Key(key)),
+                TermEvent::Mouse(mouse) => {
+                    external = dispatch(&mut state, &runner, Event::Mouse(mouse));
+                }
                 _ => {}
+            }
+        }
+        for program in external {
+            if let Some(message) = hand_over(terminal, &program)? {
+                state.message = Some(message);
             }
         }
         while let Ok(result) = results.try_recv() {
@@ -98,8 +112,32 @@ fn run(
     }
 }
 
-/// Applies an event and starts the git requests it produces.
-fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event) {
+/// Steps the TUI aside, runs `program` in the plain terminal and comes back
+/// with a full redraw. Returns the status message when the program failed.
+/// Not unit-tested (it needs a real terminal); `external::run` is.
+fn hand_over(terminal: &mut DefaultTerminal, program: &External) -> Result<Option<String>> {
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(
+        std::io::stdout(),
+        event::DisableMouseCapture,
+        crossterm::terminal::LeaveAlternateScreen,
+        crossterm::cursor::Show
+    )?;
+    let message = external::run(program);
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(
+        std::io::stdout(),
+        crossterm::terminal::EnterAlternateScreen,
+        event::EnableMouseCapture
+    )?;
+    terminal.clear()?;
+    Ok(message)
+}
+
+/// Applies an event and starts the git requests it produces. Returns the
+/// programs to run with the terminal handed over, which only `run` can do.
+fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event) -> Vec<External> {
+    let mut external = Vec::new();
     for command in state.update(event) {
         match command {
             Command::Git(request) => {
@@ -120,8 +158,10 @@ fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event
                     state.message = Some(format!("Could not open {url}: {err}"));
                 }
             }
+            Command::External(program) => external.push(program),
         }
     }
+    external
 }
 
 /// Turns on mouse reporting for the session and turns it off again on drop,

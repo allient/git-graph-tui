@@ -10,6 +10,7 @@ use tgg_ui::{
 
 use super::compare::Comparison;
 use super::{AppState, Command, Job, Request, SCROLL_LINES, actions::widget_key};
+use crate::external;
 
 /// The details of one commit, filled in as its two reads arrive; or a
 /// comparison (S12), shown in the same place.
@@ -94,6 +95,7 @@ impl AppState {
             KeyCode::Char('j') => Key::Down,
             KeyCode::Char('k') => Key::Up,
             KeyCode::Char('v') => Key::Char('v'),
+            KeyCode::Char('t') => return Some(self.difftool_selected()),
             KeyCode::Up
             | KeyCode::Down
             | KeyCode::Home
@@ -112,6 +114,26 @@ impl AppState {
             None => DetailsOutcome::Stay,
         };
         Some(self.on_details_outcome(outcome))
+    }
+
+    /// `t`: opens the selected file in `git difftool` (S12).
+    fn difftool_selected(&self) -> Vec<Command> {
+        let Some(details) = &self.details else {
+            return Vec::new();
+        };
+        let Some(file) = details.view.as_ref().and_then(|v| v.selected_file()) else {
+            return Vec::new();
+        };
+        let args = match (&details.compare, &details.info) {
+            (Some(c), _) => show::compare_difftool_args(&c.base, c.other.as_ref(), file),
+            (None, Some(info)) => {
+                show::difftool_args(&details.commit, info.commit.parents.first(), file)
+            }
+            (None, None) => return Vec::new(),
+        };
+        vec![Command::External(external::difftool_command(
+            &self.repo, args,
+        ))]
     }
 
     /// A left click inside the panel; None when the click is outside it.
@@ -135,13 +157,26 @@ impl AppState {
                 self.details = None;
                 Vec::new()
             }
-            DetailsOutcome::OpenFile(file) => match &self.details {
-                Some(Details {
-                    compare: Some(c), ..
-                }) => vec![Command::Git(Request::CompareDiff(c.clone(), file))],
-                Some(d) => vec![Command::Git(Request::Diff(d.commit.clone(), file))],
-                None => Vec::new(),
-            },
+            DetailsOutcome::OpenFile(file) => {
+                let (args, request) = match &self.details {
+                    Some(Details {
+                        compare: Some(c), ..
+                    }) => (c.diff_args(&file), Request::CompareDiff(c.clone(), file)),
+                    Some(d) => (
+                        show::diff_args(&d.commit, &file),
+                        Request::Diff(d.commit.clone(), file),
+                    ),
+                    None => return Vec::new(),
+                };
+                // With a pager (S12) the same git command is piped into it
+                // instead of read for the built-in view.
+                vec![match &self.pager {
+                    Some(pager) => {
+                        Command::External(external::pager_command(&self.repo, &args, pager))
+                    }
+                    None => Command::Git(request),
+                }]
+            }
             DetailsOutcome::ViewFile(file) => match &self.details {
                 Some(d) => vec![Command::Git(Request::FileAt(d.commit.clone(), file.path))],
                 None => Vec::new(),

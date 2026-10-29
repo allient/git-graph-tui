@@ -17,6 +17,7 @@ use tgg_graph::Graph;
 use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
 use tgg_ui::{ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
 
+use crate::external::External;
 use crate::git::{JobHandle, JobId, JobResult};
 
 mod actions;
@@ -69,6 +70,9 @@ pub enum Command {
     Clipboard(String),
     /// A web page to open in the browser.
     OpenUrl(String),
+    /// A program to run with the terminal handed over (a diff pager or
+    /// `git difftool`).
+    External(External),
 }
 
 /// What a tracked job is for.
@@ -207,6 +211,8 @@ pub struct AppState {
     pub columns: ColumnWidths,
     /// The commit marked with "Select for Compare".
     pub compare_base: Option<Oid>,
+    /// Shell command the diffs are piped into (S12); None uses the built-in view.
+    pub pager: Option<String>,
     drag: Option<resize::Drag>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
@@ -252,6 +258,7 @@ impl AppState {
             last_click: None,
             columns: ColumnWidths::default(),
             compare_base: None,
+            pager: None,
             drag: None,
             running: None,
             pending: HashMap::new(),
@@ -829,6 +836,8 @@ mod jump_tests;
 mod mouse_tests;
 #[cfg(test)]
 mod output_tests;
+#[cfg(test)]
+mod pager_tests;
 #[cfg(test)]
 mod resize_tests;
 #[cfg(test)]

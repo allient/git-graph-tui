@@ -15,9 +15,9 @@ const PARENT_HASH: usize = 8;
 /// Width of the `Committer: ` label column.
 const LABEL: usize = 11;
 /// Keys for the selected file, beside the changed-files title.
-const KEY_HINTS: &str = "enter diff  v view file";
+const KEY_HINTS: &str = "enter diff  v view file  t difftool";
 /// The same for a comparison, which has no single commit to view a file at.
-const COMPARISON_HINTS: &str = "enter diff  esc close";
+const COMPARISON_HINTS: &str = "enter diff  t difftool  esc close";
 
 /// A row of the changed-files tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
