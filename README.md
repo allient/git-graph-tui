@@ -271,7 +271,7 @@ Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
 
 ## Roadmap
 
-Steps 1 to 3 are done; step 5 is next.
+Steps 1 to 3 and step 5 are done; step 4 is next.
 
 1. **MVP:** colored graph with badges, uncommitted row, selection, scrolling, mouse + keyboard, branch and commit context menus with checkout / switch branch, create branch, tag, cherry-pick, revert, merge, reset, copy; commit details with file diffs.
 2. **Daily driver:** branch filter, remote toggle, search, repository "..." menu, pull / push / fetch, tags and stashes, config file.
