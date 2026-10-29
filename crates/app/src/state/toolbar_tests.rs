@@ -3,6 +3,7 @@
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use pretty_assertions::assert_eq;
+use tgg_actions::{InputId, InputValue};
 use tgg_testkit::FixtureRepo;
 
 use super::*;
@@ -493,4 +494,41 @@ fn view_and_sort_change_how_source_control_lists_files() {
     open_repo_menu(&mut h);
     assert!(h.find_on_screen("View as List").is_some());
     press(&mut h, KeyCode::Esc);
+}
+
+#[test]
+fn clone_copies_a_repository_into_the_chosen_folder_and_says_where() {
+    let repo = FixtureRepo::sample();
+    let source = FixtureRepo::sample();
+    let parent = FixtureRepo::new();
+    let mut h = open(&repo);
+    open_repo_menu(&mut h);
+    click_text(&mut h, "Clone");
+    let Some(Dialog::Input { view, .. }) = &h.state.dialog else {
+        panic!("Clone asks for the URL and folder");
+    };
+    // The folder that holds this repository is suggested.
+    let suggested = repo.path().parent().unwrap().display().to_string();
+    assert!(
+        view.values()
+            .contains(&(InputId::Path, InputValue::Text(suggested.clone()))),
+        "{:?}",
+        view.values()
+    );
+
+    type_text(&mut h, source.path().to_str().unwrap());
+    press(&mut h, KeyCode::Tab);
+    // Replace the suggested folder.
+    for _ in 0..suggested.chars().count() {
+        press(&mut h, KeyCode::Backspace);
+    }
+    type_text(&mut h, parent.path().to_str().unwrap());
+    accept_dialogs(&mut h);
+
+    let name = source.path().file_name().unwrap().to_str().unwrap();
+    let dest = parent.path().join(name);
+    assert!(dest.join(".git").exists(), "cloned into {}", dest.display());
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.starts_with("✓ Cloned into "), "{message}");
+    assert!(message.contains(name), "{message}");
 }

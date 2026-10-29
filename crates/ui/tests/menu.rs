@@ -79,11 +79,11 @@ fn menu_near_the_bottom_right_corner_flips_up_and_left() {
 #[test]
 fn repository_menu_with_the_branch_submenu_open() {
     let mut menu = PopupMenu::new(menu_for(&Target::Repository, &ctx()), Position::new(1, 0));
-    // Down past View as Tree, View & Sort, Pull, Push, Checkout to, Fetch,
-    // Commit, Changes and Pull, Push.
-    for _ in 0..9 {
+    // Down past View as Tree, View & Sort, Pull, Push, Clone, Checkout to,
+    // Fetch, Commit, Changes and Pull, Push.
+    for _ in 0..10 {
         menu.handle_key(tgg_ui::Key::Down);
     }
     menu.handle_key(tgg_ui::Key::Right);
-    insta::assert_snapshot!(render(&menu, 60, 24));
+    insta::assert_snapshot!(render(&menu, 60, 25));
 }

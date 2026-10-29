@@ -26,7 +26,7 @@ Branch: feat/scm-menu-parity, based on fix/badge-white-text (PR #43); its PR ope
 | T3 | S5, S6 | inline | done | feat(menu): Branch and Remote submenus |
 | T4 | S7, S8 | inline | done | feat(menu): Stash and Tags submenus |
 | T5 | S9 | inline | done | feat(menu): View as Tree and View & Sort |
-| T6 | S10, S11 | inline | todo | |
+| T6 | S10, S11 | inline | done | feat(menu): Clone |
 
 Route evidence: one feature, units depend on the shared menu.rs, so no parallel-writer reason; parent works inline.
 
@@ -42,3 +42,4 @@ Route evidence: one feature, units depend on the shared menu.rs, so no parallel-
 - **L8** (2026-10-29) T4 done: Stash submenu (Stash, Include Untracked, Stash Staged; Apply/Pop latest or picked; Drop picked or all; View Stash shows `git stash show --patch`) and Tags (Delete Tag..., Delete Remote Tag..., Push Tags). The app now loads the stash list on every refresh (`Request::Stashes`). Gate green, 781 tests.
 - **L9** (2026-10-29) w2 delivered the herdr plugin on feat/herdr-plugin (worktree ~/Documents/Github/Internal/tui-git-graph-herdr, commits b7b98ef, b14031c; not pushed): app routes plain right-click to itself inside herdr and restores it on exit (`TUI_GIT_GRAPH_HERDR_RIGHT_CLICK=off` disables), plugin opens tui-git-graph in a herdr tab. Plain right-click not yet tried with a real mouse.
 - **L10** (2026-10-29) T5 done: View as Tree / List and View & Sort (Name, Path, Status) for the Source Control pane; folder rows in tree view stage, unstage or discard everything under them. Sort by Path keeps git's order (git status already lists by path). Not persisted across runs. Gate green, 786 tests.
+- **L11** (2026-10-29) T6 done: Clone (URL + parent folder, defaulting to the folder that holds the repository; clones into `<parent>/<repo name>` and reports it). S11 was done in T1. Feature complete: every section of VS Code's Source Control "..." menu is present. Gate green, 789 tests. Next: PR after #43 merges (rebase onto main), then merge w2's herdr plugin branch.

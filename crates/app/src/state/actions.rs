@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use tgg_actions::{Action, InputId, InputValue, Plan, UiEffect, WorkingTreeAction};
+use tgg_actions::{Action, InputId, InputValue, Plan, RepoAction, UiEffect, WorkingTreeAction};
 use tgg_git::{ExecError, Failure, GitCommand, Output};
 use tgg_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
@@ -71,7 +71,14 @@ enum Step {
 impl AppState {
     /// Starts an action chosen from a menu: asks for inputs, then confirms,
     /// then runs it. Only one action runs at a time.
-    pub fn start_action(&mut self, action: Action, label: String) -> Vec<Command> {
+    pub fn start_action(&mut self, mut action: Action, label: String) -> Vec<Command> {
+        // Clone suggests the folder that holds this repository.
+        if let Action::Repo(RepoAction::Clone { parent, .. }) = &mut action
+            && parent.is_empty()
+            && let Some(dir) = self.repo.parent()
+        {
+            *parent = dir.display().to_string();
+        }
         if self.running.is_some() {
             self.message = Some("Wait for the current action to finish.".into());
             return Vec::new();
@@ -200,7 +207,13 @@ impl AppState {
                     self.running = Some(running);
                     return vec![Command::Run(next)];
                 }
-                self.message = Some(format!("✓ {}", running.label));
+                self.message = Some(match &running.action {
+                    Action::Repo(clone @ RepoAction::Clone { .. }) => {
+                        let dest = clone.destination().unwrap_or_default();
+                        format!("✓ Cloned into {dest}. Open it with: tui-git-graph {dest}")
+                    }
+                    _ => format!("✓ {}", running.label),
+                });
                 if matches!(
                     running.action,
                     Action::WorkingTree(WorkingTreeAction::Commit { .. })

@@ -542,6 +542,13 @@ fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
         entry_if(on_branch_with_remote, "Push", || {
             Action::Repo(RepoAction::Push)
         }),
+        entry(
+            "Clone",
+            Action::Repo(RepoAction::Clone {
+                url: String::new(),
+                parent: String::new(),
+            }),
+        ),
         entry("Checkout to...", pick(PickPurpose::Checkout)),
         entry_if(remote.is_some(), "Fetch", || {
             Action::Repo(RepoAction::FetchDefault { prune: false })
