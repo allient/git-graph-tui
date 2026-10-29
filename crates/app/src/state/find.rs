@@ -1,5 +1,6 @@
-//! Find (`/`, S12): search the loaded commits by message, author, date, hash
-//! and branch or tag name, and step through the matches.
+//! Find (`/`, S12): search the commits by message, author, date, hash and
+//! branch or tag name, and step through the matches. A match that isn't
+//! loaded yet is looked for in older history, a page at a time.
 
 use crossterm::event::KeyEvent;
 use tgg_model::{Commit, Ref};
@@ -15,6 +16,9 @@ pub struct Find {
     pub matches: Vec<usize>,
     /// The match that is selected.
     pub current: usize,
+    /// While older history is read for a match beyond the first `n` (0: for
+    /// any match at all), `Some(n)`.
+    pub searching: Option<usize>,
 }
 
 impl AppState {
@@ -51,17 +55,47 @@ impl AppState {
             Key::End => find.query.end(),
             Key::PageUp | Key::PageDown => {}
         }
-        self.load_more_if_needed()
+        if self.find.as_ref().is_some_and(|f| f.searching.is_some()) {
+            self.next_log_page()
+        } else {
+            self.load_more_if_needed()
+        }
     }
 
-    /// Recomputes the matches and selects the first one.
+    /// Recomputes the matches and selects the first one; with none loaded,
+    /// starts searching older history.
     fn search(&mut self) {
-        self.refind();
+        self.refind(false);
         self.select_match();
+        let complete = self.history_complete;
+        if let Some(find) = &mut self.find {
+            let none = find.matches.is_empty() && !find.query.text().is_empty();
+            find.searching = (none && !complete).then_some(0);
+        }
     }
 
-    /// Recomputes the matches, after typing or when history changed.
-    pub(super) fn refind(&mut self) {
+    /// After a log page arrived while searching older history: selects the
+    /// match that was waited for, or the first one (wrapping) once history
+    /// is complete, or asks for the next page. None when not searching.
+    pub(super) fn continue_find(&mut self) -> Option<Vec<Command>> {
+        let complete = self.history_complete;
+        let find = self.find.as_mut()?;
+        let wanted = find.searching?;
+        if find.matches.len() > wanted {
+            find.current = wanted;
+        } else if complete {
+            find.current = 0;
+        } else {
+            return Some(self.next_log_page());
+        }
+        find.searching = None;
+        self.select_match();
+        Some(self.load_more_if_needed())
+    }
+
+    /// Recomputes the matches, after typing or when history changed;
+    /// `keep_current` keeps the selected match when history only grew.
+    pub(super) fn refind(&mut self, keep_current: bool) {
         let Some(find) = &mut self.find else {
             return;
         };
@@ -73,7 +107,9 @@ impl AppState {
                 .filter(|&i| matches(&self.commits[i], &self.refs, &query))
                 .collect()
         };
-        find.current = 0;
+        if !keep_current || find.current >= find.matches.len() {
+            find.current = 0;
+        }
     }
 
     fn step_find(&mut self, forward: bool) {
@@ -84,6 +120,12 @@ impl AppState {
         if count == 0 {
             return;
         }
+        if forward && find.current + 1 == count && !self.history_complete {
+            // Past the last loaded match: look further before wrapping.
+            find.searching = Some(count);
+            return;
+        }
+        find.searching = None;
         find.current = if forward {
             (find.current + 1) % count
         } else {

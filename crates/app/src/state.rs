@@ -751,8 +751,10 @@ impl AppState {
                     Ok(page) => self.on_log_page(skip, page),
                     Err(err) => self.message = Some(format!("Could not read git log: {err}")),
                 }
-                // A pending parent jump does its own paging.
+                // A pending parent jump, or a find in older history, does
+                // its own paging.
                 self.continue_jump()
+                    .or_else(|| self.continue_find())
                     .unwrap_or_else(|| self.load_more_if_needed())
             }
             (Request::Reflog, Ok(out)) => {
@@ -847,7 +849,7 @@ impl AppState {
             return; // A page for a history that has since been reloaded.
         }
         self.history_complete = complete;
-        self.refind();
+        self.refind(skip > 0);
     }
 
     fn parsed<T>(
@@ -869,12 +871,24 @@ impl AppState {
         }))
     }
 
+    /// Whether a log page is being read.
+    fn loading_log(&self) -> bool {
+        self.pending
+            .values()
+            .any(|(job, _)| matches!(job, Job::Read(Request::Log { .. })))
+    }
+
+    /// Asks for the next log page, unless one is already being read.
+    fn next_log_page(&self) -> Vec<Command> {
+        if self.loading_log() {
+            return Vec::new();
+        }
+        self.log_request(self.commits.len()).into_iter().collect()
+    }
+
     /// Asks for the next page when the selection is within half a page of the end.
     fn load_more_if_needed(&mut self) -> Vec<Command> {
-        let loading_log = self
-            .pending
-            .values()
-            .any(|(job, _)| matches!(job, Job::Read(Request::Log { .. })));
+        let loading_log = self.loading_log();
         let margin = (self.page_size / 2).max(1);
         let bottom = (self.offset + self.viewport_height).max(self.selected);
         let near_end = self
