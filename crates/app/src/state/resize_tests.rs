@@ -98,3 +98,33 @@ fn moving_the_mouse_without_grabbing_a_divider_resizes_nothing() {
     assert_eq!(cell(&h, 30, 5), "│");
     assert!(h.state.source_control.width.is_none());
 }
+
+#[test]
+fn a_saved_layout_is_applied_and_read_back() {
+    use crate::config::Layout;
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    let saved = Layout {
+        source_control_width: Some(40),
+        date_column: Some(20),
+        ..Layout::default()
+    };
+    h.state.apply_layout(saved);
+    h.draw(150, H);
+    assert_eq!(cell(&h, 40, 5), "│", "the saved pane width");
+    assert_eq!(
+        h.state.layout(),
+        saved,
+        "unchanged until something is dragged"
+    );
+
+    let (x, y) = find(&h, "│Description");
+    drag(&mut h, (x, y), x + 3, 150);
+    let layout = h.state.layout();
+    assert_eq!(layout.source_control_width, Some(40));
+    assert_eq!(layout.date_column, Some(20));
+    assert!(
+        layout.graph_column.is_some(),
+        "the dragged graph column is saved"
+    );
+}

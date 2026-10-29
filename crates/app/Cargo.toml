@@ -22,12 +22,15 @@ anyhow.workspace = true
 clap.workspace = true
 crossbeam-channel.workspace = true
 crossterm.workspace = true
+dirs.workspace = true
 ratatui.workspace = true
+serde.workspace = true
 tgg-actions.workspace = true
 tgg-git.workspace = true
 tgg-graph.workspace = true
 tgg-model.workspace = true
 tgg-ui.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

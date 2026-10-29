@@ -200,6 +200,23 @@ The toolbar shows VS Code's own icons (Codicons) when the terminal can draw them
 
    `--icons unicode` always uses the plain symbols, `--icons auto` goes back to detecting the terminal, and the flag wins over the variable. If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.
 
+### Config file
+
+Settings live in `~/.config/tui-git-graph/config.toml` (under `$XDG_CONFIG_HOME` when it is set, or wherever `TUI_GIT_GRAPH_CONFIG` points). The file is optional:
+
+```toml
+icons = "auto"            # "auto", "nerd" or "unicode"; --icons and TUI_GIT_GRAPH_ICONS win over it
+
+[layout]                  # saved for you when you quit after resizing
+source_control_width = 36
+graph_column = 12
+date_column = 16
+author_column = 14
+hash_column = 8
+```
+
+Drag the pane or column dividers and quit: the new widths are written to `[layout]` and used next time. Other settings in the file are kept, but comments are not. A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
+
 ## Development
 
 ```sh
