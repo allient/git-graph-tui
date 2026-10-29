@@ -36,7 +36,7 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 Target feature set, based on Git Graph for VS Code. The detailed specs for the first release are in [`odd/tasks/git-graph-mvp.md`](odd/tasks/git-graph-mvp.md).
 
 ### Graph view
-- [x] Commit graph with color-coded lanes per branch and merge lines, drawn with thick lanes (`┃`, `┠─╮`) and rounded curves in Git Graph's own palette (blue, magenta, green, orange, purple, red, cyan, ...)
+- [x] Commit graph with color-coded lanes per branch and merge lines, drawn with thick lanes (`┃`) and rounded S-curves where a line changes lanes (`●╮`, `┃╰╮`) in Git Graph's own palette (blue, magenta, green, orange, purple, red, cyan, ...)
 - [x] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges
 - [x] Uncommitted changes shown as a virtual row at the top
 - [x] Columns: graph, description, date, author, commit hash (show/hide, adapt to width)
