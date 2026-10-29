@@ -27,6 +27,8 @@ pub struct GitCommand {
     timeout: Duration,
     /// Where git would ask for a message in an editor, keep its own.
     no_editor: bool,
+    /// Shell command git runs instead of an editor on a rebase's todo list.
+    sequence_editor: Option<String>,
 }
 
 impl GitCommand {
@@ -72,6 +74,7 @@ impl GitCommand {
             kind,
             timeout,
             no_editor: false,
+            sequence_editor: None,
         }
     }
 
@@ -88,6 +91,15 @@ impl GitCommand {
     #[must_use]
     pub fn without_editor(mut self) -> Self {
         self.no_editor = true;
+        self
+    }
+
+    /// Sets `GIT_SEQUENCE_EDITOR`: git runs `command` through the shell
+    /// with the todo file's path appended, instead of opening an editor on
+    /// an interactive rebase's todo list.
+    #[must_use]
+    pub fn with_sequence_editor(mut self, command: String) -> Self {
+        self.sequence_editor = Some(command);
         self
     }
 
@@ -108,13 +120,16 @@ impl GitCommand {
 
     /// Environment variables to set on the process.
     #[must_use]
-    pub fn env(&self) -> Vec<(&'static str, &'static str)> {
+    pub fn env(&self) -> Vec<(&'static str, &str)> {
         let mut env = vec![("GIT_TERMINAL_PROMPT", "0")];
         if self.kind == CommandKind::Read {
             env.push(("GIT_OPTIONAL_LOCKS", "0"));
         }
         if self.no_editor {
             env.push(("GIT_EDITOR", "true"));
+        }
+        if let Some(command) = &self.sequence_editor {
+            env.push(("GIT_SEQUENCE_EDITOR", command));
         }
         env
     }
@@ -196,6 +211,14 @@ mod tests {
         let cmd = GitCommand::write(Path::new("/r"), ["merge", "--continue"]);
         assert!(!cmd.env().iter().any(|(k, _)| *k == "GIT_EDITOR"));
         assert!(cmd.without_editor().env().contains(&("GIT_EDITOR", "true")));
+    }
+
+    #[test]
+    fn with_sequence_editor_replaces_the_todo_editor() {
+        let cmd = GitCommand::write(Path::new("/r"), ["rebase", "--interactive", "base"]);
+        assert!(!cmd.env().iter().any(|(k, _)| *k == "GIT_SEQUENCE_EDITOR"));
+        let cmd = cmd.with_sequence_editor("printf x >".to_owned());
+        assert!(cmd.env().contains(&("GIT_SEQUENCE_EDITOR", "printf x >")));
     }
 
     #[test]
