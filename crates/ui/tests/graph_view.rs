@@ -6,12 +6,13 @@
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 use tgg_actions::GraphColumn;
 use tgg_git::{log, refs, status};
 use tgg_graph::{Graph, Row};
 use tgg_model::{Commit, Oid, Ref, WorkingTreeStatus};
 use tgg_testkit::FixtureRepo;
-use tgg_ui::{ColumnDivider, ColumnWidths, Gap, GraphView, HitTarget, Theme};
+use tgg_ui::{ColumnDivider, ColumnWidths, Gap, GraphView, HitTarget, Icons, Theme};
 
 struct Loaded {
     commits: Vec<Commit>,
@@ -77,10 +78,35 @@ fn text(buf: &Buffer) -> String {
 }
 
 fn render(v: &GraphView<'_>, width: u16, height: u16) -> (Buffer, tgg_ui::HitMap) {
+    render_with(v, width, height, &Theme::default())
+}
+
+fn render_with(
+    v: &GraphView<'_>,
+    width: u16,
+    height: u16,
+    theme: &Theme,
+) -> (Buffer, tgg_ui::HitMap) {
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);
-    let hits = v.render(area, &mut buf, &Theme::default());
+    let hits = v.render(area, &mut buf, theme);
     (buf, hits)
+}
+
+/// Where `needle` starts on the screen, in cells.
+fn find(buf: &Buffer, needle: &str) -> (u16, u16) {
+    let screen = text(buf);
+    let (y, line) = screen
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains(needle))
+        .unwrap_or_else(|| panic!("{needle:?} not on screen:\n{screen}"));
+    let x = line[..line.find(needle).unwrap()].chars().count();
+    (u16::try_from(x).unwrap(), u16::try_from(y).unwrap())
+}
+
+fn modifiers(buf: &Buffer, x: u16, y: u16, len: u16) -> Vec<Modifier> {
+    (x..x + len).map(|x| buf[(x, y)].modifier).collect()
 }
 
 #[test]
@@ -416,4 +442,73 @@ fn the_header_line_is_known_to_the_hit_map() {
     assert!(hits.is_header(109, 0));
     assert!(!hits.is_header(30, 1));
     assert!(!hits.is_header(110, 0));
+}
+
+#[test]
+fn the_current_branch_has_a_circle_and_a_bold_name() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, _) = render(&view(&loaded), 110, 16);
+
+    // HEAD is on main: a circle before its badge, and its name in bold.
+    let (x, y) = find(&buf, " main ");
+    assert_eq!(buf[(x - 2, y)].symbol(), "○");
+    assert!(
+        modifiers(&buf, x + 1, y, 4)
+            .iter()
+            .all(|m| m.contains(Modifier::BOLD))
+    );
+    // Other branches keep normal text and no circle.
+    let (x, y) = find(&buf, " develop ");
+    assert_ne!(buf[(x - 2, y)].symbol(), "○");
+    assert!(
+        modifiers(&buf, x + 1, y, 7)
+            .iter()
+            .all(|m| !m.contains(Modifier::BOLD))
+    );
+}
+
+#[test]
+fn remote_names_on_a_badge_are_italic() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, _) = render(&view(&loaded), 110, 16);
+    let (x, y) = find(&buf, "│ origin ");
+    assert!(
+        modifiers(&buf, x + 2, y, 6)
+            .iter()
+            .all(|m| m.contains(Modifier::ITALIC))
+    );
+}
+
+#[test]
+fn nerd_badges_have_an_icon_and_rounded_ends() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let theme = Theme {
+        icons: Icons::Nerd,
+        ..Theme::default()
+    };
+    let (buf, hits) = render_with(&view(&loaded), 110, 16, &theme);
+    let screen = text(&buf);
+    // Codicons git-branch and tag, between Powerline half circles.
+    assert!(
+        screen.contains("○ \u{e0b6}\u{ec6f}  main │ origin \u{e0b4}"),
+        "{screen}"
+    );
+    assert!(
+        screen.contains("\u{e0b6}\u{ec6f}  develop \u{e0b4}"),
+        "{screen}"
+    );
+    assert!(
+        screen.contains("\u{e0b6}\u{ea66}  v0.1.0 \u{e0b4}"),
+        "{screen}"
+    );
+
+    // The rounded ends belong to the badge: clicking one opens its menu.
+    let (x, y) = find(&buf, "\u{e0b6}\u{ec6f}  develop");
+    match hits.hit(x, y) {
+        Some(HitTarget::Ref { full_name, .. }) => assert_eq!(full_name, "refs/heads/develop"),
+        other => panic!("expected the develop badge, got {other:?}"),
+    }
 }

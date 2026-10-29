@@ -5,7 +5,7 @@ use tgg_actions::GraphColumn;
 use tgg_graph::Row;
 use tgg_model::{Commit, Oid, Ref};
 
-use crate::badges::{BadgeKind, badges_for};
+use crate::badges::{Badge, BadgeKind, badges_for};
 use crate::glyphs::{GlyphCell, connector_glyphs, lane_glyphs};
 use crate::text::{fit, format_date};
 use crate::theme::Theme;
@@ -370,20 +370,8 @@ impl GraphView<'_> {
         let mut x = cols.description.x;
         let right = cols.description.right();
         for badge in badges_for(&commit.id, self.refs) {
-            let bg = match badge.kind {
-                BadgeKind::Tag => theme.tag,
-                BadgeKind::Stash => theme.stash,
-                _ => theme.lane(lane_color),
-            };
-            let mut style = Style::new().fg(theme.badge_text(bg)).bg(bg);
-            if badge.kind == BadgeKind::Head {
-                style = style.add_modifier(Modifier::BOLD);
-            }
-            let text: String = std::iter::once(format!(" {} ", badge.label))
-                .chain(badge.remotes.iter().map(|remote| format!("│ {remote} ")))
-                .collect();
             let start = x;
-            x = put(buf, x, y, right, &text, style);
+            x = draw_badge(buf, x, y, right, &badge, lane_color, theme);
             if x > start {
                 hits.push(
                     Rect::new(start, y, x - start, 1),
@@ -422,6 +410,63 @@ impl GraphView<'_> {
             );
         }
     }
+}
+
+/// Draws one ref badge from `x` and returns where it ends. The current
+/// branch gets a circle before it and a bold name; remote names are italic.
+/// With Nerd icons the badge is VS Code's: rounded ends, an icon on the lane
+/// color, then the name on `badge_bg`.
+fn draw_badge(
+    buf: &mut Buffer,
+    mut x: u16,
+    y: u16,
+    right: u16,
+    badge: &Badge,
+    lane_color: usize,
+    theme: &Theme,
+) -> u16 {
+    let color = match badge.kind {
+        BadgeKind::Tag => theme.tag,
+        BadgeKind::Stash => theme.stash,
+        _ => theme.lane(lane_color),
+    };
+    let head = badge.kind == BadgeKind::Head;
+    if head {
+        x = put(buf, x, y, right, "○ ", Style::new().fg(color));
+    }
+    let icon = theme.icons.ref_badge(badge.kind);
+    let ends = theme.icons.badge_ends();
+    // Without an icon the whole badge is on the lane color.
+    let body_bg = if icon.is_some() {
+        theme.badge_bg
+    } else {
+        color
+    };
+    let body = |style: Style| style.fg(theme.badge_text(body_bg)).bg(body_bg);
+    let name = if head {
+        body(Style::new()).add_modifier(Modifier::BOLD)
+    } else {
+        body(Style::new())
+    };
+    let remote = body(Style::new()).add_modifier(Modifier::ITALIC);
+
+    if let Some((left, _)) = ends {
+        x = put(buf, x, y, right, &left.to_string(), Style::new().fg(color));
+    }
+    if let Some(icon) = icon {
+        // A blank cell after the icon lets a wide Nerd glyph overflow.
+        let style = Style::new().fg(theme.badge_text(color)).bg(color);
+        x = put(buf, x, y, right, &format!("{icon} "), style);
+    }
+    x = put(buf, x, y, right, &format!(" {} ", badge.label), name);
+    for name in &badge.remotes {
+        x = put(buf, x, y, right, "│", body(Style::new()));
+        x = put(buf, x, y, right, &format!(" {name} "), remote);
+    }
+    if let Some((_, end)) = ends {
+        x = put(buf, x, y, right, &end.to_string(), Style::new().fg(body_bg));
+    }
+    x
 }
 
 fn draw_glyphs(buf: &mut Buffer, cols: &Columns, y: u16, cells: &[GlyphCell], theme: &Theme) {

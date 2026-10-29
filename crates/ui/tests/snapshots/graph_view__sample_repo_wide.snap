@@ -9,7 +9,7 @@ Graph │Description                                                   │Date  
   ┃
   ●     develop  Return a value                                       2026-01-01 00:06 Fixture Author 6681ca2
   ┃
-  ┃╭●   main │ origin   v0.1.0  Merge branch 'develop'                2026-01-01 00:05 Fixture Author 0b1f05f
+  ┃╭●  ○  main │ origin   v0.1.0  Merge branch 'develop'              2026-01-01 00:05 Fixture Author 0b1f05f
   ┠╯┃
   ● ┃  Add lib                                                        2026-01-01 00:03 Fixture Author 4351aec
   ┃ ┃

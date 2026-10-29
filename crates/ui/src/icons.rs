@@ -1,3 +1,5 @@
+use crate::BadgeKind;
+
 /// The characters toolbar buttons are drawn with.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Icons {
@@ -30,6 +32,34 @@ impl Icons {
         match self {
             Self::Unicode => "[...]",
             Self::Nerd => " \u{ea7c} ",
+        }
+    }
+}
+
+impl Icons {
+    /// The icon at the start of a ref badge in the graph. Plain Unicode
+    /// badges have none.
+    #[must_use]
+    pub fn ref_badge(self, kind: BadgeKind) -> Option<char> {
+        match self {
+            Self::Unicode => None,
+            Self::Nerd => Some(match kind {
+                // cod-tag and cod-git_stash
+                BadgeKind::Tag => '\u{ea66}',
+                BadgeKind::Stash => '\u{ec26}',
+                // cod-git_branch
+                _ => '\u{ec6f}',
+            }),
+        }
+    }
+
+    /// The rounded left and right ends of a ref badge (Powerline half
+    /// circles). Plain Unicode badges are square.
+    #[must_use]
+    pub fn badge_ends(self) -> Option<(char, char)> {
+        match self {
+            Self::Unicode => None,
+            Self::Nerd => Some(('\u{e0b6}', '\u{e0b4}')),
         }
     }
 }
