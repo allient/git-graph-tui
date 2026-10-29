@@ -4,7 +4,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use tgg_model::{Change, ChangedFile};
 use unicode_width::UnicodeWidthChar;
 
@@ -383,7 +383,9 @@ impl SourceControl {
 
         // Commit button, across the pane but the margins.
         let button = Rect::new(area.x + 1, area.y + 1 + MESSAGE_LINES, area.width - 2, 1);
-        let mut style = Style::new().fg(theme.badge_fg).bg(theme.lane(0));
+        let mut style = Style::new()
+            .fg(theme.badge_text(theme.lane(0)))
+            .bg(theme.lane(0));
         if focused && self.focus == Focus::Commit {
             style = style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
         }
@@ -577,12 +579,7 @@ impl SourceControl {
                 };
                 let letter = change.map_or_else(
                     || (String::new(), muted),
-                    |c| {
-                        (
-                            c.letter().to_string(),
-                            Style::new().fg(change_color(c, theme)),
-                        )
-                    },
+                    |c| (c.letter().to_string(), Style::new().fg(theme.change(c))),
                 );
                 let buttons = if staged {
                     vec![(Glyph::Remove, Hit::Toggle(index))]
@@ -664,15 +661,6 @@ fn cursor_row(lines: &[(usize, usize)], cursor: usize) -> usize {
 
 fn width(chars: &[char]) -> usize {
     chars.iter().map(|c| c.width().unwrap_or(0)).sum()
-}
-
-fn change_color(change: Change, theme: &Theme) -> Color {
-    match change {
-        Change::Modified | Change::TypeChanged => theme.tag,
-        Change::Added | Change::Untracked => theme.lane(2),
-        Change::Deleted | Change::Conflicted => theme.lane(5),
-        Change::Renamed | Change::Copied => theme.lane(4),
-    }
 }
 
 #[cfg(test)]
