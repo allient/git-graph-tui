@@ -723,6 +723,7 @@ fn repository_menu_matches_the_vs_code_order() {
             "---",
             "Pull",
             "Push",
+            "Clone",
             "Checkout to...",
             "Fetch",
             "---",
@@ -1127,6 +1128,14 @@ fn repository_actions_are_prefilled() {
         &Action::Repo(RepoAction::PullUpstream { rebase: false })
     );
     assert_eq!(action(&menu, "Push"), &Action::Repo(RepoAction::Push));
+    // The app fills in the folder that holds the repository.
+    assert_eq!(
+        action(&menu, "Clone"),
+        &Action::Repo(RepoAction::Clone {
+            url: String::new(),
+            parent: String::new()
+        })
+    );
     assert_eq!(
         action(&menu, "Fetch"),
         &Action::Repo(RepoAction::FetchDefault { prune: false })
@@ -1187,6 +1196,7 @@ fn repository_menu_without_remotes_or_branch() {
             "---",
             "View & Sort ▸",
             "---",
+            "Clone",
             "Checkout to...",
             "---",
             "Commit ▸",

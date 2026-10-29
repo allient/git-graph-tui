@@ -242,3 +242,48 @@ fn drop_all_stashes_clears_the_list_after_asking() {
     assert!(action.is_destructive());
     assert!(action.confirmation().is_some());
 }
+
+#[test]
+fn clone_asks_for_a_url_and_a_parent_folder() {
+    let mut action = RepoAction::Clone {
+        url: String::new(),
+        parent: "/work".into(),
+    };
+    let ids: Vec<InputId> = action.inputs().iter().map(|i| i.id).collect();
+    assert_eq!(ids, [InputId::Url, InputId::Path]);
+    assert_eq!(
+        action.set_input(InputId::Url, InputValue::Text(String::new())),
+        Err(InputError::Required(InputId::Url))
+    );
+    action
+        .set_input(
+            InputId::Url,
+            InputValue::Text("https://github.com/allient/tui-git-graph.git".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        commands(&action),
+        [network(&[
+            "clone",
+            "--",
+            "https://github.com/allient/tui-git-graph.git",
+            "/work/tui-git-graph"
+        ])]
+    );
+    assert_eq!(action.destination().as_deref(), Some("/work/tui-git-graph"));
+}
+
+#[test]
+fn clone_names_the_folder_after_the_repository() {
+    let dest = |url: &str| {
+        RepoAction::Clone {
+            url: url.into(),
+            parent: "/w/".into(),
+        }
+        .destination()
+    };
+    assert_eq!(dest("git@github.com:a/b.git").as_deref(), Some("/w/b"));
+    assert_eq!(dest("https://host/x/repo/").as_deref(), Some("/w/repo"));
+    assert_eq!(dest("../local").as_deref(), Some("/w/local"));
+    assert_eq!(dest(""), None);
+}

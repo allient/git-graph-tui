@@ -111,6 +111,12 @@ pub enum RepoAction {
     PopLatestStash,
     /// Deletes every stash (`git stash clear`).
     DropAllStashes,
+    /// Clones `url` into a new folder of `parent` named after the
+    /// repository; the app keeps showing the current one.
+    Clone {
+        url: String,
+        parent: String,
+    },
 }
 
 impl RepoAction {
@@ -163,8 +169,30 @@ impl RepoAction {
             Self::ApplyLatestStash => vec![write(strings(&["stash", "apply"]))],
             Self::PopLatestStash => vec![write(strings(&["stash", "pop"]))],
             Self::DropAllStashes => vec![write(strings(&["stash", "clear"]))],
+            Self::Clone { url, .. } => {
+                let dest = self.destination().unwrap_or_default();
+                vec![network(strings(&["clone", "--", url, &dest]))]
+            }
         };
         Plan::Git(commands)
+    }
+
+    /// Where Clone puts the repository: `parent` plus the last part of the
+    /// URL without `.git`; None until the URL names something.
+    #[must_use]
+    pub fn destination(&self) -> Option<String> {
+        let Self::Clone { url, parent } = self else {
+            return None;
+        };
+        let name = url
+            .trim_end_matches('/')
+            .rsplit(['/', ':', '\\'])
+            .next()?
+            .trim_end_matches(".git");
+        if name.is_empty() || name == "." || name == ".." {
+            return None;
+        }
+        Some(format!("{}/{name}", parent.trim_end_matches('/')))
     }
 
     #[must_use]
@@ -212,6 +240,10 @@ impl RepoAction {
                 InputSpec::text(InputId::Remote, "Remote", InputKind::Remote, remote),
                 InputSpec::text(InputId::Name, "Branch", InputKind::RefName, branch),
             ],
+            Self::Clone { url, parent } => vec![
+                InputSpec::text(InputId::Url, "Repository URL", InputKind::Path, url),
+                InputSpec::text(InputId::Path, "Parent folder", InputKind::Path, parent),
+            ],
             Self::AddRemote { name, url } => vec![
                 InputSpec::text(InputId::Name, "Remote name", InputKind::Remote, name),
                 InputSpec::text(InputId::Url, "URL", InputKind::Path, url),
@@ -227,7 +259,10 @@ impl RepoAction {
             }
             (Self::PullFrom { branch, .. }, InputId::Name) => *branch = input::ref_name(id, value)?,
             (Self::AddRemote { name, .. }, InputId::Name) => *name = input::ref_name(id, value)?,
-            (Self::AddRemote { url, .. }, InputId::Url) => *url = input::required(id, value)?,
+            (Self::AddRemote { url, .. } | Self::Clone { url, .. }, InputId::Url) => {
+                *url = input::required(id, value)?;
+            }
+            (Self::Clone { parent, .. }, InputId::Path) => *parent = input::required(id, value)?,
             _ => return Err(InputError::NotAnInput(id)),
         }
         Ok(())
