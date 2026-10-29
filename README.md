@@ -168,6 +168,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `j` `k` / arrows, `PgUp` `PgDn`, `g` `G` | Move the selection (top, bottom) |
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
+| Double click a branch | Check the branch out (a remote branch asks for the local branch's name), like VS Code Git Graph |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
 | Compare (commit menu) | "Select for Compare" marks a commit; on another commit, "Compare with Selected" lists the files changed from the marked one to it, and "Compare with Working Tree" lists what changed since the commit, uncommitted edits included. `Enter` opens a file's diff, `Esc` closes the comparison |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |

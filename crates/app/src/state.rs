@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -43,6 +44,9 @@ pub const DEFAULT_PAGE_SIZE: usize = 500;
 
 /// Lines scrolled per mouse-wheel step.
 pub const SCROLL_LINES: usize = 3;
+
+/// Longest gap between the two clicks of a double-click.
+const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 /// Something that happened.
 #[derive(Debug)]
@@ -195,6 +199,10 @@ pub struct AppState {
     pub source_control: SourceControlState,
     /// The open find bar (`/`).
     pub find: Option<Find>,
+    /// Longest gap between the two clicks of a double-click.
+    pub double_click: Duration,
+    /// The last left click on the graph, to spot a double-click.
+    last_click: Option<(Instant, HitTarget)>,
     /// The graph's column widths, set by dragging the header dividers.
     pub columns: ColumnWidths,
     /// The commit marked with "Select for Compare".
@@ -240,6 +248,8 @@ impl AppState {
             picker: None,
             source_control: SourceControlState::default(),
             find: None,
+            double_click: DOUBLE_CLICK,
+            last_click: None,
             columns: ColumnWidths::default(),
             compare_base: None,
             drag: None,
@@ -450,6 +460,8 @@ impl AppState {
                 self.select(self.display_index(&target));
                 match button {
                     MouseButton::Right => self.open_menu(&target, Position { x, y }),
+                    // Double-clicking a branch checks it out, like VS Code.
+                    _ if self.is_double_click(&target) => return self.checkout_ref(&target),
                     _ if target != HitTarget::Uncommitted => return self.toggle_details(),
                     _ => {}
                 }
@@ -465,6 +477,41 @@ impl AppState {
                 Vec::new()
             }
             _ => Vec::new(),
+        }
+    }
+
+    /// Whether this left click on `target` completes a double-click on a branch.
+    fn is_double_click(&mut self, target: &HitTarget) -> bool {
+        let now = Instant::now();
+        let double = matches!(target, HitTarget::Ref { .. })
+            && self.last_click.as_ref().is_some_and(|(at, last)| {
+                last == target && now.duration_since(*at) < self.double_click
+            });
+        self.last_click = (!double).then(|| (now, target.clone()));
+        double
+    }
+
+    /// Checks out the branch a badge shows (a remote one asks for the local name).
+    fn checkout_ref(&mut self, target: &HitTarget) -> Vec<Command> {
+        let HitTarget::Ref { full_name, .. } = target else {
+            return Vec::new();
+        };
+        let Some(branch) = self
+            .refs
+            .iter()
+            .find(|r| &r.full_name == full_name)
+            .filter(|r| matches!(r.kind, RefKind::LocalBranch | RefKind::RemoteBranch))
+            .map(|r| r.short_name().to_owned())
+        else {
+            return Vec::new();
+        };
+        if self.menu_context().is_current_branch(&branch) {
+            self.message = Some(format!("Already on {branch}."));
+            return Vec::new();
+        }
+        match self.checkout_action(&branch) {
+            Some(action) => self.start_action(action, format!("Checkout {branch}")),
+            None => Vec::new(),
         }
     }
 

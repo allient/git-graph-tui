@@ -294,7 +294,7 @@ impl AppState {
 
     /// The checkout for a picked short name: a local branch, a remote branch
     /// (creating a local branch that tracks it) or a tag (detached).
-    fn checkout_action(&self, name: &str) -> Option<Action> {
+    pub(super) fn checkout_action(&self, name: &str) -> Option<Action> {
         let r = self.refs.iter().find(|r| {
             r.short_name() == name
                 && matches!(

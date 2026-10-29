@@ -96,10 +96,10 @@ fn lists_staged_and_unstaged_files_like_vs_code() {
             "▾ Staged Changes                − 2",
             "  app.rs src                    − M",
             "  README.md                     − M",
+            "",
             "▾ Changes                     ↶ + 2",
             "  README.md                   ↶ + M",
             "  notes.txt                   ↶ + U",
-            "",
         ]
     );
 }
@@ -117,9 +117,9 @@ fn nerd_font_icons_replace_the_buttons() {
         lines[0]
     );
     assert!(
-        lines[11].ends_with("\u{eae2} \u{ea60} U"),
+        lines[12].ends_with("\u{eae2} \u{ea60} U"),
         "{:?}",
-        lines[11]
+        lines[12]
     );
 }
 
@@ -312,13 +312,13 @@ fn header_buttons_commit_refresh_and_open_more_actions() {
 fn row_buttons_stage_unstage_and_discard() {
     let mut pane = pane();
     let (_, hits) = render(&mut pane, 13, true);
-    // notes.txt is on line 11: ↶ at x 30, + at x 32.
+    // notes.txt is on line 12: ↶ at x 30, + at x 32.
     assert_eq!(
-        pane.handle_click(&hits, 32, 11),
+        pane.handle_click(&hits, 32, 12),
         SourceControlOutcome::Stage(paths(&["notes.txt"]))
     );
     assert_eq!(
-        pane.handle_click(&hits, 30, 11),
+        pane.handle_click(&hits, 30, 12),
         SourceControlOutcome::Discard {
             paths: Vec::new(),
             untracked: paths(&["notes.txt"]),
@@ -326,7 +326,7 @@ fn row_buttons_stage_unstage_and_discard() {
     );
     // The Changes header's ↶ and + act on the whole section.
     assert_eq!(
-        pane.handle_click(&hits, 32, 9),
+        pane.handle_click(&hits, 32, 10),
         SourceControlOutcome::Stage(paths(&["README.md", "notes.txt"]))
     );
     // The − of the Staged Changes header unstages everything staged.
@@ -384,5 +384,23 @@ fn new_changes_keep_the_selection_in_range() {
     assert_eq!(
         press(&mut pane, &[Key::Char(' ')]),
         SourceControlOutcome::Stage(paths(&["a.txt"]))
+    );
+}
+
+#[test]
+fn the_gap_between_the_sections_is_skipped_by_the_keyboard() {
+    let mut pane = pane();
+    pane.focus_message();
+    press(&mut pane, &TO_LIST);
+    // Staged header → app.rs → README.md → (gap) → Changes header.
+    press(&mut pane, &[Key::Down, Key::Down, Key::Down]);
+    assert_eq!(
+        press(&mut pane, &[Key::Enter]),
+        SourceControlOutcome::Stage(paths(&["README.md", "notes.txt"]))
+    );
+    // And back up over it.
+    assert_eq!(
+        press(&mut pane, &[Key::Up, Key::Char(' ')]),
+        SourceControlOutcome::Unstage(paths(&["README.md"]))
     );
 }
