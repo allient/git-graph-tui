@@ -22,6 +22,8 @@ mod actions;
 mod details;
 mod info;
 mod output;
+mod source_control;
+pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
 
 use actions::Running;
@@ -165,6 +167,8 @@ pub struct AppState {
     pub toolbar: ToolbarState,
     /// The open ref picker (branch filter, "Checkout to...", ...), above any menu.
     pub picker: Option<OpenPicker>,
+    /// The Source Control pane beside the graph.
+    pub source_control: SourceControlState,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -203,6 +207,7 @@ impl AppState {
             output_view: None,
             toolbar: ToolbarState::default(),
             picker: None,
+            source_control: SourceControlState::default(),
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -304,6 +309,9 @@ impl AppState {
         if self.toolbar.focus.is_some() {
             return self.on_toolbar_key(key);
         }
+        if self.source_control.focus {
+            return self.on_source_control_key(key);
+        }
         if let Some(commands) = self.on_details_key(key) {
             return commands;
         }
@@ -327,6 +335,7 @@ impl AppState {
             (KeyCode::PageUp, _) => self.select(self.selected.saturating_sub(page)),
             (KeyCode::Enter, _) => return self.toggle_details(),
             (KeyCode::Tab, _) => self.focus_toolbar(),
+            (KeyCode::Char('c'), _) => self.focus_source_control(),
             (KeyCode::Char('g') | KeyCode::Home, _) => self.select(0),
             (KeyCode::Char('G') | KeyCode::End, _) => self.select(last),
             (KeyCode::Char('m') | KeyCode::Menu, _) | (KeyCode::F(10), KeyModifiers::SHIFT) => {
@@ -385,7 +394,8 @@ impl AppState {
         }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left)
             && let Some(commands) = self
-                .on_toolbar_click(x, y)
+                .on_source_control_click(x, y)
+                .or_else(|| self.on_toolbar_click(x, y))
                 .or_else(|| self.on_details_click(x, y))
         {
             return commands;
@@ -586,6 +596,7 @@ impl AppState {
             .then(|| self.selected_commit().map(|c| c.id.clone()))
             .flatten();
         self.status = status;
+        self.update_source_control();
         if keep.is_some() {
             self.restore_selection(keep.as_ref());
         } else {
@@ -710,6 +721,8 @@ mod jump_tests;
 mod mouse_tests;
 #[cfg(test)]
 mod output_tests;
+#[cfg(test)]
+mod source_control_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

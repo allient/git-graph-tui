@@ -6,12 +6,13 @@ use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 use tgg_model::HeadState;
-use tgg_ui::{Gap, GraphView, Theme};
+use tgg_ui::{Gap, GraphView, SourceControlHitMap, Theme};
 
-use crate::state::{AppState, Dialog, DialogHits};
+use crate::state::{AppState, Dialog, DialogHits, MIN_WIDTH_FOR_PANE};
 
 /// Key hints shown at the right of the status bar.
-const HINTS: &str = "j/k move  enter details  m menu  tab toolbar  H head  r refresh  q quit";
+const HINTS: &str =
+    "j/k move  enter details  m menu  c commit  tab toolbar  H head  r refresh  q quit";
 
 /// Most lines the inline details panel takes.
 const DETAILS_HEIGHT: u16 = 12;
@@ -19,15 +20,20 @@ const DETAILS_HEIGHT: u16 = 12;
 /// Graph lines kept visible above and below an open details panel.
 const MIN_GRAPH_LINES: u16 = 3;
 
-/// Draws the graph, the status bar and the open menu. Updates the viewport
+/// Width of the Source Control pane: a quarter of the terminal, within bounds.
+fn pane_width(total: u16) -> u16 {
+    (total / 4).clamp(30, 44)
+}
+
+/// Draws the Source Control pane and, beside it, the toolbar and the graph;
+/// then the status bar and whatever is open on top. Updates the viewport
 /// height and stores the hit-maps that mouse events resolve against.
 pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
-    let [toolbar_area, graph_area, status_area] = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ])
-    .areas(frame.area());
+    let [main_area, status_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
+    let right_area = draw_source_control(frame, main_area, state, theme);
+    let [toolbar_area, graph_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(right_area);
     state.toolbar.hits = state
         .toolbar
         .widget()
@@ -100,6 +106,44 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         }
         None => {}
     }
+}
+
+/// Draws the pane and a divider when the terminal is wide enough, and returns
+/// the area left for the graph.
+fn draw_source_control(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &mut AppState,
+    theme: &Theme,
+) -> Rect {
+    state.source_control.visible = area.width >= MIN_WIDTH_FOR_PANE;
+    if !state.source_control.visible {
+        state.source_control.focus = false;
+        state.source_control.hits = SourceControlHitMap::default();
+        return area;
+    }
+    let [pane, divider, rest] = Layout::horizontal([
+        Constraint::Length(pane_width(area.width)),
+        Constraint::Length(1),
+        Constraint::Fill(1),
+    ])
+    .areas(area);
+    let hits = state.source_control.view.render(
+        pane,
+        frame.buffer_mut(),
+        theme,
+        state.source_control.focus,
+    );
+    if let Some(cursor) = hits.cursor() {
+        frame.set_cursor_position(cursor);
+    }
+    state.source_control.hits = hits;
+    for y in divider.top()..divider.bottom() {
+        frame.buffer_mut()[(divider.x, y)]
+            .set_char('│')
+            .set_fg(theme.muted);
+    }
+    rest
 }
 
 fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Theme) {

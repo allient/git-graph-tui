@@ -205,8 +205,10 @@ fn ui_only_actions_show_a_hint_and_run_no_git() {
     press(&mut h, KeyCode::Esc);
 
     choose(&mut h, "Uncommitted Changes", "Open Source Control View");
-    let message = h.state.message.clone().unwrap_or_default();
-    assert!(message.contains("source control"), "{message}");
+    assert!(
+        h.state.source_control.focus,
+        "the pane's message box has the keyboard"
+    );
     assert!(h.state.running.is_none());
     assert_eq!(repo.git(&["rev-parse", "HEAD"]), before);
 }
