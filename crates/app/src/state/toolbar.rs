@@ -101,11 +101,21 @@ impl AppState {
         self.refs
             .iter()
             .filter(|r| {
-                self.toolbar.show_remotes
-                    || !matches!(r.kind, RefKind::RemoteBranch | RefKind::RemoteHead)
+                // Each stash gets its own badge below, not just the newest.
+                r.kind != RefKind::Stash
+                    && (self.toolbar.show_remotes
+                        || !matches!(r.kind, RefKind::RemoteBranch | RefKind::RemoteHead))
             })
             .cloned()
+            .chain(self.stashes.iter().map(stash_ref))
             .collect()
+    }
+
+    /// The stash a stash badge (`refs/stash@{n}`) stands for.
+    pub(super) fn stash_named(&self, full_name: &str) -> Option<&tgg_model::Stash> {
+        self.stashes
+            .iter()
+            .find(|stash| stash_ref(stash).full_name == full_name)
     }
 
     /// Tab gives the keyboard to the toolbar.
@@ -463,5 +473,16 @@ fn picker_title(purpose: PickPurpose) -> &'static str {
         PickPurpose::DeleteTag => "Delete Tag",
         PickPurpose::DeleteRemoteTag => "Delete Remote Tag",
         PickPurpose::RemoveRemote => "Remove Remote",
+    }
+}
+
+/// A badge for `stash`: `stash@{n}` on the stash's row.
+fn stash_ref(stash: &tgg_model::Stash) -> Ref {
+    Ref {
+        full_name: format!("refs/{}", stash.selector()),
+        kind: RefKind::Stash,
+        target: stash.id.clone(),
+        upstream: None,
+        is_head: false,
     }
 }

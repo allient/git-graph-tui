@@ -88,9 +88,10 @@ fn wheel_scrolls_the_view_and_loads_more_history() {
         h.settle(commands);
         h.draw(W, 4);
     }
+    // Seven commits and the fixture's stash row.
     assert_eq!(
         h.state.commits.len(),
-        7,
+        8,
         "scrolling near the end loads older pages"
     );
     assert!(h.state.offset > 0);
