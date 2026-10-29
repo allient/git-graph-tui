@@ -196,12 +196,7 @@ pub fn diff_args(commit: &Oid, file: &FileChange) -> Vec<String> {
         commit.to_string(),
         "--".into(),
     ];
-    args.extend(
-        file.old_path
-            .iter()
-            .chain(std::iter::once(&file.path))
-            .map(|p| format!(":(literal){p}")),
-    );
+    args.extend(literal_paths(file));
     args
 }
 
@@ -235,13 +230,45 @@ pub fn compare_diff_args(base: &Oid, other: Option<&Oid>, file: &FileChange) -> 
     ];
     args.extend(other.map(Oid::to_string));
     args.push("--".into());
-    args.extend(
-        file.old_path
-            .iter()
-            .chain(std::iter::once(&file.path))
-            .map(|p| format!(":(literal){p}")),
-    );
+    args.extend(literal_paths(file));
     args
+}
+
+/// The empty tree's hash (SHA-1 repositories): the "parent" of a root commit.
+const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/// Arguments for `git difftool` on one file of `commit` against its first
+/// `parent` (the empty tree for a root commit), the side [`diff_args`] shows.
+#[must_use]
+pub fn difftool_args(commit: &Oid, parent: Option<&Oid>, file: &FileChange) -> Vec<String> {
+    let parent = parent.map_or_else(|| EMPTY_TREE.to_owned(), Oid::to_string);
+    difftool(vec![parent, commit.to_string()], file)
+}
+
+/// Arguments for `git difftool` on one file between `base` and `other` (the
+/// working tree when `None`), as in [`compare_diff_args`].
+#[must_use]
+pub fn compare_difftool_args(base: &Oid, other: Option<&Oid>, file: &FileChange) -> Vec<String> {
+    let mut revisions = vec![base.to_string()];
+    revisions.extend(other.map(Oid::to_string));
+    difftool(revisions, file)
+}
+
+fn difftool(revisions: Vec<String>, file: &FileChange) -> Vec<String> {
+    let mut args: Vec<String> = vec!["difftool".into(), "--no-prompt".into()];
+    args.extend(revisions);
+    args.push("--".into());
+    args.extend(literal_paths(file));
+    args
+}
+
+/// Both sides of a rename as literal pathspecs, so names with `*` or `:`
+/// are never treated as patterns.
+fn literal_paths(file: &FileChange) -> impl Iterator<Item = String> + '_ {
+    file.old_path
+        .iter()
+        .chain(std::iter::once(&file.path))
+        .map(|p| format!(":(literal){p}"))
 }
 
 /// Arguments for the whole content of `path` as it was in `commit`

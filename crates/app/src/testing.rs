@@ -6,6 +6,7 @@ use crossbeam_channel::Receiver;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tgg_testkit::FixtureRepo;
 
+use crate::external::External;
 use crate::git::{JobResult, ProcessExecutor, Runner};
 use crate::state::{AppState, Command, DEFAULT_PAGE_SIZE, Event};
 
@@ -17,6 +18,8 @@ pub struct Harness {
     pub clipboard: Vec<String>,
     /// Pages the app asked to open in the browser.
     pub opened: Vec<String>,
+    /// Programs the app asked to run with the terminal (never run here).
+    pub external: Vec<External>,
     pub runner: Runner<ProcessExecutor>,
     pub results: Receiver<JobResult>,
 }
@@ -38,6 +41,7 @@ impl Harness {
             screen: ratatui::buffer::Buffer::empty(ratatui::layout::Rect::default()),
             clipboard: Vec::new(),
             opened: Vec::new(),
+            external: Vec::new(),
         };
         let commands = h.state.update(Event::Refresh);
         h.settle(commands);
@@ -58,6 +62,7 @@ impl Harness {
                     }
                     Command::Clipboard(text) => self.clipboard.push(text),
                     Command::OpenUrl(url) => self.opened.push(url),
+                    Command::External(external) => self.external.push(external),
                 }
             }
             if !self.state.is_loading() {

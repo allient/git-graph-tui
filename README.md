@@ -74,7 +74,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ### Commit details
 - [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
-- [ ] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
+- [x] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
 - [x] View a file at that revision
 - [x] Compare any two commits, or a commit with the working tree
 
@@ -168,6 +168,8 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `j` `k` / arrows, `PgUp` `PgDn`, `g` `G` | Move the selection (top, bottom) |
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
+| `t` (in the details) | Open the selected file in your configured `git difftool` (against the commit's first parent, or between the two sides of a comparison). The app steps aside until the tool exits |
+| Diff pager | With a pager configured (`[diff] pager` in the config file, or `TUI_GIT_GRAPH_PAGER`), `Enter` on a file pipes its colored diff into it, for example `delta`, instead of the built-in diff view. The app steps aside until the pager exits; if it fails, the status bar says so |
 | Double click a branch | Check the branch out (a remote branch asks for the local branch's name), like VS Code Git Graph |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
 | Compare (commit menu) | "Select for Compare" marks a commit; on another commit, "Compare with Selected" lists the files changed from the marked one to it, and "Compare with Working Tree" lists what changed since the commit, uncommitted edits included. `Enter` opens a file's diff, `Esc` closes the comparison |
@@ -215,7 +217,12 @@ graph_column = 12
 date_column = 16
 author_column = 14
 hash_column = 8
+
+[diff]
+pager = "delta"           # pipe file diffs into this command; unset or "" uses the built-in view
 ```
+
+`pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `TUI_GIT_GRAPH_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 
 Drag the pane or column dividers and quit: the new widths are written to `[layout]` and used next time. Other settings in the file are kept, but comments are not. A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
 

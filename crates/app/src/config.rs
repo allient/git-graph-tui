@@ -10,6 +10,10 @@
 //! date_column = 16
 //! author_column = 14
 //! hash_column = 8
+//!
+//! [diff]
+//! pager = "delta"         # pipe file diffs into this command; "" or unset:
+//!                         # the built-in view ($TUI_GIT_GRAPH_PAGER wins)
 //! ```
 
 use std::fs;
@@ -29,6 +33,16 @@ pub const CONFIG_ENV: &str = "TUI_GIT_GRAPH_CONFIG";
 pub struct Config {
     pub icons: Option<IconStyle>,
     pub layout: Layout,
+    pub diff: Diff,
+}
+
+/// How file diffs are shown.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Diff {
+    /// Shell command the colored diff is piped into, such as `delta`; None
+    /// (or empty) uses the built-in diff view.
+    pub pager: Option<String>,
 }
 
 /// Pane and column widths; None keeps the built-in default.
@@ -162,8 +176,32 @@ mod tests {
                     date_column: Some(20),
                     ..Layout::default()
                 },
+                diff: Diff::default(),
             }
         );
+    }
+
+    #[test]
+    fn reads_the_diff_pager() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(&file, "[diff]\npager = \"delta --side-by-side\"\n").unwrap();
+        assert_eq!(
+            load(&file).unwrap().diff.pager.as_deref(),
+            Some("delta --side-by-side")
+        );
+        fs::write(&file, "[diff]\nviewer = \"delta\"\n").unwrap();
+        let err = format!("{:#}", load(&file).unwrap_err());
+        assert!(err.contains("unknown field `viewer`"), "{err}");
+    }
+
+    #[test]
+    fn saving_the_layout_keeps_the_pager() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(&file, "[diff]\npager = \"delta\"\n").unwrap();
+        save_layout(&file, Layout::default()).unwrap();
+        assert_eq!(load(&file).unwrap().diff.pager.as_deref(), Some("delta"));
     }
 
     #[test]
