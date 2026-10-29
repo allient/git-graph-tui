@@ -8,6 +8,16 @@ use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 /// Reset modes that make sense for uncommitted changes (soft would do nothing).
 const RESET_CHOICES: &[&str] = &["mixed", "hard"];
 
+/// What the Source Control menu's commit entries commit (VS Code's
+/// Commit, Commit Staged and Commit All).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommitScope {
+    /// What is staged or, when nothing is, every change.
+    Auto,
+    Staged,
+    All,
+}
+
 /// Actions on the "Uncommitted Changes" row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkingTreeAction {
@@ -31,10 +41,19 @@ pub enum WorkingTreeAction {
     Unstage {
         paths: Vec<String>,
     },
-    /// Commits what is staged.
+    /// Commits what is staged or, with `all`, every change (untracked
+    /// files too). `amend` rewrites the last commit, keeping its message
+    /// when `message` is empty; `signoff` adds a Signed-off-by trailer.
     Commit {
         message: String,
+        all: bool,
+        amend: bool,
+        signoff: bool,
     },
+    /// Takes back the last commit, keeping its changes staged.
+    UndoLastCommit,
+    /// Throws away every unstaged change and deletes untracked files.
+    DiscardAll,
     /// Throws away unstaged changes: tracked `paths` go back to their staged
     /// (or committed) content, `untracked` files are deleted.
     Discard {
@@ -46,6 +65,19 @@ pub enum WorkingTreeAction {
 impl WorkingTreeAction {
     #[must_use]
     pub fn plan(&self, repo: &Path) -> Plan {
+        if let Self::Commit { all: true, .. } = self {
+            return Plan::Git(vec![
+                GitCommand::write(repo, strings(&["add", "--all"])),
+                GitCommand::write(repo, self.commit_args()),
+            ]);
+        }
+        if let Self::DiscardAll = self {
+            // `:/` is the whole working tree, wherever git runs from.
+            return Plan::Git(vec![
+                GitCommand::write(repo, strings(&["restore", "--worktree", "--", ":/"])),
+                GitCommand::write(repo, strings(&["clean", "-d", "--force", "--", ":/"])),
+            ]);
+        }
         if let Self::Discard { paths, untracked } = self {
             let mut commands = Vec::new();
             if !paths.is_empty() {
@@ -80,11 +112,37 @@ impl WorkingTreeAction {
             Self::OpenSourceControl => return Plan::Ui(UiEffect::OpenSourceControl),
             Self::Stage { paths } => with_paths(&["add", "--all", "--"], paths),
             Self::Unstage { paths } => with_paths(&["reset", "--quiet", "--"], paths),
-            // One `--message=` argument, so a message starting with `-` stays a message.
-            Self::Commit { message } => vec!["commit".into(), format!("--message={message}")],
-            Self::Discard { .. } => unreachable!("planned above"),
+            Self::Commit { .. } => self.commit_args(),
+            Self::UndoLastCommit => strings(&["reset", "--soft", "HEAD~1", "--"]),
+            Self::Discard { .. } | Self::DiscardAll => unreachable!("planned above"),
         };
         Plan::Git(vec![GitCommand::write(repo, args)])
+    }
+
+    fn commit_args(&self) -> Vec<String> {
+        let Self::Commit {
+            message,
+            amend,
+            signoff,
+            ..
+        } = self
+        else {
+            return Vec::new();
+        };
+        let mut args = strings(&["commit"]);
+        if *amend {
+            args.push("--amend".into());
+        }
+        if *signoff {
+            args.push("--signoff".into());
+        }
+        if *amend && message.trim().is_empty() {
+            args.push("--no-edit".into());
+        } else {
+            // One `--message=` argument, so a message starting with `-` stays a message.
+            args.push(format!("--message={message}"));
+        }
+        args
     }
 
     #[must_use]
@@ -95,6 +153,7 @@ impl WorkingTreeAction {
                 mode: ResetMode::Hard
             } | Self::Clean
                 | Self::Discard { .. }
+                | Self::DiscardAll
         )
     }
 
@@ -114,6 +173,11 @@ impl WorkingTreeAction {
             return Some(Confirmation::new("Discard Changes", message, "Discard"));
         }
         let (title, message, label) = match self {
+            Self::DiscardAll => (
+                "Discard All Changes",
+                "Discard ALL unstaged changes and delete every untracked file? Staged changes are kept. This can't be undone.",
+                "Discard",
+            ),
             Self::Reset {
                 mode: ResetMode::Hard,
             } => (
@@ -136,6 +200,7 @@ impl WorkingTreeAction {
             | Self::Stage { .. }
             | Self::Unstage { .. }
             | Self::Commit { .. }
+            | Self::UndoLastCommit
             | Self::Discard { .. } => return None,
         };
         Some(Confirmation::new(title, message.to_owned(), label))
@@ -171,7 +236,9 @@ impl WorkingTreeAction {
             | Self::Stage { .. }
             | Self::Unstage { .. }
             | Self::Commit { .. }
-            | Self::Discard { .. } => Vec::new(),
+            | Self::UndoLastCommit
+            | Self::Discard { .. }
+            | Self::DiscardAll => Vec::new(),
         }
     }
 

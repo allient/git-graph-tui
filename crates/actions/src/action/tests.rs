@@ -828,6 +828,9 @@ fn resolving_conflicts_stays_allowed() {
         },
         WorkingTreeAction::Commit {
             message: "Merge".into(),
+            all: false,
+            amend: false,
+            signoff: false,
         },
         WorkingTreeAction::Discard {
             paths,

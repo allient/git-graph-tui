@@ -240,3 +240,118 @@ fn the_repository_menu_button_moves_to_the_toolbar_on_narrow_terminals() {
     click_text(&mut h, "[...]");
     assert!(h.state.menu.is_some());
 }
+
+/// Opens a submenu of the repository menu (its row is below "Fetch") and
+/// clicks `entry` in it.
+fn repo_submenu_entry(h: &mut Harness, submenu: &str, entry: &str) {
+    open_repo_menu(h);
+    // Only right of the menu's left edge: the pane lists "Staged Changes" too.
+    let (left, below) = find(h, "Fetch");
+    let (x, y) = find_in_menu(h, &format!("{submenu} "), left, below);
+    mouse(h, MouseEventKind::Down(MouseButton::Left), x, y);
+    let (x, y) = find_in_menu(h, entry, left, below);
+    mouse(h, MouseEventKind::Down(MouseButton::Left), x, y);
+}
+
+/// Like [`find_below`], counting only cells from column `left` on.
+fn find_in_menu(h: &Harness, text: &str, left: u16, min_y: u16) -> (u16, u16) {
+    let area = h.screen.area;
+    (min_y + 1..area.bottom())
+        .find_map(|y| {
+            let line: String = (left..area.right())
+                .map(|x| h.screen[(x, y)].symbol())
+                .collect();
+            let byte = line.find(text)?;
+            let x = left + u16::try_from(line[..byte].chars().count()).ok()?;
+            Some((x, y))
+        })
+        .unwrap_or_else(|| panic!("{text:?} not in the menu below line {min_y}"))
+}
+
+fn head_subject(repo: &FixtureRepo) -> String {
+    repo.git(&["log", "-1", "--format=%s"])
+}
+
+fn commit_count(repo: &FixtureRepo) -> String {
+    repo.git(&["rev-list", "--count", "HEAD"])
+}
+
+/// Types `message` in the Source Control message box, then leaves the pane.
+fn type_commit_message(h: &mut Harness, message: &str) {
+    press(h, KeyCode::Char('c'));
+    type_text(h, message);
+    press(h, KeyCode::Esc);
+}
+
+#[test]
+fn commit_all_from_the_menu_commits_every_change_with_the_pane_message() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    type_commit_message(&mut h, "Add notes");
+    repo_submenu_entry(&mut h, "Commit", "Commit All");
+    assert_eq!(head_subject(&repo), "Add notes");
+    assert_eq!(status_of(&repo), "");
+    assert_eq!(h.state.source_control.view.message(), "");
+}
+
+#[test]
+fn commit_from_the_menu_needs_a_message_unless_it_amends() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let before = commit_count(&repo);
+    let subject = head_subject(&repo);
+    repo_submenu_entry(&mut h, "Commit", "Commit All");
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some("Type a commit message first.")
+    );
+    assert_eq!(commit_count(&repo), before);
+
+    // An empty message amends with the last commit's message.
+    press(&mut h, KeyCode::Esc);
+    repo_submenu_entry(&mut h, "Commit", "Commit All (Amend)");
+    assert_eq!(commit_count(&repo), before);
+    assert_eq!(head_subject(&repo), subject);
+    assert_eq!(status_of(&repo), "");
+}
+
+#[test]
+fn signed_off_commits_carry_the_trailer() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    type_commit_message(&mut h, "Add notes");
+    repo_submenu_entry(&mut h, "Commit", "Commit All (Signed Off)");
+    let body = repo.git(&["log", "-1", "--format=%B"]);
+    assert!(body.contains("Signed-off-by: "), "{body}");
+}
+
+#[test]
+fn undo_last_commit_keeps_its_changes_staged() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let parent = repo.git(&["rev-parse", "HEAD~1"]);
+    repo_submenu_entry(&mut h, "Commit", "Undo Last Commit");
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]), parent);
+    let staged = repo.git(&["diff", "--cached", "--name-only"]);
+    assert!(!staged.is_empty(), "the undone commit's files are staged");
+}
+
+#[test]
+fn the_changes_submenu_stages_unstages_and_discards_everything() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Changes", "Stage All Changes");
+    assert_eq!(status_of(&repo), "A  notes.txt");
+    repo_submenu_entry(&mut h, "Changes", "Unstage All Changes");
+    assert_eq!(status_of(&repo), "?? notes.txt");
+    repo_submenu_entry(&mut h, "Changes", "Discard All Changes");
+    // Destructive: focus starts on Cancel, so move to Discard first.
+    assert!(matches!(h.state.dialog, Some(Dialog::Confirm { .. })));
+    press(&mut h, KeyCode::Left);
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(status_of(&repo), "");
+}
+
+fn status_of(repo: &FixtureRepo) -> String {
+    repo.git(&["status", "--porcelain", "--untracked-files=all"])
+}

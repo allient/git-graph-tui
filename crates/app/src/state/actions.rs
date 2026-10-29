@@ -142,6 +142,11 @@ impl AppState {
                 self.pick_ref(purpose);
                 Vec::new()
             }
+            Plan::Ui(UiEffect::Commit {
+                scope,
+                amend,
+                signoff,
+            }) => self.commit(scope, amend, signoff),
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
             Plan::Ui(UiEffect::ShowReflog) => self.show_reflog(),
             Plan::Ui(UiEffect::ShowWorktrees) => self.show_worktrees(),

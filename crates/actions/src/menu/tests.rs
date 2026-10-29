@@ -3,8 +3,9 @@ use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
 use crate::{
-    Action, CommitTarget, GraphColumn, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
-    StashAction, TagAction, UiEffect, WorkingTreeAction, WorktreeAction,
+    Action, CommitScope, CommitTarget, GraphColumn, Operation, OperationAction, PickPurpose,
+    PullMode, RepoAction, ResetMode, Rev, StashAction, TagAction, UiEffect, WorkingTreeAction,
+    WorktreeAction,
 };
 use tgg_git::worktree::Worktree;
 
@@ -718,6 +719,8 @@ fn repository_menu_matches_the_vs_code_order() {
             "Checkout to...",
             "Fetch",
             "---",
+            "Commit ▸",
+            "Changes ▸",
             "Branch ▸",
             "Remote ▸",
             "Stash ▸",
@@ -747,6 +750,99 @@ fn repository_menu_matches_the_vs_code_order() {
     assert_eq!(
         labels(submenu(&menu, "Tags")),
         ["Create Tag...", "Push All Tags"]
+    );
+}
+
+#[test]
+fn commit_and_changes_submenus_match_vs_code() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    let no_rebase = " (disabled: No rebase is in progress.)";
+    assert_eq!(
+        labels(submenu(&menu, "Commit")),
+        [
+            "Commit",
+            "Commit Staged",
+            "Commit All",
+            "Undo Last Commit",
+            &format!("Abort Rebase{no_rebase}"),
+            "---",
+            "Commit (Amend)",
+            "Commit Staged (Amend)",
+            "Commit All (Amend)",
+            "---",
+            "Commit (Signed Off)",
+            "Commit Staged (Signed Off)",
+            "Commit All (Signed Off)",
+        ]
+    );
+    let commit = submenu(&menu, "Commit");
+    let effect = |scope, amend, signoff| {
+        Action::Ui(UiEffect::Commit {
+            scope,
+            amend,
+            signoff,
+        })
+    };
+    assert_eq!(
+        action(commit, "Commit"),
+        &effect(CommitScope::Auto, false, false)
+    );
+    assert_eq!(
+        action(commit, "Commit Staged (Amend)"),
+        &effect(CommitScope::Staged, true, false)
+    );
+    assert_eq!(
+        action(commit, "Commit All (Signed Off)"),
+        &effect(CommitScope::All, false, true)
+    );
+    assert_eq!(
+        action(commit, "Undo Last Commit"),
+        &Action::WorkingTree(WorkingTreeAction::UndoLastCommit)
+    );
+
+    assert_eq!(
+        labels(submenu(&menu, "Changes")),
+        [
+            "Stage All Changes",
+            "Unstage All Changes",
+            "Discard All Changes"
+        ]
+    );
+    let changes = submenu(&menu, "Changes");
+    assert_eq!(
+        action(changes, "Stage All Changes"),
+        &Action::WorkingTree(WorkingTreeAction::Stage { paths: Vec::new() })
+    );
+    assert_eq!(
+        action(changes, "Unstage All Changes"),
+        &Action::WorkingTree(WorkingTreeAction::Unstage { paths: Vec::new() })
+    );
+    assert_eq!(
+        action(changes, "Discard All Changes"),
+        &Action::WorkingTree(WorkingTreeAction::DiscardAll)
+    );
+}
+
+#[test]
+fn abort_rebase_and_undo_depend_on_the_repository_state() {
+    let rebasing = MenuContext {
+        operation: Some(Operation::Rebase),
+        ..ctx()
+    };
+    let menu = menu_for(&Target::Repository, &rebasing);
+    assert_eq!(
+        action(submenu(&menu, "Commit"), "Abort Rebase"),
+        &Action::Operation(OperationAction::Abort(Operation::Rebase))
+    );
+    let unborn = MenuContext {
+        head: HeadState::Unborn,
+        head_commit: None,
+        ..ctx()
+    };
+    let menu = menu_for(&Target::Repository, &unborn);
+    assert!(
+        labels(submenu(&menu, "Commit"))
+            .contains(&"Undo Last Commit (disabled: There is no commit yet.)".to_owned())
     );
 }
 
@@ -823,6 +919,8 @@ fn repository_menu_without_remotes_or_branch() {
         [
             "Checkout to...",
             "---",
+            "Commit ▸",
+            "Changes ▸",
             "Branch ▸",
             "Remote ▸",
             "Stash ▸",

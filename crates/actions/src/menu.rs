@@ -2,8 +2,9 @@ use tgg_git::worktree::Worktree;
 use tgg_model::{Oid, Stash};
 
 use crate::{
-    Action, CommitTarget, GraphColumn, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode,
-    Rev, StashAction, TagAction, Target, UiEffect, WorkingTreeAction, WorktreeAction,
+    Action, CommitScope, CommitTarget, GraphColumn, MenuContext, Operation, OperationAction,
+    PickPurpose, PullMode, RepoAction, ResetMode, Rev, StashAction, TagAction, Target, UiEffect,
+    WorkingTreeAction, WorktreeAction,
 };
 
 /// One row of a context menu.
@@ -504,8 +505,8 @@ fn pick(purpose: PickPurpose) -> Action {
     Action::Ui(UiEffect::PickRef { purpose })
 }
 
-/// The repository "..." menu (S11), without Clone, Commit and Changes
-/// (README non-goals). Remote entries need a remote; current-branch entries
+/// The repository "..." menu (S11), in the order of VS Code's Source
+/// Control "..." menu. Remote entries need a remote; current-branch entries
 /// need HEAD on a branch; create entries need a HEAD commit.
 fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
     let current = ctx.current_branch();
@@ -536,6 +537,8 @@ fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
             Action::Repo(RepoAction::Fetch { prune: false })
         }),
         Some(MenuItem::Separator),
+        Some(submenu("Commit", commit_submenu(ctx))),
+        Some(submenu("Changes", changes_submenu())),
         Some(submenu("Branch", branch_submenu(ctx))),
         Some(submenu("Remote", remote_submenu(ctx))),
         Some(submenu("Stash", stash_submenu())),
@@ -635,6 +638,68 @@ pub fn reflog_menu(id: &Oid, subject: &str, ctx: &MenuContext) -> Vec<MenuItem> 
             Action::CopyCommitHash { commit: id.clone() },
         ),
     ])
+}
+
+/// VS Code's Commit submenu: commit what is staged (or everything when
+/// nothing is), only what is staged, or everything; each also as an amend
+/// and signed off. The message is the Source Control pane's.
+fn commit_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let commits = |amend: bool, signoff: bool, suffix: &str| {
+        [
+            ("Commit", CommitScope::Auto),
+            ("Commit Staged", CommitScope::Staged),
+            ("Commit All", CommitScope::All),
+        ]
+        .map(|(label, scope)| {
+            entry(
+                &format!("{label}{suffix}"),
+                Action::Ui(UiEffect::Commit {
+                    scope,
+                    amend,
+                    signoff,
+                }),
+            )
+        })
+    };
+    let rebasing = ctx.operation == Some(Operation::Rebase);
+    let mut items = commits(false, false, "").to_vec();
+    items.extend([
+        Some(entry_unless(
+            ctx.head_commit
+                .is_none()
+                .then_some("There is no commit yet."),
+            "Undo Last Commit",
+            Action::WorkingTree(WorkingTreeAction::UndoLastCommit),
+        )),
+        Some(entry_unless(
+            (!rebasing).then_some("No rebase is in progress."),
+            "Abort Rebase",
+            Action::Operation(OperationAction::Abort(Operation::Rebase)),
+        )),
+        Some(MenuItem::Separator),
+    ]);
+    items.extend(commits(true, false, " (Amend)"));
+    items.push(Some(MenuItem::Separator));
+    items.extend(commits(false, true, " (Signed Off)"));
+    items
+}
+
+/// VS Code's Changes submenu, for every file at once.
+fn changes_submenu() -> Vec<Option<MenuItem>> {
+    vec![
+        entry(
+            "Stage All Changes",
+            Action::WorkingTree(WorkingTreeAction::Stage { paths: Vec::new() }),
+        ),
+        entry(
+            "Unstage All Changes",
+            Action::WorkingTree(WorkingTreeAction::Unstage { paths: Vec::new() }),
+        ),
+        entry(
+            "Discard All Changes",
+            Action::WorkingTree(WorkingTreeAction::DiscardAll),
+        ),
+    ]
 }
 
 fn branch_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {

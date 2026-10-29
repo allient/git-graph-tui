@@ -1,7 +1,7 @@
 //! The Source Control pane (S3): focus, keys, clicks and the git actions it runs.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tgg_actions::{Action, WorkingTreeAction};
+use tgg_actions::{Action, CommitScope, WorkingTreeAction};
 use tgg_model::HeadState;
 use tgg_ui::{Key, SourceControl, SourceControlHitMap, SourceControlOutcome};
 
@@ -114,19 +114,50 @@ impl AppState {
             SourceControlOutcome::Unstage(paths) => {
                 ("Unstage", WorkingTreeAction::Unstage { paths })
             }
-            SourceControlOutcome::Commit(message) => {
-                if message.trim().is_empty() {
-                    self.message = Some("Type a commit message first.".into());
-                    return Vec::new();
-                }
-                if self.status.staged == 0 {
-                    self.message = Some("Nothing staged: stage files with + first.".into());
-                    return Vec::new();
-                }
-                ("Commit", WorkingTreeAction::Commit { message })
+            SourceControlOutcome::Commit(_) => {
+                return self.commit(CommitScope::Staged, false, false);
             }
         };
         let (label, action) = action;
+        self.start_action(Action::WorkingTree(action), label.into())
+    }
+
+    /// Commits with the pane's message: the pane's `✓` (what is staged) and
+    /// the "..." menu's Commit entries. An amend may leave the message
+    /// empty to keep the last commit's.
+    pub(super) fn commit(
+        &mut self,
+        scope: CommitScope,
+        amend: bool,
+        signoff: bool,
+    ) -> Vec<Command> {
+        let message = self.source_control.view.message().to_owned();
+        if message.trim().is_empty() && !amend {
+            self.message = Some("Type a commit message first.".into());
+            self.focus_source_control();
+            return Vec::new();
+        }
+        let staged = self.status.staged > 0;
+        let all = match scope {
+            CommitScope::Staged => false,
+            CommitScope::All => true,
+            CommitScope::Auto => !staged,
+        };
+        if !amend && !all && !staged {
+            self.message = Some("Nothing staged: stage files with + first.".into());
+            return Vec::new();
+        }
+        if !amend && all && self.status.is_clean() {
+            self.message = Some("Nothing to commit.".into());
+            return Vec::new();
+        }
+        let label = if amend { "Amend" } else { "Commit" };
+        let action = WorkingTreeAction::Commit {
+            message,
+            all,
+            amend,
+            signoff,
+        };
         self.start_action(Action::WorkingTree(action), label.into())
     }
 }

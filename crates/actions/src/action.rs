@@ -5,8 +5,8 @@ use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{
-    InteractiveRebase, OperationAction, PickPurpose, RepoAction, StashAction, TagAction,
-    WorkingTreeAction, WorktreeAction,
+    CommitScope, InteractiveRebase, OperationAction, PickPurpose, RepoAction, StashAction,
+    TagAction, WorkingTreeAction, WorktreeAction,
 };
 
 /// Abbreviated hash length in confirmation text (git's default).
@@ -234,6 +234,13 @@ pub enum UiEffect {
     /// Open a ref picker; [`PickPurpose::action_for`] turns the pick into an action.
     PickRef {
         purpose: PickPurpose,
+    },
+    /// Commit with the Source Control pane's message (the "..." menu's
+    /// Commit entries); the app checks there is something to commit.
+    Commit {
+        scope: CommitScope,
+        amend: bool,
+        signoff: bool,
     },
     /// Show the log of git commands and their output.
     ShowGitOutput,

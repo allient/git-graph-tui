@@ -120,7 +120,10 @@ fn stage_unstage_and_commit_use_literal_paths_and_one_message_argument() {
     );
     assert_eq!(
         args(&WorkingTreeAction::Commit {
-            message: "-m: fix it".into()
+            message: "-m: fix it".into(),
+            all: false,
+            amend: false,
+            signoff: false
         }),
         ["commit", "--message=-m: fix it"]
     );
@@ -133,6 +136,9 @@ fn stage_unstage_and_commit_need_no_dialog() {
         WorkingTreeAction::Unstage { paths: Vec::new() },
         WorkingTreeAction::Commit {
             message: "x".into(),
+            all: false,
+            amend: false,
+            signoff: false,
         },
     ] {
         assert!(!action.is_destructive(), "{action:?}");
@@ -197,4 +203,52 @@ fn discard_is_destructive_and_names_what_it_loses() {
         many.confirmation().unwrap().message,
         "Discard the changes in 3 files? Untracked files are deleted. This can't be undone."
     );
+}
+
+fn commit(message: &str, all: bool, amend: bool, signoff: bool) -> WorkingTreeAction {
+    WorkingTreeAction::Commit {
+        message: message.into(),
+        all,
+        amend,
+        signoff,
+    }
+}
+
+#[test]
+fn commit_options_map_to_git_flags() {
+    assert_eq!(
+        args(&commit("Fix", false, true, true)),
+        ["commit", "--amend", "--signoff", "--message=Fix"]
+    );
+    // An amend without a message keeps the last commit's.
+    assert_eq!(
+        args(&commit("  ", false, true, false)),
+        ["commit", "--amend", "--no-edit"]
+    );
+    // Commit All stages every change, untracked files too, first.
+    assert_eq!(
+        all_args(&commit("Fix", true, false, false)),
+        [
+            vec!["add".to_owned(), "--all".to_owned()],
+            vec!["commit".to_owned(), "--message=Fix".to_owned()],
+        ]
+    );
+}
+
+#[test]
+fn undo_last_commit_and_discard_all() {
+    assert_eq!(
+        args(&WorkingTreeAction::UndoLastCommit),
+        ["reset", "--soft", "HEAD~1", "--"]
+    );
+    assert_eq!(
+        all_args(&WorkingTreeAction::DiscardAll),
+        [
+            vec!["restore", "--worktree", "--", ":/"],
+            vec!["clean", "-d", "--force", "--", ":/"],
+        ]
+    );
+    assert!(WorkingTreeAction::DiscardAll.is_destructive());
+    assert!(WorkingTreeAction::DiscardAll.confirmation().is_some());
+    assert!(!WorkingTreeAction::UndoLastCommit.is_destructive());
 }
