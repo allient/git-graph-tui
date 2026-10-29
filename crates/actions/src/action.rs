@@ -210,6 +210,11 @@ pub enum UiEffect {
     },
     /// Show the log of git commands and their output.
     ShowGitOutput,
+    /// Open the hosting site's "new pull request" page for `branch` on `remote`.
+    CreatePullRequest {
+        remote: String,
+        branch: String,
+    },
 }
 
 /// The dialog shown before an action runs (S13).

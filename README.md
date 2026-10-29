@@ -52,7 +52,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Merge into current branch, rebase current branch onto it, reset
 - [ ] Pull, push, fetch into local branch
 - [x] Create archive, copy branch name
-- [ ] Create a pull request (GitHub / GitLab / Bitbucket, opens the browser)
+- [x] Create a pull request (GitHub / GitLab / Bitbucket, opens the browser)
 
 ### Actions on commits (right-click a commit)
 - [x] Add tag, create branch

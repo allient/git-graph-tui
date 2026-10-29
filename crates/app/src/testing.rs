@@ -15,6 +15,8 @@ pub struct Harness {
     pub screen: ratatui::buffer::Buffer,
     /// Texts the app copied to the clipboard.
     pub clipboard: Vec<String>,
+    /// Pages the app asked to open in the browser.
+    pub opened: Vec<String>,
     pub runner: Runner<ProcessExecutor>,
     pub results: Receiver<JobResult>,
 }
@@ -35,6 +37,7 @@ impl Harness {
             results,
             screen: ratatui::buffer::Buffer::empty(ratatui::layout::Rect::default()),
             clipboard: Vec::new(),
+            opened: Vec::new(),
         };
         let commands = h.state.update(Event::Refresh);
         h.settle(commands);
@@ -54,6 +57,7 @@ impl Harness {
                         self.state.track_action(&job);
                     }
                     Command::Clipboard(text) => self.clipboard.push(text),
+                    Command::OpenUrl(url) => self.opened.push(url),
                 }
             }
             if !self.state.is_loading() {

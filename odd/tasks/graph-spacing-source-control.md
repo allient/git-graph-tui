@@ -28,7 +28,7 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 | T4 | S6 | inline | done (462 tests, pty drag moved the divider 30→45) | feat/resize-panes |
 | T6 | S9, S10, S11 | inline | done (463 tests) | feat/graph-padding-auto-icons |
 | T7 | S12 Find | inline | done (470 tests) | feat/graph-padding-auto-icons |
-| T8 | S12 Create PR | inline | pending | |
+| T8 | S12 Create PR | inline | done (479 tests) | feat/graph-padding-auto-icons |
 | T9 | S12 file at revision, compare | inline | pending | |
 | T10 | S12 external pager | inline | pending | |
 | T11 | S12 settings and config | inline | pending | |
@@ -52,3 +52,4 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L14** (2026-10-28) User: "add more oadding at left of vlue dots [Image #21]. coplete teh two open item and continue with they feature not built yet"
 - **L15** T6: lanes start 2 columns in (GRAPH_PADDING). `--icons auto` is the new default: Nerd icons when TERM_PROGRAM is ghostty/wezterm, TERM is xterm-ghostty/xterm-kitty, or GHOSTTY_RESOURCES_DIR, WEZTERM_EXECUTABLE or KITTY_WINDOW_ID is set (these survive inside herdr/tmux). README: 23 checklist items ticked; still open: Find, fetch into local branch, column show/hide, create PR, external pager, file at revision, compare, issue linking, stretch goals.
 - **L16** T7 Find: `/` opens a find bar on the status line. It matches loaded commits case-insensitively on subject, author name/email, the formatted date, a hash prefix, and branch/tag short names on the commit. It selects the first match, highlights matching subjects (theme.tag, bold), Enter/↓ next, ↑ previous (wrapping), Esc closes, and re-runs when history pages load. It only searches commits already loaded.
+- **L17** T8 Create Pull Request: on local branches (default remote) and remote branches. `git remote get-url`, then tgg_actions::pull_request_url builds the GitHub compare / GitLab merge_requests/new / Bitbucket pull-requests/new link from https, ssh:// and scp-like URLs (hosts recognised by name, ports dropped, branch percent-encoded); Command::OpenUrl opens it with open/xdg-open/explorer. Other hosts get an explanation instead of a link.

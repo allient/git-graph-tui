@@ -61,6 +61,8 @@ pub enum Command {
     Run(GitCommand),
     /// Text to put on the system clipboard.
     Clipboard(String),
+    /// A web page to open in the browser.
+    OpenUrl(String),
 }
 
 /// What a tracked job is for.
@@ -90,6 +92,11 @@ pub enum Request {
     Diff(Oid, FileChange),
     /// A tag's target and annotation, for its info dialog.
     Tag(String),
+    /// A remote's URL, to open a pull request page for `branch`.
+    RemoteUrl {
+        remote: String,
+        branch: String,
+    },
 }
 
 impl Request {
@@ -115,6 +122,9 @@ impl Request {
             Self::Files(id) => GitCommand::read(repo, show::files_args(id)),
             Self::Diff(id, file) => GitCommand::read(repo, show::diff_args(id, file)),
             Self::Tag(name) => GitCommand::read(repo, tgg_git::tag::args(name)),
+            Self::RemoteUrl { remote, .. } => {
+                GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
+            }
         }
     }
 
@@ -589,6 +599,9 @@ impl AppState {
             (Request::Tag(name), Ok(out)) => {
                 self.on_tag_read(&name, &out.stdout);
                 Vec::new()
+            }
+            (Request::RemoteUrl { remote, branch }, Ok(out)) => {
+                self.on_remote_url(&remote, &branch, &out.stdout)
             }
             (request @ (Request::Details(_) | Request::Files(_) | Request::Diff(..)), Ok(out)) => {
                 self.on_details_read(request, &out.stdout);
