@@ -1,8 +1,9 @@
+use tgg_git::worktree::Worktree;
 use tgg_model::{Oid, Stash};
 
 use crate::{
     Action, CommitTarget, GraphColumn, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode,
-    Rev, StashAction, TagAction, Target, UiEffect, WorkingTreeAction,
+    Rev, StashAction, TagAction, Target, UiEffect, WorkingTreeAction, WorktreeAction,
 };
 
 /// One row of a context menu.
@@ -515,7 +516,55 @@ fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
         Some(MenuItem::Separator),
         entry("Show Git Output", Action::Ui(UiEffect::ShowGitOutput)),
         entry("Show Reflog", Action::Ui(UiEffect::ShowReflog)),
+        entry("Worktrees...", Action::Ui(UiEffect::ShowWorktrees)),
     ]
+}
+
+/// The menu of an entry in the worktrees view (S20 4). The main worktree
+/// and the one the app runs in (`is_current`) can't be removed, and git
+/// can't lock the main one.
+#[must_use]
+pub fn worktree_menu(worktree: &Worktree, is_current: bool) -> Vec<MenuItem> {
+    let path = || worktree.path.clone();
+    let why_not_removed = if worktree.is_main {
+        Some("The main worktree can't be removed.")
+    } else if is_current {
+        Some("tui-git-graph is running in this worktree.")
+    } else {
+        None
+    };
+    let remove = MenuEntry::new(
+        "Remove Worktree...",
+        Action::Worktree(WorktreeAction::Remove {
+            path: path(),
+            force: false,
+            locked: worktree.locked.is_some(),
+        }),
+    )
+    .disabled_because(why_not_removed);
+    let lock = if worktree.locked.is_some() {
+        entry(
+            "Unlock",
+            Action::Worktree(WorktreeAction::Unlock { path: path() }),
+        )
+    } else {
+        entry(
+            "Lock",
+            Action::Worktree(WorktreeAction::Lock { path: path() }),
+        )
+    };
+    tidy([
+        entry(
+            "Copy Path to Clipboard",
+            Action::Worktree(WorktreeAction::CopyPath { path: path() }),
+        ),
+        lock.filter(|_| !worktree.is_main),
+        Some(MenuItem::Separator),
+        Some(MenuItem::Entry(remove)),
+        Some(MenuItem::Separator),
+        entry("Add Worktree...", Action::Worktree(WorktreeAction::add())),
+        entry("Prune Worktrees", Action::Worktree(WorktreeAction::Prune)),
+    ])
 }
 
 /// The menu of an entry in the reflog view (S20 4): ways to get back to its

@@ -140,6 +140,7 @@ impl AppState {
             }
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
             Plan::Ui(UiEffect::ShowReflog) => self.show_reflog(),
+            Plan::Ui(UiEffect::ShowWorktrees) => self.show_worktrees(),
             Plan::Ui(UiEffect::CreatePullRequest { remote, branch }) => {
                 vec![Command::Git(Request::RemoteUrl { remote, branch })]
             }

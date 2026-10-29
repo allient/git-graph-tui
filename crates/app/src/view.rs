@@ -106,6 +106,9 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         view.page =
             crate::panels::draw_output(frame, graph_area, &state.git_output, view.offset, theme);
     }
+    if let Some(view) = &mut state.worktrees {
+        view.area = crate::panels::draw_worktrees(frame, graph_area, view, theme);
+    }
     if let Some(view) = &mut state.reflog {
         view.area = crate::panels::draw_reflog(frame, graph_area, view, theme);
     }
