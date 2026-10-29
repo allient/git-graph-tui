@@ -19,6 +19,7 @@ mod error;
 mod exec;
 mod failure;
 pub mod log;
+pub mod reflog;
 pub mod refs;
 pub mod stash;
 pub mod status;
