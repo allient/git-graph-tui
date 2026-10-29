@@ -49,6 +49,14 @@ jobs:
       - run: cargo nextest run --workspace --locked --profile ci
       - run: cargo test --workspace --doc --locked
 
+  herdr-plugin:
+    name: herdr plugin scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Ubuntu's sh is dash, the strictest POSIX shell the scripts target.
+      - run: sh integrations/herdr/tests/run.sh
+
   msrv:
     name: MSRV (1.88)
     runs-on: ubuntu-latest
