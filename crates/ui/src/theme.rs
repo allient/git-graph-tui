@@ -35,6 +35,9 @@ pub struct Theme {
     pub badge_fg: Color,
     /// Text on dark RGB badge backgrounds, such as most lane colors.
     pub badge_fg_on_dark: Color,
+    /// Behind a ref badge's name when badges have icons; the icon sits on
+    /// the lane color.
+    pub badge_bg: Color,
     pub tag: Color,
     pub stash: Color,
     pub date: Color,
@@ -101,6 +104,7 @@ impl Default for Theme {
             header_bg: Color::Indexed(235),
             badge_fg: Color::Black,
             badge_fg_on_dark: Color::White,
+            badge_bg: Color::Indexed(238),
             tag: Color::Yellow,
             stash: Color::Gray,
             date: Color::Gray,

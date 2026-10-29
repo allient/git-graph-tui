@@ -2,7 +2,7 @@
 source: crates/app/src/view.rs
 expression: "graph.join(\"\\n\")"
 ---
- SOURCE CONTROL         ✓ ↻ … │ Branches: [Show All ▾]  [x] Show Remote Branches                      [↻] [⇣]
+ SOURCE CONTROL         ✓ ↻ … │               Branches: [Show All ▾]  [x] Show Remote Branches        [⇣] [↻]
  Message (Enter commits on "… │Graph │Description                                                    │Commit
  Alt+Enter: new line          │    ○  Uncommitted Changes (1)
                               │    ┇
@@ -10,4 +10,4 @@ expression: "graph.join(\"\\n\")"
                               │  ┃
 ▾ Changes             ⧉ ↶ + 1 │  ●     develop  Return a value                                        6681ca2
   notes.txt           ↗ ↶ + U │  ┃
-                              │  ┃╭●   main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f
+                              │  ┃╭●  ○  main │ origin   v0.1.0  Merge branch 'develop'               0b1f05f
