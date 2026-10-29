@@ -215,9 +215,11 @@ impl AppState {
                         return self.confirm_or_run(forced, "Force Delete Branch".into());
                     }
                 }
-                let why =
-                    fetch_rejected(&err, &running.action).unwrap_or_else(|| err.user_message());
-                self.message = Some(format!("{} failed: {why}", running.label));
+                self.message = Some(rebase_raced(&err, &running.action).unwrap_or_else(|| {
+                    let why =
+                        fetch_rejected(&err, &running.action).unwrap_or_else(|| err.user_message());
+                    format!("{} failed: {why}", running.label)
+                }));
                 // Earlier steps may have changed the repository.
                 self.refresh()
             }
@@ -299,6 +301,27 @@ fn fetch_rejected(err: &ExecError, action: &Action) -> Option<String> {
     Some(format!(
         "'{local_name}' has commits that aren't on {remote}/{branch}. Turn on Force fetch to overwrite them."
     ))
+}
+
+/// The panel's todo list misses a commit only when HEAD moved after the
+/// panel opened; git then stops before replaying anything, with the rebase
+/// still in progress.
+fn rebase_raced(err: &ExecError, action: &Action) -> Option<String> {
+    matches!(
+        (err, action),
+        (
+            ExecError::Failed {
+                failure: Failure::CommitsMissingFromTodo,
+                ..
+            },
+            Action::InteractiveRebase(_),
+        )
+    )
+    .then(|| {
+        "The branch changed after the rebase panel opened, so nothing was rewritten. \
+         Abort the rebase (A) and open the panel again."
+            .to_owned()
+    })
 }
 
 fn input_step(outcome: InputOutcome) -> Step {
