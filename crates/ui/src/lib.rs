@@ -29,7 +29,8 @@ pub use key::Key;
 pub use menu::{MenuHit, MenuHitMap, MenuOutcome, PopupMenu};
 mod details;
 pub use details::{
-    CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, TreeRow, file_label,
+    CommitDetailsView, DetailsButton, DetailsHit, DetailsHitMap, DetailsOutcome, FileLayout,
+    TreeRow, file_label,
 };
 mod diff_view;
 pub use diff_view::{DiffHit, DiffHitMap, DiffOutcome, DiffStyle, DiffView, SIDE_BY_SIDE_WIDTH};

@@ -82,6 +82,14 @@ pub enum Glyph {
     OpenChanges,
     /// Opens a changed file in the editor ("Open File").
     OpenFile,
+    /// Closes the details panel.
+    Close,
+    /// Filters the details panel's files by name.
+    Find,
+    /// Shows the details panel's files as a folder tree.
+    TreeView,
+    /// Shows the details panel's files as a flat list of paths.
+    ListView,
 }
 
 impl Icons {
@@ -99,6 +107,10 @@ impl Icons {
             (Self::Unicode, Glyph::File) => '·',
             (Self::Unicode, Glyph::OpenChanges) => '⧉',
             (Self::Unicode, Glyph::OpenFile) => '↗',
+            (Self::Unicode, Glyph::Close) => '✕',
+            (Self::Unicode, Glyph::Find) => '⌕',
+            (Self::Unicode, Glyph::TreeView) => '├',
+            (Self::Unicode, Glyph::ListView) => '≡',
             (Self::Nerd, Glyph::Check) => '\u{eab2}',
             (Self::Nerd, Glyph::Refresh) => '\u{eb37}',
             (Self::Nerd, Glyph::More) => '\u{ea7c}',
@@ -111,6 +123,12 @@ impl Icons {
             // cod-diff_multiple and cod-go_to_file, as in VS Code.
             (Self::Nerd, Glyph::OpenChanges) => '\u{ec23}',
             (Self::Nerd, Glyph::OpenFile) => '\u{ea94}',
+            // cod-close, cod-search, cod-list_tree and cod-list_flat, the
+            // buttons beside VS Code Git Graph's commit details.
+            (Self::Nerd, Glyph::Close) => '\u{ea76}',
+            (Self::Nerd, Glyph::Find) => '\u{ea6d}',
+            (Self::Nerd, Glyph::TreeView) => '\u{eb86}',
+            (Self::Nerd, Glyph::ListView) => '\u{eb84}',
         }
     }
 }
@@ -125,5 +143,18 @@ mod tests {
         assert_eq!(Icons::Unicode.glyph(Glyph::OpenFile), '↗');
         assert_eq!(Icons::Nerd.glyph(Glyph::OpenChanges), '\u{ec23}');
         assert_eq!(Icons::Nerd.glyph(Glyph::OpenFile), '\u{ea94}');
+    }
+
+    #[test]
+    fn the_details_buttons_have_one_cell_unicode_fallbacks() {
+        use unicode_width::UnicodeWidthChar;
+        for glyph in [Glyph::Close, Glyph::Find, Glyph::TreeView, Glyph::ListView] {
+            let ch = Icons::Unicode.glyph(glyph);
+            assert_eq!(ch.width(), Some(1), "{glyph:?} {ch}");
+        }
+        assert_eq!(Icons::Nerd.glyph(Glyph::Close), '\u{ea76}');
+        assert_eq!(Icons::Nerd.glyph(Glyph::Find), '\u{ea6d}');
+        assert_eq!(Icons::Nerd.glyph(Glyph::TreeView), '\u{eb86}');
+        assert_eq!(Icons::Nerd.glyph(Glyph::ListView), '\u{eb84}');
     }
 }
