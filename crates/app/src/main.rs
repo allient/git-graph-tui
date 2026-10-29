@@ -40,10 +40,10 @@ fn main() -> Result<()> {
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    let layout = ratatui::run(|terminal| run(terminal, repo, icons, config.layout))?;
+    let (before, after) = ratatui::run(|terminal| run(terminal, repo, icons, config.layout))?;
     // Remember resized panes and columns for next time.
-    if let Some(path) = config_path.filter(|_| layout != config.layout) {
-        save_layout(&path, layout);
+    if let Some(path) = config_path.filter(|_| after != before) {
+        save_layout(&path, after);
     }
     Ok(())
 }
@@ -60,13 +60,14 @@ fn save_layout(path: &std::path::Path, layout: config::Layout) {
     }
 }
 
-/// Runs the app until it quits and returns the final pane and column widths.
+/// Runs the app until it quits. Returns the pane and column widths it started
+/// with and those it ended with.
 fn run(
     terminal: &mut DefaultTerminal,
     repo: PathBuf,
     icons: Icons,
     layout: config::Layout,
-) -> Result<config::Layout> {
+) -> Result<(config::Layout, config::Layout)> {
     let _mouse = MouseCapture::enable()?;
     let (runner, results) = Runner::new(ProcessExecutor::new());
     let theme = Theme {
@@ -74,7 +75,7 @@ fn run(
         ..Theme::default()
     };
     let mut state = AppState::new(repo);
-    state.apply_layout(layout);
+    let before = state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
 
     loop {
@@ -82,7 +83,7 @@ fn run(
             view::draw(frame, &mut state, &theme);
         })?;
         if state.should_quit {
-            return Ok(state.layout());
+            return Ok((before, state.layout()));
         }
         if event::poll(INPUT_POLL)? {
             match event::read()? {

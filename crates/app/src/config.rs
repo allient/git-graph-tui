@@ -55,7 +55,13 @@ pub fn path(env: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let base = env("XDG_CONFIG_HOME")
         .filter(|dir| !dir.is_empty())
         .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".config")))?;
+        .or_else(|| {
+            // HOME on Unix, USERPROFILE on Windows.
+            env("HOME")
+                .or_else(|| env("USERPROFILE"))
+                .filter(|dir| !dir.is_empty())
+                .map(|home| PathBuf::from(home).join(".config"))
+        })?;
     Some(base.join("tui-git-graph").join("config.toml"))
 }
 
@@ -82,8 +88,12 @@ pub fn save_layout(path: &Path, layout: Layout) -> Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
     }
-    fs::write(path, toml::to_string(&table)?)
-        .with_context(|| format!("cannot write {}", path.display()))
+    // Write a sibling file and rename it over the config, so a crash or a
+    // full disk never leaves a half-written config behind.
+    let partial = path.with_extension("toml.partial");
+    fs::write(&partial, toml::to_string(&table)?)
+        .with_context(|| format!("cannot write {}", partial.display()))?;
+    fs::rename(&partial, path).with_context(|| format!("cannot write {}", path.display()))
 }
 
 #[cfg(test)]
@@ -112,11 +122,17 @@ mod tests {
             ])),
             Some(PathBuf::from("/elsewhere.toml"))
         );
-        let home = path(&env(&[])).unwrap();
-        assert!(
-            home.ends_with(".config/tui-git-graph/config.toml"),
-            "{home:?}"
+        assert_eq!(
+            path(&env(&[("HOME", "/home/me")])),
+            Some(PathBuf::from("/home/me/.config/tui-git-graph/config.toml"))
         );
+        assert_eq!(
+            path(&env(&[("USERPROFILE", "C:/Users/me")])),
+            Some(PathBuf::from(
+                "C:/Users/me/.config/tui-git-graph/config.toml"
+            ))
+        );
+        assert_eq!(path(&env(&[])), None, "no home, no config file");
     }
 
     #[test]
