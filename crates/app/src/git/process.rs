@@ -77,7 +77,7 @@ impl ProcessExecutor {
 
         let stdout = join(stdout)?;
         let stderr = join(stderr)?;
-        if status.success() {
+        if status.success() || command.accepts_exit(status.code()) {
             Ok(Output { stdout, stderr })
         } else {
             // A signal-terminated process has no code; report it as -1.

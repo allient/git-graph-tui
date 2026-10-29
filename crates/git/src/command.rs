@@ -29,6 +29,9 @@ pub struct GitCommand {
     no_editor: bool,
     /// Shell command git runs instead of an editor on a rebase's todo list.
     sequence_editor: Option<String>,
+    /// A non-zero exit code that still means success (`diff --no-index`
+    /// exits 1 when the files differ).
+    also_succeeds: Option<i32>,
 }
 
 impl GitCommand {
@@ -75,6 +78,7 @@ impl GitCommand {
             timeout,
             no_editor: false,
             sequence_editor: None,
+            also_succeeds: None,
         }
     }
 
@@ -101,6 +105,20 @@ impl GitCommand {
     pub fn with_sequence_editor(mut self, command: String) -> Self {
         self.sequence_editor = Some(command);
         self
+    }
+
+    /// Treats exit `code` as success too, keeping the output: `git diff
+    /// --no-index` exits 1 when the files differ, which is what it is run for.
+    #[must_use]
+    pub fn succeeding_with(mut self, code: i32) -> Self {
+        self.also_succeeds = Some(code);
+        self
+    }
+
+    /// Whether a non-zero exit `code` still counts as success.
+    #[must_use]
+    pub fn accepts_exit(&self, code: Option<i32>) -> bool {
+        code.is_some() && code == self.also_succeeds
     }
 
     /// Arguments for the `git` executable, including `-C <repo>` and config overrides.
@@ -219,6 +237,16 @@ mod tests {
         assert!(!cmd.env().iter().any(|(k, _)| *k == "GIT_SEQUENCE_EDITOR"));
         let cmd = cmd.with_sequence_editor("printf x >".to_owned());
         assert!(cmd.env().contains(&("GIT_SEQUENCE_EDITOR", "printf x >")));
+    }
+
+    #[test]
+    fn succeeding_with_accepts_one_more_exit_code() {
+        let cmd = GitCommand::read(Path::new("/r"), ["diff", "--no-index"]);
+        assert!(!cmd.accepts_exit(Some(1)));
+        let cmd = cmd.succeeding_with(1);
+        assert!(cmd.accepts_exit(Some(1)));
+        assert!(!cmd.accepts_exit(Some(2)));
+        assert!(!cmd.accepts_exit(None));
     }
 
     #[test]
