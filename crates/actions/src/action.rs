@@ -121,6 +121,15 @@ pub enum Action {
         set_upstream: bool,
         force_with_lease: bool,
     },
+    /// Updates (or creates) the local branch `local_name` from `branch` on
+    /// `remote` without checking it out. Without `force`, git only
+    /// fast-forwards it.
+    FetchIntoLocal {
+        remote: String,
+        branch: String,
+        local_name: String,
+        force: bool,
+    },
     /// `output` is relative to the repository root; git picks the format
     /// (zip, tar, tar.gz, ...) from its extension.
     CreateArchive {
@@ -314,7 +323,9 @@ impl Action {
             Self::CopyBranchName { name } => Plan::Clipboard(name.clone()),
             Self::CopyCommitHash { commit } => Plan::Clipboard(commit.to_string()),
             Self::CopyCommitSubject { subject } => Plan::Clipboard(subject.clone()),
-            Self::PushBranch { .. } => Plan::Git(vec![GitCommand::network(repo, self.git_args())]),
+            Self::PushBranch { .. } | Self::FetchIntoLocal { .. } => {
+                Plan::Git(vec![GitCommand::network(repo, self.git_args())])
+            }
             Self::Tag(action) => action.plan(repo),
             Self::Stash(action) => action.plan(repo),
             Self::WorkingTree(action) => action.plan(repo),
@@ -322,6 +333,27 @@ impl Action {
             Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
+    }
+
+    /// `fetch [--force] -- <remote> refs/heads/<branch>:refs/heads/<local>`:
+    /// full ref names, so neither side can be read as something else.
+    fn fetch_into_args(&self) -> Vec<String> {
+        let Self::FetchIntoLocal {
+            remote,
+            branch,
+            local_name,
+            force,
+        } = self
+        else {
+            return Vec::new();
+        };
+        let mut argv = strings(&["fetch"]);
+        if *force {
+            argv.push("--force".into());
+        }
+        let refspec = format!("refs/heads/{branch}:refs/heads/{local_name}");
+        argv.extend(strings(&["--", remote, &refspec]));
+        argv
     }
 
     /// The arguments after `git` for actions that run git (empty otherwise).
@@ -383,6 +415,7 @@ impl Action {
                 argv.extend(strings(&["--", remote, &refspec]));
                 argv
             }
+            Self::FetchIntoLocal { .. } => self.fetch_into_args(),
             Self::CreateArchive { rev, output } => {
                 strings(&["archive", &format!("--output={output}"), "--", &rev.arg()])
             }
@@ -440,6 +473,7 @@ impl Action {
             Self::PushBranch {
                 force_with_lease, ..
             } => *force_with_lease,
+            Self::FetchIntoLocal { force, .. } => *force,
             Self::Tag(action) => action.is_destructive(),
             Self::Stash(action) => action.is_destructive(),
             Self::WorkingTree(action) => action.is_destructive(),
@@ -497,6 +531,18 @@ impl Action {
                 ),
                 "Force Push",
             ),
+            Self::FetchIntoLocal {
+                remote,
+                branch,
+                local_name,
+                force: true,
+            } => Confirmation::new(
+                "Force Fetch",
+                format!(
+                    "Force fetch {remote}/{branch} into the local branch '{local_name}'? Commits on '{local_name}' that aren't on {remote}/{branch} will be lost."
+                ),
+                "Force Fetch",
+            ),
             Self::CheckoutCommit { commit, subject } => Confirmation::new(
                 "Checkout Commit",
                 format!(
@@ -552,6 +598,17 @@ impl Action {
                 RefName,
                 local_name,
             )],
+            Self::FetchIntoLocal {
+                local_name, force, ..
+            } => vec![
+                InputSpec::text(
+                    InputId::Name,
+                    "Name of the local branch",
+                    RefName,
+                    local_name,
+                ),
+                InputSpec::toggle(InputId::Force, "Force fetch", *force),
+            ],
             Self::CreateBranch { name, checkout, .. } => vec![
                 InputSpec::text(InputId::Name, "Branch name", RefName, name),
                 InputSpec::toggle(InputId::Checkout, "Check out the new branch", *checkout),
@@ -621,6 +678,9 @@ impl Action {
                 Self::CheckoutRemoteBranch {
                     local_name: field, ..
                 }
+                | Self::FetchIntoLocal {
+                    local_name: field, ..
+                }
                 | Self::CreateBranch { name: field, .. }
                 | Self::RenameBranch { to: field, .. }
                 | Self::AddTag { name: field, .. },
@@ -639,7 +699,10 @@ impl Action {
                 },
                 InputId::Checkout,
             )
-            | (Self::DeleteBranch { force: field, .. }, InputId::Force)
+            | (
+                Self::DeleteBranch { force: field, .. } | Self::FetchIntoLocal { force: field, .. },
+                InputId::Force,
+            )
             | (Self::MergeIntoCurrent { no_ff: field, .. }, InputId::NoFastForward)
             | (
                 Self::PushBranch {

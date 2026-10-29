@@ -231,6 +231,7 @@ fn remote_branch_menu_checks_out_a_tracking_branch() {
         labels(&menu),
         [
             "Checkout Branch...",
+            "Fetch into local branch...",
             "Merge into current branch...",
             "Rebase current branch on Branch...",
             "Create Pull Request",
@@ -254,6 +255,42 @@ fn remote_branch_menu_checks_out_a_tracking_branch() {
         &Action::CopyBranchName {
             name: "origin/feature/x".into()
         }
+    );
+}
+
+#[test]
+fn fetch_into_local_branch_defaults_to_the_remote_branch_name() {
+    let target = Target::RemoteBranch {
+        remote: "origin".into(),
+        branch: "feature/x".into(),
+        target: oid('b'),
+    };
+    assert_eq!(
+        action(&menu_for(&target, &ctx()), "Fetch into local branch..."),
+        &Action::FetchIntoLocal {
+            remote: "origin".into(),
+            branch: "feature/x".into(),
+            local_name: "feature/x".into(),
+            force: false,
+        }
+    );
+}
+
+#[test]
+fn fetch_into_the_current_branch_is_disabled() {
+    let target = Target::RemoteBranch {
+        remote: "origin".into(),
+        branch: "main".into(),
+        target: oid('b'),
+    };
+    let menu = menu_for(&target, &ctx());
+    assert!(
+        labels(&menu).contains(
+            &"Fetch into local branch... (disabled: 'main' is the current branch, and git can't fetch into a checked-out branch. Use Pull instead.)"
+                .to_owned()
+        ),
+        "{:?}",
+        labels(&menu)
     );
 }
 

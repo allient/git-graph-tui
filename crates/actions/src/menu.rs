@@ -172,6 +172,7 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
                 local_name: branch.to_owned(),
             },
         ),
+        Some(fetch_into_local(remote, branch, ctx)),
         entry_if(current.is_some(), "Merge into current branch...", || {
             Action::MergeIntoCurrent {
                 source: rev(),
@@ -197,6 +198,29 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
             Action::CopyBranchName { name: full.clone() },
         ),
     ]
+}
+
+/// "Fetch into local branch..." for a remote branch, into the local branch
+/// of the same name by default. Git refuses to fetch into the checked-out
+/// branch, so that case is disabled.
+fn fetch_into_local(remote: &str, branch: &str, ctx: &MenuContext) -> MenuItem {
+    let why = ctx.is_current_branch(branch).then(|| {
+        format!(
+            "'{branch}' is the current branch, and git can't fetch into a checked-out branch. Use Pull instead."
+        )
+    });
+    MenuItem::Entry(
+        MenuEntry::new(
+            "Fetch into local branch...",
+            Action::FetchIntoLocal {
+                remote: remote.to_owned(),
+                branch: branch.to_owned(),
+                local_name: branch.to_owned(),
+                force: false,
+            },
+        )
+        .disabled_because(why.as_deref()),
+    )
 }
 
 fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>> {

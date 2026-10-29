@@ -253,6 +253,63 @@ fn push_sets_upstream_and_force_with_lease_rewrites_the_remote() {
     );
 }
 
+fn remote_tip(repo: &FixtureRepo, branch: &str) -> String {
+    let line = repo.git(&["ls-remote", "origin", &format!("refs/heads/{branch}")]);
+    line.split_whitespace().next().unwrap().to_owned()
+}
+
+#[test]
+fn fetch_into_a_local_branch_moves_it_to_the_remote_commit() {
+    let repo = FixtureRepo::sample();
+    repo.push("develop");
+    let remote = remote_tip(&repo, "develop");
+    repo.git(&["branch", "--force", "develop", "develop~1"]);
+    let mut fetch = Action::FetchIntoLocal {
+        remote: "origin".into(),
+        branch: "develop".into(),
+        local_name: "develop".into(),
+        force: false,
+    };
+    ok(&repo, &fetch);
+    assert_eq!(
+        repo.git(&["rev-parse", "develop"]),
+        remote,
+        "fast-forwarded"
+    );
+    assert_eq!(head_branch(&repo), "main", "nothing was checked out");
+
+    // A new name creates the branch.
+    let mut copy = fetch.clone();
+    copy.set_input(InputId::Name, InputValue::Text("develop-copy".into()))
+        .unwrap();
+    ok(&repo, &copy);
+    assert_eq!(repo.git(&["rev-parse", "develop-copy"]), remote);
+
+    // A local branch ahead of the remote isn't rewound without force.
+    let login = repo.git(&["rev-parse", "feature/login"]);
+    repo.git(&["branch", "--force", "develop", &login]);
+    assert_eq!(run(&repo, &fetch), Err(Failure::NonFastForward));
+    assert_eq!(repo.git(&["rev-parse", "develop"]), login);
+    fetch
+        .set_input(InputId::Force, InputValue::Bool(true))
+        .unwrap();
+    ok(&repo, &fetch);
+    assert_eq!(repo.git(&["rev-parse", "develop"]), remote, "forced");
+}
+
+#[test]
+fn fetch_into_the_checked_out_branch_fails_readably() {
+    let repo = FixtureRepo::sample();
+    let into_main = Action::FetchIntoLocal {
+        remote: "origin".into(),
+        branch: "main".into(),
+        local_name: "main".into(),
+        force: false,
+    };
+    let message = run(&repo, &into_main).unwrap_err().message();
+    assert!(message.contains("main"), "{message}");
+}
+
 #[test]
 fn create_archive_writes_a_zip() {
     let (repo, _) = diverged();
