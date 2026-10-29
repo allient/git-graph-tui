@@ -297,3 +297,50 @@ fn double_clicking_a_commit_without_a_branch_checks_nothing_out() {
         "the second click closes the details"
     );
 }
+
+/// Top-level rows of the open menu: entries and `Label ▸` submenus.
+fn top_level(state: &AppState) -> Vec<String> {
+    state
+        .menu
+        .as_ref()
+        .map(|m| {
+            m.items()
+                .iter()
+                .filter_map(|item| match item {
+                    MenuItem::Entry(e) => Some(e.label.clone()),
+                    MenuItem::Submenu { label, .. } => Some(format!("{label} ▸")),
+                    MenuItem::Separator => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn the_keyboard_menu_reaches_every_badge_on_the_selected_row() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    // HEAD's row carries main (with origin) and the v0.1.0 tag.
+    h.key(KeyCode::Char('H'));
+    h.draw(W, H);
+    h.key(KeyCode::Char('m'));
+    h.draw(W, H);
+    let rows = top_level(&h.state);
+    assert_eq!(
+        rows[..3],
+        ["Branch main ▸", "Remote origin/main ▸", "Tag v0.1.0 ▸"],
+        "{rows:?}"
+    );
+    assert!(
+        rows.contains(&"Add Tag...".to_owned()),
+        "the commit's own entries follow"
+    );
+
+    // Right opens the branch's submenu; Enter there runs its entry.
+    h.key(KeyCode::Right);
+    h.draw(W, H);
+    assert!(
+        h.find_on_screen("Rename Branch...").is_some(),
+        "the branch menu is open"
+    );
+}

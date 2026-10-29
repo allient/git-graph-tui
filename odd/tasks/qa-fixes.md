@@ -20,7 +20,7 @@ Branch: build/release-setup (same PR as the release setup). Delivery: ask-on-ris
 | ID | Specs | Route | Status | Commit |
 |---|---|---|---|---|
 | T1 | S2 | inline | done | fix(graph): stash rows |
-| T2 | S3 | inline | todo | |
+| T2 | S3 | inline | done | fix(app): keyboard badge menus |
 | T3 | S4, S5 | inline | todo | |
 | T4 | S6, S7, S8, S9 | inline | todo | |
 | T5 | S1 | QA rerun on a new release binary | todo | |
@@ -32,3 +32,4 @@ Route evidence: the fixes share crates/app/src/state.rs, so they run inline one 
 - **L1** (2026-10-29) "before deplot first version make sure all features are working as expected and use argent or any other mcp to test all features work as extected". QA results: graph/views mostly PASS (F1 stash rows, F2 README line fixed in 5ba17fb, F3 detached marker, F4 empty repo); context menus 66/69 (stash menu unreachable, keyboard branch menus, conflict message); Source Control + "..." menu 60/60 with five notes.
 - **L2** Not fixed now (by design or later): no auto-refresh on outside file changes (press r); Cherry Pick/Revert run without a dialog; non-destructive confirmations focus the confirm button.
 - **L3** (2026-10-29) T1 done: `git stash list` is read in the log format (`stash::parse_commits`, first parent only); the app inserts each stash just above its base commit as history pages load (`log_loaded` counts real commits for paging) and re-lays out when the stash list arrives after the history; one `stash@{n}` badge per stash (`visible_refs`), and right-clicking a stash row or badge opens the stash menu. Tests that counted the sample repo's 7 rows now count its stash row (8). 802 tests pass.
+- **L4** (2026-10-29) T2 done: `m` / Shift+F10 on a commit row with badges opens one submenu per branch, remote branch (including remote names on a local badge) and tag (`Branch main ▸`, `Remote origin/main ▸`, `Tag v0.1.0 ▸`), then the commit's entries; a stash row keeps its stash menu. 803 tests pass.
