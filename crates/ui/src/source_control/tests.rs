@@ -93,13 +93,13 @@ fn lists_staged_and_unstaged_files_like_vs_code() {
             "",
             "              ✓ Commit",
             "",
-            "▾ Staged Changes                − 2",
-            "  app.rs src                    − M",
-            "  README.md                     − M",
+            "▾ Staged Changes              ⧉ − 2",
+            "  app.rs src                  ↗ − M",
+            "  README.md                   ↗ − M",
             "",
-            "▾ Changes                     ↶ + 2",
-            "  README.md                   ↶ + M",
-            "  notes.txt                   ↶ + U",
+            "▾ Changes                   ⧉ ↶ + 2",
+            "  README.md                 ↗ ↶ + M",
+            "  notes.txt                 ↗ ↶ + U",
         ]
     );
 }
@@ -117,9 +117,14 @@ fn nerd_font_icons_replace_the_buttons() {
         lines[0]
     );
     assert!(
-        lines[12].ends_with("\u{eae2} \u{ea60} U"),
+        lines[12].ends_with("\u{ea94} \u{eae2} \u{ea60} U"),
         "{:?}",
         lines[12]
+    );
+    assert!(
+        lines[10].ends_with("\u{ec23} \u{eae2} \u{ea60} 2"),
+        "{:?}",
+        lines[10]
     );
 }
 
@@ -197,11 +202,14 @@ fn headers_stage_or_unstage_everything_in_their_section() {
     pane.focus_message();
     press(&mut pane, &TO_LIST);
     assert_eq!(
-        press(&mut pane, &[Key::Enter]),
+        press(&mut pane, &[Key::Char(' ')]),
         SourceControlOutcome::Unstage(paths(&["src/app.rs", "README.md"]))
     );
     assert_eq!(
-        press(&mut pane, &[Key::Down, Key::Down, Key::Down, Key::Enter]),
+        press(
+            &mut pane,
+            &[Key::Down, Key::Down, Key::Down, Key::Char(' ')]
+        ),
         SourceControlOutcome::Stage(paths(&["README.md", "notes.txt"]))
     );
 }
@@ -371,7 +379,7 @@ fn a_long_list_scrolls_to_keep_the_selection_visible() {
     press(&mut pane, &TO_LIST);
     press(&mut pane, &[Key::End]);
     let (lines, _) = render(&mut pane, 12, true);
-    assert_eq!(lines[11], "  f19.txt                     ↶ + U");
+    assert_eq!(lines[11], "  f19.txt                   ↗ ↶ + U");
 }
 
 #[test]
@@ -395,7 +403,7 @@ fn the_gap_between_the_sections_is_skipped_by_the_keyboard() {
     // Staged header → app.rs → README.md → (gap) → Changes header.
     press(&mut pane, &[Key::Down, Key::Down, Key::Down]);
     assert_eq!(
-        press(&mut pane, &[Key::Enter]),
+        press(&mut pane, &[Key::Char(' ')]),
         SourceControlOutcome::Stage(paths(&["README.md", "notes.txt"]))
     );
     // And back up over it.
@@ -403,4 +411,157 @@ fn the_gap_between_the_sections_is_skipped_by_the_keyboard() {
         press(&mut pane, &[Key::Up, Key::Char(' ')]),
         SourceControlOutcome::Unstage(paths(&["README.md"]))
     );
+}
+
+fn pane_file(path: &str, change: Change, staged: bool) -> PaneFile {
+    PaneFile {
+        path: path.to_owned(),
+        orig_path: None,
+        change,
+        staged,
+        on_disk: true,
+    }
+}
+
+#[test]
+fn enter_opens_the_selected_files_diff() {
+    let mut pane = pane();
+    pane.focus_message();
+    press(&mut pane, &TO_LIST);
+    assert_eq!(
+        press(&mut pane, &[Key::Down, Key::Enter]),
+        SourceControlOutcome::OpenDiff(pane_file("src/app.rs", Change::Modified, true))
+    );
+    // README.md under Changes: its unstaged side.
+    assert_eq!(
+        press(&mut pane, &[Key::Down, Key::Down, Key::Down, Key::Enter]),
+        SourceControlOutcome::OpenDiff(pane_file("README.md", Change::Modified, false))
+    );
+    assert_eq!(
+        press(&mut pane, &[Key::Down, Key::Enter]),
+        SourceControlOutcome::OpenDiff(pane_file("notes.txt", Change::Untracked, false))
+    );
+}
+
+#[test]
+fn enter_on_a_header_and_o_open_the_changes_of_a_whole_section() {
+    let mut pane = pane();
+    pane.focus_message();
+    press(&mut pane, &TO_LIST);
+    let staged = SourceControlOutcome::OpenChanges {
+        staged: true,
+        files: vec![
+            pane_file("src/app.rs", Change::Modified, true),
+            pane_file("README.md", Change::Modified, true),
+        ],
+    };
+    assert_eq!(press(&mut pane, &[Key::Enter]), staged);
+    // `o` on a file row: the section it is in.
+    assert_eq!(press(&mut pane, &[Key::Down, Key::Char('o')]), staged);
+    assert_eq!(
+        press(&mut pane, &[Key::End, Key::Char('o')]),
+        SourceControlOutcome::OpenChanges {
+            staged: false,
+            files: vec![
+                pane_file("README.md", Change::Modified, false),
+                pane_file("notes.txt", Change::Untracked, false),
+            ],
+        }
+    );
+}
+
+#[test]
+fn e_opens_the_selected_file_and_knows_a_deleted_one_is_gone() {
+    let mut pane = SourceControl::default();
+    pane.set_changes(
+        vec![
+            file("kept.rs", None, Some(Change::Modified)),
+            file("gone.rs", None, Some(Change::Deleted)),
+            file("removed.rs", Some(Change::Deleted), None),
+        ],
+        None,
+    );
+    pane.focus_message();
+    press(&mut pane, &TO_LIST);
+    // Staged header, removed.rs, gap, Changes header, kept.rs, gone.rs.
+    assert_eq!(
+        press(&mut pane, &[Key::Char('e')]),
+        SourceControlOutcome::Stay,
+        "a header is not a file"
+    );
+    let SourceControlOutcome::OpenFile(removed) = press(&mut pane, &[Key::Down, Key::Char('e')])
+    else {
+        panic!("expected OpenFile");
+    };
+    assert!(!removed.on_disk);
+    assert_eq!(
+        press(&mut pane, &[Key::Down, Key::Down, Key::Char('e')]),
+        SourceControlOutcome::OpenFile(pane_file("kept.rs", Change::Modified, false))
+    );
+    let SourceControlOutcome::OpenFile(gone) = press(&mut pane, &[Key::Down, Key::Char('e')])
+    else {
+        panic!("expected OpenFile");
+    };
+    assert_eq!(gone.path, "gone.rs");
+    assert!(!gone.on_disk);
+}
+
+#[test]
+fn clicks_on_rows_and_the_new_buttons_open_diffs_and_files() {
+    let mut pane = pane();
+    let (_, hits) = render(&mut pane, 13, true);
+    // A file row's name opens its diff; a header row only takes the selection.
+    assert_eq!(
+        pane.handle_click(&hits, 4, 12),
+        SourceControlOutcome::OpenDiff(pane_file("notes.txt", Change::Untracked, false))
+    );
+    assert_eq!(pane.handle_click(&hits, 4, 10), SourceControlOutcome::Stay);
+    // ↗ at x 28 on an unstaged row, x 30 on a staged one.
+    assert_eq!(
+        pane.handle_click(&hits, 28, 11),
+        SourceControlOutcome::OpenFile(pane_file("README.md", Change::Modified, false))
+    );
+    assert_eq!(
+        pane.handle_click(&hits, 30, 7),
+        SourceControlOutcome::OpenFile(pane_file("src/app.rs", Change::Modified, true))
+    );
+    // ⧉ on the headers.
+    assert!(matches!(
+        pane.handle_click(&hits, 28, 10),
+        SourceControlOutcome::OpenChanges { staged: false, .. }
+    ));
+    assert!(matches!(
+        pane.handle_click(&hits, 30, 6),
+        SourceControlOutcome::OpenChanges { staged: true, .. }
+    ));
+}
+
+#[test]
+fn every_new_icon_is_followed_by_a_blank_cell() {
+    // Nerd Font icons can be drawn wider than their cell, so each one needs
+    // the next cell empty.
+    for icons in [Icons::Unicode, Icons::Nerd] {
+        let theme = Theme {
+            icons,
+            ..Theme::default()
+        };
+        let mut pane = pane();
+        let area = Rect::new(0, 0, W, 13);
+        let mut buf = Buffer::empty(area);
+        pane.render(area, &mut buf, &theme, false);
+        let mut found = 0;
+        for y in 0..13 {
+            for x in 0..W - 1 {
+                let symbol = buf[(x, y)].symbol();
+                let new_icon = [Glyph::OpenChanges, Glyph::OpenFile]
+                    .iter()
+                    .any(|g| symbol == icons.glyph(*g).to_string());
+                if new_icon {
+                    found += 1;
+                    assert_eq!(buf[(x + 1, y)].symbol(), " ", "{icons:?} at ({x}, {y})");
+                }
+            }
+        }
+        assert_eq!(found, 6, "two headers and four file rows");
+    }
 }

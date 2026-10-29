@@ -115,7 +115,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let screen = frame.area();
     if let Some(diff) = &mut state.diff {
         Clear.render(graph_area, frame.buffer_mut());
-        let block = Block::bordered().title(" diff · esc closes ");
+        let block = Block::bordered().title(" diff · s side by side · esc closes ");
         let inner = block.inner(graph_area);
         block.render(graph_area, frame.buffer_mut());
         diff.hits = Some(diff.view.render(inner, frame.buffer_mut(), theme));

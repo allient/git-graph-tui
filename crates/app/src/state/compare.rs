@@ -5,7 +5,7 @@ use tgg_git::show::{self, FileChange};
 use tgg_model::Oid;
 use tgg_ui::{CommitDetailsView, DiffView};
 
-use super::details::{Details, DiffPanel};
+use super::details::Details;
 use super::{AppState, Command, Request};
 
 /// Characters of a hash in comparison titles and messages.
@@ -82,10 +82,7 @@ impl AppState {
                     }
                 },
                 Request::CompareDiff(c, file) if c == *comparison => {
-                    self.diff = Some(DiffPanel {
-                        view: DiffView::new(&file, show::parse_diff(stdout)),
-                        hits: None,
-                    });
+                    self.show_diff(DiffView::new(&file, show::parse_diff(stdout)));
                 }
                 _ => {}
             }

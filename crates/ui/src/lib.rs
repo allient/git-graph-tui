@@ -19,7 +19,7 @@ pub use badges::{Badge, BadgeKind, badges_for};
 pub use glyphs::{GlyphCell, connector_glyphs, lane_glyphs};
 pub use graph_view::{ColumnDivider, ColumnWidths, Gap, GraphView, HitMap, HitTarget, ROW_HEIGHT};
 pub use icons::{Glyph, Icons};
-pub use source_control::{SourceControl, SourceControlHitMap, SourceControlOutcome};
+pub use source_control::{PaneFile, SourceControl, SourceControlHitMap, SourceControlOutcome};
 pub use text::{fit, format_date};
 pub use theme::Theme;
 mod key;
@@ -32,7 +32,7 @@ pub use details::{
     CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, TreeRow, file_label,
 };
 mod diff_view;
-pub use diff_view::{DiffHit, DiffHitMap, DiffOutcome, DiffStyle, DiffView};
+pub use diff_view::{DiffHit, DiffHitMap, DiffOutcome, DiffStyle, DiffView, SIDE_BY_SIDE_WIDTH};
 mod confirm;
 pub use confirm::{
     Button, ConfirmDialog, DialogHit, DialogHitMap, DialogOutcome, DialogStyle, MAX_WIDTH,

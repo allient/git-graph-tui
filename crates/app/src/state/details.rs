@@ -5,7 +5,7 @@ use tgg_git::show::{self, CommitDetails, FileChange};
 use tgg_model::Oid;
 use tgg_ui::{
     CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, DiffHitMap, DiffOutcome,
-    DiffView, Key,
+    DiffView, Key, SIDE_BY_SIDE_WIDTH,
 };
 
 use super::compare::Comparison;
@@ -259,17 +259,11 @@ impl AppState {
                 Err(err) => self.message = Some(format!("Could not read changed files: {err}")),
             },
             Request::Diff(id, file) if details.shows_commit(&id) => {
-                self.diff = Some(DiffPanel {
-                    view: DiffView::new(&file, show::parse_diff(stdout)),
-                    hits: None,
-                });
+                self.show_diff(DiffView::new(&file, show::parse_diff(stdout)));
             }
             Request::FileAt(id, path) if details.shows_commit(&id) => {
                 let title = format!("{path} @ {}", id.short(7));
-                self.diff = Some(DiffPanel {
-                    view: DiffView::text(title, stdout),
-                    hits: None,
-                });
+                self.show_diff(DiffView::text(title, stdout));
             }
             _ => {}
         }
@@ -284,7 +278,41 @@ impl AppState {
         }
     }
 
+    /// Opens `view` in the diff panel, side by side if that was chosen.
+    pub(super) fn show_diff(&mut self, view: DiffView) {
+        self.diff = Some(DiffPanel {
+            view: view.with_side_by_side(self.side_by_side),
+            hits: None,
+        });
+    }
+
+    /// `s`: old and new side by side, or back to one column; the choice
+    /// holds for later diffs too.
+    fn toggle_side_by_side(&mut self) {
+        let Some(diff) = &mut self.diff else {
+            return;
+        };
+        if !diff.view.can_split() {
+            self.message = Some("A file has no sides to show side by side.".into());
+            return;
+        }
+        let on = !diff.view.side_by_side();
+        let width = diff.hits.as_ref().map_or(0, DiffHitMap::width);
+        if on && width < SIDE_BY_SIDE_WIDTH {
+            self.message = Some(format!(
+                "Widen the diff to at least {SIDE_BY_SIDE_WIDTH} columns to show it side by side."
+            ));
+            return;
+        }
+        diff.view.set_side_by_side(on);
+        self.side_by_side = on;
+    }
+
     pub(super) fn on_diff_key(&mut self, key: KeyEvent) -> Vec<Command> {
+        if key.code == KeyCode::Char('s') {
+            self.toggle_side_by_side();
+            return Vec::new();
+        }
         let Some(diff) = &mut self.diff else {
             return Vec::new();
         };

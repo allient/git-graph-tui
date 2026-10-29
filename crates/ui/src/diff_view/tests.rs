@@ -153,3 +153,108 @@ fn binary_files_say_so() {
     assert_eq!(row_text(&buf, 0), " logo.png (binary)");
     assert_eq!(row_text(&buf, 1), " Binary file, no text diff to show.");
 }
+
+/// Two deletions replaced by three additions, then context.
+const RUNS: &str = "diff --git a/a.txt b/a.txt\n\
+                    index 1111111..2222222 100644\n\
+                    --- a/a.txt\n\
+                    +++ b/a.txt\n\
+                    @@ -1,3 +1,4 @@\n\
+                    -one\n\
+                    -two\n\
+                    +uno\n\
+                    +dos\n\
+                    +tres\n \
+                    same\n";
+
+fn wide() -> Rect {
+    Rect::new(0, 0, SIDE_BY_SIDE_WIDTH, 10)
+}
+
+#[test]
+fn side_by_side_pairs_runs_and_leaves_blanks() {
+    let view =
+        DiffView::titled("a.txt (working tree)".into(), parse_diff(RUNS)).with_side_by_side(true);
+    let (buf, hits) = render(&view, wide());
+    assert_eq!(row_text(&buf, 0), " a.txt (working tree) (+3 -2)");
+    // The patch header is left out; the hunk spans the width.
+    assert_eq!(row_text(&buf, 1), " @@ -1,3 +1,4 @@");
+    let half = usize::from(SIDE_BY_SIDE_WIDTH / 2);
+    let row = |y| {
+        let text: Vec<String> = (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol().to_owned())
+            .collect();
+        let left = text[..half].concat().trim_end().to_owned();
+        let right = text[half + 1..].concat().trim_end().to_owned();
+        (left, text[half].clone(), right)
+    };
+    assert_eq!(row(2), ("   1 one".into(), "│".into(), "   1 uno".into()));
+    assert_eq!(row(3), ("   2 two".into(), "│".into(), "   2 dos".into()));
+    assert_eq!(row(4), (String::new(), "│".into(), "   3 tres".into()));
+    assert_eq!(row(5), ("   3 same".into(), "│".into(), "   4 same".into()));
+    let style = DiffStyle::default();
+    assert_eq!(buf[(5, 2)].fg, style.deleted);
+    assert_eq!(buf[(u16::try_from(half).unwrap() + 6, 2)].fg, style.added);
+    assert_eq!(
+        hits.hit(3, 4),
+        DiffHit::Line(9),
+        "the added line of a blank-left row"
+    );
+}
+
+#[test]
+fn side_by_side_falls_back_to_unified_when_narrow() {
+    let view = DiffView::titled("a.txt".into(), parse_diff(RUNS)).with_side_by_side(true);
+    let (buf, hits) = render(&view, Rect::new(0, 0, SIDE_BY_SIDE_WIDTH - 1, 12));
+    assert_eq!(hits.width(), SIDE_BY_SIDE_WIDTH - 1);
+    assert_eq!(row_text(&buf, 6), "    1      │ -one");
+    assert!(view.side_by_side(), "the choice is kept for a wider area");
+}
+
+#[test]
+fn side_by_side_scrolls_by_rows() {
+    let mut view = DiffView::titled("a.txt".into(), parse_diff(RUNS)).with_side_by_side(true);
+    render(&view, wide());
+    // Hunk, three pairs (two deletions against three additions), context.
+    view.handle_key(Key::End, 2);
+    assert_eq!(view.offset(), 3);
+}
+
+#[test]
+fn a_plain_file_never_goes_side_by_side() {
+    let mut view = DiffView::text("a.rs @ abc".into(), "x\n");
+    assert!(!view.can_split());
+    view.set_side_by_side(true);
+    assert!(!view.side_by_side());
+}
+
+#[test]
+fn a_multi_file_view_stacks_each_file_under_its_header() {
+    let other = "diff --git a/b.txt b/b.txt\n\
+                 --- a/b.txt\n\
+                 +++ b/b.txt\n\
+                 @@ -1 +1 @@\n\
+                 -old\n\
+                 +new\n";
+    let view = DiffView::multi(
+        "Changes (working tree)".into(),
+        vec![
+            ("a.txt M".into(), parse_diff(RUNS)),
+            ("b.txt M".into(), parse_diff(other)),
+        ],
+    );
+    let (buf, _) = render(&view, Rect::new(0, 0, 60, 20));
+    assert_eq!(row_text(&buf, 0), " Changes (working tree) (+4 -3)");
+    assert_eq!(row_text(&buf, 1), " ▾ a.txt M");
+    assert_eq!(buf[(30, 1)].bg, Theme::default().header_bg);
+    assert_eq!(row_text(&buf, 7), "    1      │ -one");
+    assert_eq!(row_text(&buf, 13), " ▾ b.txt M");
+    assert_eq!(row_text(&buf, 18), "    1      │ -old");
+    assert_eq!(row_text(&buf, 19), "         1 │ +new");
+
+    let split = view.with_side_by_side(true);
+    let (buf, _) = render(&split, Rect::new(0, 0, SIDE_BY_SIDE_WIDTH, 20));
+    assert_eq!(row_text(&buf, 1), " ▾ a.txt M");
+    assert_eq!(row_text(&buf, 7), " ▾ b.txt M");
+    assert_eq!(row_text(&buf, 8), " @@ -1 +1 @@");
+}

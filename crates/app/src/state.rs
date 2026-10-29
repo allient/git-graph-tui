@@ -37,6 +37,7 @@ mod source_control;
 pub use find::Find;
 pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
+mod working_diff;
 mod worktrees;
 
 use actions::Running;
@@ -136,6 +137,15 @@ pub enum Request {
     Reflog,
     /// The repository's worktrees, for the worktrees view (S20).
     Worktrees,
+    /// Uncommitted changes for the Source Control pane: the working tree
+    /// against the index, or (`staged`) the index against HEAD, limited to
+    /// `paths` (all files when empty).
+    WorkingDiff {
+        staged: bool,
+        paths: Vec<String>,
+    },
+    /// An untracked file against nothing: every line added.
+    UntrackedDiff(String),
 }
 
 impl Request {
@@ -171,6 +181,13 @@ impl Request {
             Self::IssueUrl { .. } => GitCommand::read(repo, ["remote", "get-url", "origin"]),
             Self::Reflog => GitCommand::read(repo, tgg_git::reflog::args(REFLOG_ENTRIES)),
             Self::Worktrees => GitCommand::read(repo, tgg_git::worktree::args()),
+            Self::WorkingDiff { staged, paths } => {
+                GitCommand::read(repo, show::working_diff_args(*staged, paths))
+            }
+            // `diff --no-index` exits 1 when the file has content.
+            Self::UntrackedDiff(path) => {
+                GitCommand::read(repo, show::untracked_diff_args(path)).succeeding_with(1)
+            }
         }
     }
 
@@ -248,6 +265,13 @@ pub struct AppState {
     pub compare_base: Option<Oid>,
     /// Shell command the diffs are piped into (S12); None uses the built-in view.
     pub pager: Option<String>,
+    /// Shell command "Open File" opens a file with (`$VISUAL`, `$EDITOR`, `vi`).
+    pub editor: String,
+    /// Diffs show old and new side by side (`s` in the diff view), for the
+    /// rest of the session.
+    pub side_by_side: bool,
+    /// Source Control diffs being read, shown once every part arrived.
+    working_diff: Option<working_diff::WorkingDiffLoad>,
     /// Where issue references in commit messages link to (S20).
     pub issues: crate::config::Issues,
     /// The merge, rebase, cherry-pick or revert git stopped in the middle of.
@@ -304,6 +328,9 @@ impl AppState {
             hidden_columns: Vec::new(),
             compare_base: None,
             pager: None,
+            editor: "vi".to_owned(),
+            side_by_side: false,
+            working_diff: None,
             issues: crate::config::Issues::default(),
             operation: None,
             banner_hits: BannerHitMap::default(),
@@ -786,6 +813,10 @@ impl AppState {
                 self.on_details_read(request, &out.stdout);
                 Vec::new()
             }
+            (request @ (Request::WorkingDiff { .. } | Request::UntrackedDiff(_)), Ok(out)) => {
+                self.on_working_diff_read(&request, out.stdout);
+                Vec::new()
+            }
             (request @ (Request::CompareFiles(_) | Request::CompareDiff(..)), Ok(out)) => {
                 self.on_compare_read(request, &out.stdout);
                 Vec::new()
@@ -794,6 +825,13 @@ impl AppState {
                 if matches!(request, Request::Log { .. }) {
                     // Paging stopped: don't jump later, out of the blue.
                     self.jump_target = None;
+                }
+                if matches!(
+                    request,
+                    Request::WorkingDiff { .. } | Request::UntrackedDiff(_)
+                ) {
+                    // A part failed: the rest of that diff is not shown.
+                    self.working_diff = None;
                 }
                 self.message = Some(format!("{} ({command})", err.user_message()));
                 Vec::new()
@@ -968,5 +1006,7 @@ mod source_control_tests;
 mod tests;
 #[cfg(test)]
 mod toolbar_tests;
+#[cfg(test)]
+mod working_diff_tests;
 #[cfg(test)]
 mod worktrees_tests;

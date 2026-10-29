@@ -1,5 +1,6 @@
 //! Programs that take over the terminal for a moment (S12): a diff pager
-//! such as `delta`, fed by git, or `git difftool`. The app emits an
+//! such as `delta`, fed by git, `git difftool`, or the user's editor on a
+//! changed file. The app emits an
 //! [`External`]; `main` steps the TUI aside, runs it with [`run`] and comes
 //! back.
 
@@ -16,6 +17,8 @@ pub struct External {
     pub label: String,
     pub program: String,
     pub args: Vec<String>,
+    /// Reload the repository afterwards: the program may have changed files.
+    pub refresh: bool,
 }
 
 /// The diff pager to use: `$TUI_GIT_GRAPH_PAGER`, else the config file's
@@ -25,6 +28,47 @@ pub fn pager(env: &dyn Fn(&str) -> Option<String>, config: Option<String>) -> Op
         .or(config)
         .map(|pager| pager.trim().to_owned())
         .filter(|pager| !pager.is_empty())
+}
+
+/// The editor for "Open File": `$VISUAL`, else `$EDITOR`, else `vi`. It is
+/// a shell command line, so it may carry arguments (`code --wait`).
+pub fn editor(env: &dyn Fn(&str) -> Option<String>) -> String {
+    ["VISUAL", "EDITOR"]
+        .into_iter()
+        .filter_map(env)
+        .map(|editor| editor.trim().to_owned())
+        .find(|editor| !editor.is_empty())
+        .unwrap_or_else(|| "vi".to_owned())
+}
+
+/// Opens `path` (relative to `repo`) in `editor`, through the shell from the
+/// repository's root, and refreshes once it exits. On a POSIX shell the
+/// directory and the path are positional parameters, never parsed as shell
+/// text.
+pub fn editor_command(repo: &Path, editor: &str, path: &str) -> External {
+    let repo = repo.to_string_lossy().into_owned();
+    let (program, args) = if cfg!(windows) {
+        let line = format!("cd /d {} && {editor} {}", quote_cmd(&repo), quote_cmd(path));
+        ("cmd", vec!["/C".to_owned(), line])
+    } else {
+        let line = format!("cd -- \"$1\" && exec {editor} \"$2\"");
+        (
+            "sh",
+            vec![
+                "-c".to_owned(),
+                line,
+                "sh".to_owned(),
+                repo,
+                path.to_owned(),
+            ],
+        )
+    };
+    External {
+        label: editor.to_owned(),
+        program: program.to_owned(),
+        args,
+        refresh: true,
+    }
 }
 
 /// Quotes `arg` for a POSIX shell: in single quotes, with each `'` closed,
@@ -65,6 +109,7 @@ pub fn pager_command(repo: &Path, diff_args: &[String], pager: &str) -> External
         label: pager.to_owned(),
         program: program.to_owned(),
         args: vec![flag.to_owned(), line],
+        refresh: false,
     }
 }
 
@@ -76,6 +121,7 @@ pub fn difftool_command(repo: &Path, difftool_args: Vec<String>) -> External {
         label: "git difftool".to_owned(),
         program: "git".to_owned(),
         args,
+        refresh: false,
     }
 }
 
@@ -158,8 +204,40 @@ mod tests {
                      | delta --side-by-side"
                         .into()
                 ],
+                refresh: false,
             }
         );
+    }
+
+    #[test]
+    fn the_editor_comes_from_visual_then_editor_then_vi() {
+        assert_eq!(editor(&env(&[])), "vi");
+        assert_eq!(editor(&env(&[("EDITOR", "nano")])), "nano");
+        assert_eq!(
+            editor(&env(&[("EDITOR", "nano"), ("VISUAL", "code --wait")])),
+            "code --wait"
+        );
+        assert_eq!(editor(&env(&[("VISUAL", " "), ("EDITOR", "nano")])), "nano");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_editor_opens_the_path_from_the_repository_root() {
+        let dir = std::env::temp_dir();
+        let command = editor_command(&dir, "printf '%s|%s'", "a b's.txt");
+        assert!(command.refresh);
+        assert_eq!(command.program, "sh");
+        // `printf` stands in for the editor: it prints the path it got and
+        // the directory it ran in.
+        let mut command = command;
+        command.args[1] = command.args[1].replace("\"$2\"", "\"$2\" \"$(pwd -P)\"");
+        let out = Command::new(&command.program)
+            .args(&command.args)
+            .output()
+            .unwrap();
+        let printed = String::from_utf8(out.stdout).unwrap();
+        let root = dir.canonicalize().unwrap();
+        assert_eq!(printed, format!("a b's.txt|{}", root.display()));
     }
 
     #[cfg(unix)]
@@ -169,6 +247,7 @@ mod tests {
             label: "delta".into(),
             program: "sh".into(),
             args: vec!["-c".into(), "exit 3".into()],
+            refresh: false,
         };
         assert_eq!(
             run(&failing).as_deref(),
@@ -183,6 +262,7 @@ mod tests {
             label: "nope".into(),
             program: "tui-git-graph-no-such-program".into(),
             args: Vec::new(),
+            refresh: false,
         };
         let message = run(&missing).unwrap();
         assert!(message.starts_with("nope failed: "), "{message}");
