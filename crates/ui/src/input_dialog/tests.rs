@@ -141,6 +141,22 @@ fn toggles_and_choices_change_with_space_and_arrows() {
 }
 
 #[test]
+fn arrows_never_tick_a_checkbox() {
+    // Delete Branch opens on its "Force delete" checkbox: Left/Right on the
+    // way to a button must not force the delete.
+    let mut dialog = create_branch();
+    dialog.handle_key(Key::Tab);
+    for key in [Key::Left, Key::Right] {
+        dialog.handle_key(key);
+        assert_eq!(
+            dialog.values()[1],
+            (InputId::Checkout, InputValue::Bool(false)),
+            "{key:?}"
+        );
+    }
+}
+
+#[test]
 fn remotes_turn_the_remote_field_into_a_choice() {
     let push = Action::PushBranch {
         branch: "topic".into(),

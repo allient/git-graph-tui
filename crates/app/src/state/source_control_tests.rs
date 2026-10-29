@@ -259,3 +259,21 @@ fn alt_enter_writes_a_multi_line_commit_message() {
         "Add notes\nWith a body."
     );
 }
+
+#[test]
+fn after_a_menu_choice_from_the_pane_keys_go_back_to_the_graph() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let (x, y) = find(&h, "✓ ↻ …");
+    click(&mut h, x + 4, y);
+    let (x, y) = find(&h, "View as Tree");
+    click(&mut h, x + 1, y);
+    assert!(h.state.menu.is_none());
+    press(&mut h, KeyCode::Char('j'));
+    assert_eq!(
+        h.state.source_control.view.message(),
+        "",
+        "not typed into the message"
+    );
+    assert!(!h.state.source_control.focus);
+}

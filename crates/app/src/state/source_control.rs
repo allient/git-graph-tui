@@ -99,6 +99,9 @@ impl AppState {
                 return self.refresh();
             }
             SourceControlOutcome::More(anchor) => {
+                // What the menu does happens in the graph: keys go back there
+                // instead of into the commit message.
+                self.source_control.focus = false;
                 self.open_repo_menu(anchor);
                 return Vec::new();
             }
