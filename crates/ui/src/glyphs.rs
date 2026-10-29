@@ -55,8 +55,8 @@ pub fn lane_glyphs(row: &Row, width: usize) -> Vec<GlyphCell> {
 /// `above` is the last row loaded), `width` lanes wide.
 ///
 /// Each line leaving `above` runs down to where it enters `below`; a line that
-/// changes lanes turns here with rounded corners, like `├─╮` for a merge or
-/// `├─╯` for a branch joining its parent.
+/// changes lanes turns here with rounded corners, like `┠─╮` for a merge or
+/// `┠─╯` for a branch joining its parent.
 #[must_use]
 pub fn connector_glyphs(above: &Row, below: Option<&Row>, width: usize) -> Vec<GlyphCell> {
     let width = width
@@ -138,18 +138,21 @@ fn render(joints: &[Joints]) -> Vec<GlyphCell> {
         .collect()
 }
 
+/// Lanes are heavy vertical lines (`┃`, and `┠ ┨ ╂ ┰ ┸` where a line
+/// branches off); horizontals stay light and turns use the rounded light
+/// corners (`╭ ╮ ╰ ╯`), as Unicode has no heavy rounded ones.
 fn box_char(j: &Joints) -> char {
     match (j.up, j.down, j.left, j.right) {
-        (true, true, true, true) => '┼',
-        (true, true, true, false) => '┤',
-        (true, true, false, true) => '├',
-        (true, false, true, true) => '┴',
-        (false, true, true, true) => '┬',
+        (true, true, true, true) => '╂',
+        (true, true, true, false) => '┨',
+        (true, true, false, true) => '┠',
+        (true, false, true, true) => '┸',
+        (false, true, true, true) => '┰',
         (true, false, true, false) => '╯',
         (true, false, false, true) => '╰',
         (false, true, true, false) => '╮',
         (false, true, false, true) => '╭',
-        (true, _, false, false) | (false, true, false, false) => '│',
+        (true, _, false, false) | (false, true, false, false) => '┃',
         (false, false, true, _) | (false, false, _, true) => '─',
         (false, false, false, false) => ' ',
     }
@@ -179,6 +182,50 @@ mod tests {
         cells.iter().map(|c| c.ch).collect()
     }
 
+    /// The character for a cell whose lines go the `ways` named: `u`p,
+    /// `d`own, `l`eft, `r`ight.
+    fn joint(ways: &str) -> char {
+        box_char(&Joints {
+            up: ways.contains('u'),
+            down: ways.contains('d'),
+            left: ways.contains('l'),
+            right: ways.contains('r'),
+            ..Joints::default()
+        })
+    }
+
+    #[test]
+    fn lanes_are_heavy_vertical_lines() {
+        assert_eq!(joint("ud"), '┃');
+        assert_eq!(joint("u"), '┃');
+        assert_eq!(joint("d"), '┃');
+    }
+
+    #[test]
+    fn junctions_keep_the_lane_heavy_and_the_branch_light() {
+        assert_eq!(joint("udr"), '┠', "up, down, right");
+        assert_eq!(joint("udl"), '┨', "up, down, left");
+        assert_eq!(joint("udlr"), '╂', "every way");
+        assert_eq!(joint("dlr"), '┰', "down, left, right");
+        assert_eq!(joint("ulr"), '┸', "up, left, right");
+    }
+
+    #[test]
+    fn horizontals_and_curves_stay_light_and_rounded() {
+        assert_eq!(joint("lr"), '─');
+        assert_eq!(joint("dr"), '╭');
+        assert_eq!(joint("dl"), '╮');
+        assert_eq!(joint("ur"), '╰');
+        assert_eq!(joint("ul"), '╯');
+        assert_eq!(joint(""), ' ');
+    }
+
+    #[test]
+    fn a_curve_joining_a_lane_from_the_left() {
+        let above = row(0, 0, &[e(1, 1, 1)], &[e(1, 1, 1), e(0, 1, 0)]);
+        assert_eq!(text(&connector_glyphs(&above, None, 2)), "╰─┨");
+    }
+
     #[test]
     fn single_commit_in_a_linear_history() {
         let r = row(0, 0, &[e(0, 0, 0)], &[e(0, 0, 0)]);
@@ -188,7 +235,7 @@ mod tests {
     #[test]
     fn pass_through_lanes_are_vertical_lines() {
         let r = row(1, 1, &[e(0, 0, 0), e(1, 1, 1)], &[e(0, 0, 0), e(1, 1, 1)]);
-        assert_eq!(text(&lane_glyphs(&r, 2)), "│ ●");
+        assert_eq!(text(&lane_glyphs(&r, 2)), "┃ ●");
     }
 
     #[test]
@@ -209,21 +256,21 @@ mod tests {
     fn consecutive_commits_are_joined_by_a_line() {
         let above = row(0, 0, &[e(0, 0, 0)], &[e(0, 0, 0)]);
         let below = row(0, 0, &[e(0, 0, 0)], &[e(0, 0, 0)]);
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 1)), "│");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 1)), "┃");
     }
 
     #[test]
     fn a_merge_curves_out_to_its_second_parent() {
         let merge = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
         let next = row(0, 0, &[e(0, 0, 0), e(1, 1, 1)], &[e(0, 0, 0), e(1, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "├─╮");
+        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "┠─╮");
     }
 
     #[test]
     fn a_branch_curves_into_its_parent() {
         let tip = row(1, 1, &[e(0, 0, 0)], &[e(0, 0, 0), e(1, 1, 1)]);
         let parent = row(0, 0, &[e(0, 0, 0), e(1, 0, 1)], &[e(0, 0, 0)]);
-        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "├─╯");
+        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "┠─╯");
     }
 
     #[test]
@@ -236,14 +283,14 @@ mod tests {
     #[test]
     fn the_last_loaded_row_continues_down() {
         let r = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&r, None, 2)), "├─╮");
+        assert_eq!(text(&connector_glyphs(&r, None, 2)), "┠─╮");
     }
 
     #[test]
     fn a_curve_crossing_a_lane() {
         let above = row(0, 0, &[e(1, 1, 4)], &[e(0, 0, 0), e(1, 1, 4), e(0, 2, 9)]);
         let cells = connector_glyphs(&above, None, 3);
-        assert_eq!(text(&cells), "├─┼─╮");
+        assert_eq!(text(&cells), "┠─╂─╮");
         assert_eq!(cells[2].color, Some(4), "the crossed lane keeps its color");
         assert_eq!(
             cells[4].color,
