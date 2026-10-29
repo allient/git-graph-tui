@@ -18,7 +18,7 @@ Branch: build/release-setup, PR against main. Delivery: ask-on-risk. Tests: `car
 |---|---|---|---|---|
 | T1 | S1, S2, S3 | inline | done | build(release): cargo-dist |
 | T2 | S5 | inline | done | docs: install section |
-| T3 | S6 | delegated (verifier) | todo | |
+| T3 | S6 | delegated (verifier) | done | ci: type-check release targets |
 | T4 | S4 | user (tap repo + token), then first tag | todo | |
 
 Route evidence: one feature; the release config and docs are small and sequential, so the parent writes inline; T3 delegates because the Risk line names item 5.
@@ -29,3 +29,4 @@ Route evidence: one feature; the release config and docs are small and sequentia
 - **L2** (2026-10-29) "do i need to create an acount on anyhting??" Answer: no new account; GitHub covers releases, runners and the tap; crates.io and Apple notarization are optional.
 - **L3** (2026-10-29) cargo-dist 0.33.1 installed with Homebrew on the dev machine.
 - **L4** (2026-10-29) T1 done: `dist init` (targets aarch64/x86_64 macOS, x86_64/aarch64 Linux gnu, x86_64 Windows msvc; installers shell, powershell, homebrew), `[package.metadata.dist] dist = true` on the app (it has `publish = false`), tap `allient/homebrew-tap`, `publish-jobs = ["homebrew"]`, `pr-run-mode = "plan"`. Evidence: `dist plan` lists all 5 archives, both installers, `tui-git-graph.rb` and checksums; `dist build --target aarch64-apple-darwin` built a 660 KB archive whose sha256 matches and whose binary runs (`--version` 0.1.0). macOS runners only in `build-local-artifacts`, which runs only when publishing (tag push), not on PRs. Gate green.
+- **L5** (2026-10-29) T3 independent verifier: no blockers. S1, S2, S3, S5 PASS (only the ubuntu `plan` job runs on PRs; macOS only in `build-local-artifacts`, gated on publishing; `dist generate --check` clean; installer URLs and `brew install allient/tap/tui-git-graph` correct). S4 prerequisite open: `allient/homebrew-tap` does not exist yet. Advisories: without the tap repo/token a tag still publishes the GitHub Release but the Homebrew job fails (re-run it after setup); aarch64 Linux builds on free `ubuntu-22.04-arm` (public repo only); Windows had never been compiled. Fix: `cargo check --target x86_64-pc-windows-msvc` passes; two Windows-only test warnings fixed (`run_raw` is `cfg(all(test, unix))`, duplicate time import removed); new CI job type-checks Windows and macOS on Linux with `-D warnings`.
