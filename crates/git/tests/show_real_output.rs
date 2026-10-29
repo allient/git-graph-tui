@@ -5,7 +5,7 @@
 use pretty_assertions::assert_eq;
 use tgg_git::GitCommand;
 use tgg_git::show::{self, FileChange, LineKind, Numstat};
-use tgg_model::Oid;
+use tgg_model::{Change, Oid};
 use tgg_testkit::FixtureRepo;
 
 /// Runs `args` the way the app does (`-C`, `core.quotepath=off`, ...).
@@ -30,6 +30,67 @@ fn files(repo: &FixtureRepo, commit: &Oid) -> Vec<FileChange> {
 
 fn paths(files: &[FileChange]) -> Vec<&str> {
     files.iter().map(|f| f.path.as_str()).collect()
+}
+
+fn statuses(files: &[FileChange]) -> Vec<Change> {
+    files.iter().map(|f| f.status).collect()
+}
+
+/// One commit that adds, modifies, deletes and renames a file; returns the
+/// commit before it and the commit.
+fn every_kind_of_change(repo: &FixtureRepo) -> (Oid, Oid) {
+    repo.write_file("keep.txt", "a\nb\nc\n");
+    repo.write_file("gone.txt", "bye\n");
+    repo.write_file("old.txt", "one\ntwo\nthree\nfour\nfive\n");
+    repo.git(&["add", "--all"]);
+    repo.git(&["commit", "--quiet", "--message", "Base"]);
+    let base = rev(repo, "HEAD");
+    repo.write_file("keep.txt", "a\nb\nc\nd\n");
+    repo.git(&["rm", "--quiet", "gone.txt"]);
+    repo.git(&["mv", "old.txt", "renamed.txt"]);
+    repo.write_file("added.txt", "new\n");
+    repo.git(&["add", "--all"]);
+    repo.git(&["commit", "--quiet", "--message", "Every kind"]);
+    (base, rev(repo, "HEAD"))
+}
+
+#[test]
+fn a_commits_files_carry_what_it_did_to_them() {
+    let repo = FixtureRepo::new();
+    let (_, commit) = every_kind_of_change(&repo);
+    let changes = files(&repo, &commit);
+    let got: Vec<(&str, Option<&str>, Change)> = changes
+        .iter()
+        .map(|f| (f.path.as_str(), f.old_path.as_deref(), f.status))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("added.txt", None, Change::Added),
+            ("gone.txt", None, Change::Deleted),
+            ("keep.txt", None, Change::Modified),
+            ("renamed.txt", Some("old.txt"), Change::Renamed),
+        ]
+    );
+    assert_eq!(changes[2].stat, lines(1, 0));
+}
+
+#[test]
+fn compared_files_carry_what_changed_between_the_revisions() {
+    let repo = FixtureRepo::new();
+    let (base, other) = every_kind_of_change(&repo);
+    let changes =
+        show::parse_files(&run(&repo, show::compare_files_args(&base, Some(&other)))).unwrap();
+    assert_eq!(
+        statuses(&changes),
+        [
+            Change::Added,
+            Change::Deleted,
+            Change::Modified,
+            Change::Renamed
+        ]
+    );
+    assert_eq!(changes[3].old_path.as_deref(), Some("old.txt"));
 }
 
 fn lines(added: u32, deleted: u32) -> Numstat {
@@ -84,6 +145,7 @@ fn root_commit_lists_every_file_as_added() {
         [FileChange {
             path: "README.md".into(),
             old_path: None,
+            status: Change::Added,
             stat: lines(1, 0)
         }]
     );
@@ -115,16 +177,19 @@ fn renames_binaries_and_unusual_paths() {
             FileChange {
                 path: "dir é/tab\tand space.md".into(),
                 old_path: None,
+                status: Change::Added,
                 stat: lines(1, 0)
             },
             FileChange {
                 path: "logo.png".into(),
                 old_path: None,
+                status: Change::Added,
                 stat: Numstat::Binary
             },
             FileChange {
                 path: "new name.txt".into(),
                 old_path: Some("old name.txt".into()),
+                status: Change::Renamed,
                 stat: lines(1, 0)
             },
         ]
@@ -206,6 +271,7 @@ fn comparing_two_commits_lists_and_diffs_every_change_between_them() {
         show::compare_files_args(&base, Some(&other)),
         [
             "diff",
+            "--raw",
             "--numstat",
             "-z",
             "--find-renames",
@@ -217,6 +283,7 @@ fn comparing_two_commits_lists_and_diffs_every_change_between_them() {
     let files =
         show::parse_files(&run(&repo, show::compare_files_args(&base, Some(&other)))).unwrap();
     assert_eq!(paths(&files), ["b.txt", "new.txt"]);
+    assert_eq!(statuses(&files), [Change::Added, Change::Renamed]);
     let renamed = &files[1];
     assert_eq!(renamed.old_path.as_deref(), Some("old.txt"));
 
@@ -246,6 +313,7 @@ fn comparing_a_commit_with_the_working_tree_includes_uncommitted_edits() {
         show::compare_files_args(&base, None),
         [
             "diff",
+            "--raw",
             "--numstat",
             "-z",
             "--find-renames",
@@ -255,6 +323,7 @@ fn comparing_a_commit_with_the_working_tree_includes_uncommitted_edits() {
     );
     let files = show::parse_files(&run(&repo, show::compare_files_args(&base, None))).unwrap();
     assert_eq!(files[0].stat, lines(2, 0));
+    assert_eq!(files[0].status, Change::Modified);
     let diff = show::parse_diff(&run(&repo, show::compare_diff_args(&base, None, &files[0])));
     assert!(diff.lines.iter().any(|l| l.text == "+c"), "{diff:?}");
 }

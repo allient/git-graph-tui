@@ -10,6 +10,7 @@ fn file() -> FileChange {
     FileChange {
         path: "src/lib.rs".into(),
         old_path: None,
+        status: tgg_model::Change::Modified,
         stat: Numstat::Lines {
             added: 1,
             deleted: 1,
@@ -141,6 +142,7 @@ fn binary_files_say_so() {
         &FileChange {
             path: "logo.png".into(),
             old_path: None,
+            status: tgg_model::Change::Modified,
             stat: Numstat::Binary,
         },
         parse_diff(

@@ -15,6 +15,7 @@ fn file(path: &str, added: u32, deleted: u32) -> FileChange {
     FileChange {
         path: path.into(),
         old_path: None,
+        status: tgg_model::Change::Modified,
         stat: Numstat::Lines { added, deleted },
     }
 }
@@ -92,6 +93,7 @@ fn file_labels_show_counts_renames_and_binaries() {
     let renamed = FileChange {
         path: "src/new.rs".into(),
         old_path: Some("src/old.rs".into()),
+        status: tgg_model::Change::Renamed,
         stat: Numstat::Lines {
             added: 1,
             deleted: 2,
@@ -100,6 +102,7 @@ fn file_labels_show_counts_renames_and_binaries() {
     let moved = FileChange {
         path: "lib/new.rs".into(),
         old_path: Some("src/old.rs".into()),
+        status: tgg_model::Change::Renamed,
         stat: Numstat::Binary,
     };
     assert_eq!(
