@@ -66,6 +66,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Add tag, create branch
 - [x] Checkout (detached), cherry-pick, revert, drop
 - [x] Merge into current branch, rebase current branch on this commit
+- [x] Interactive rebase from here (reorder, squash, fixup, drop the commits after it)
 - [x] Reset current branch to this commit (soft / mixed / hard)
 - [x] Copy hash / subject to clipboard
 
@@ -93,7 +94,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Issue linking (turn `#123` into links that open in the browser)
 
 ### Stretch goals (inspired by Git Graph+)
-- [ ] Interactive rebase UI (reorder, squash, fixup, drop)
+- [x] Interactive rebase UI (reorder, squash, fixup, drop)
 - [x] Conflict detection banner with continue / abort
 - [x] Worktree management
 - [x] Reflog view with recovery of lost commits
@@ -185,6 +186,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
 | Fetch into local branch (remote branch menu) | Updates a local branch from the remote one without checking it out (`git fetch <remote> refs/heads/<branch>:refs/heads/<local>`). The dialog asks for the local branch's name (the remote branch's name by default; a new name creates the branch) and has a "Force fetch" toggle, which overwrites local commits after asking. Without force, only a fast-forward is allowed. Disabled for the current branch, which git can't fetch into: use Pull |
 | Compare (commit menu) | "Select for Compare" marks a commit; on another commit, "Compare with Selected" lists the files changed from the marked one to it, and "Compare with Working Tree" lists what changed since the commit, uncommitted edits included. `Enter` opens a file's diff, `Esc` closes the comparison |
+| Interactive Rebase from Here... (commit menu) | Edits the commits after the chosen one up to HEAD, like `git rebase -i <commit>`. Offered on an older commit of the current branch; disabled, with the reason, on HEAD itself, on a detached HEAD, when a merge commit lies between the commit and HEAD, or while an operation is in progress. A panel over the graph lists the commits oldest first (git's todo order) with their action: `p` pick, `s` squash (melds into the commit above, keeping both messages), `f` fixup (melds, keeping only the message above), `d` drop, `Space` cycles; `J`/`K` or `Alt+↓`/`Alt+↑` move the selected commit down or up; `j`/`k` or arrows select. The first kept commit can't be squashed or fixed up. The last line previews the result (`3 commits → 2`). `Enter` asks to confirm ("Rewrite N commits on '<branch>'? The old commits stay reachable in the reflog.") and runs the rebase without an editor; `Esc` cancels with nothing changed. Uncommitted changes to tracked files are refused ("Commit or stash your changes first.") instead of stashed. A conflict stops the rebase and the conflict banner takes over (Continue / Abort); a commit made since the panel opened stops it too, so nothing is dropped by accident |
 | Show Reflog (repository menu) | Lists where HEAD has been, newest first (the latest 500 `git reflog` entries): short hash, `HEAD@{n}`, what moved HEAD (`commit: ...`, `checkout: moving from main to dev`, `reset: moving to HEAD~2`) and when. `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` or a click select an entry; the wheel scrolls. `Enter` or right click opens its menu to recover the commit, even one a reset left on no branch: "Create Branch Here...", "Checkout (detached)...", "Reset current branch to here..." and "Copy Commit Hash to Clipboard". The view stays open and reloads after the action; `Esc` closes it |
 | Worktrees... (repository menu) | Lists the repository's worktrees (`git worktree list`): a `*` on the one tui-git-graph runs in, short hash, branch (or `(detached)`, `(bare)`), folder, and `current`, `main`, `locked (reason)` or `prunable`. Selection, scrolling and clicks work as in the reflog view. `a` adds one: a branch, "Create a new branch" (on: `git worktree add -b <branch> -- <folder>` at HEAD; off: checks out an existing branch) and the folder (empty for `../<repository>-<branch>`). `Enter` or right click opens the worktree's menu: "Copy Path to Clipboard", "Lock"/"Unlock", "Remove Worktree..." (asks first, since it deletes the folder; "Force" also removes one with uncommitted changes or a lock; disabled for the main worktree and the current one), "Add Worktree..." and "Prune Worktrees" (forgets worktrees whose folder is gone). The view reloads after each action; `Esc` closes it |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |

@@ -1,5 +1,7 @@
 use tgg_model::{HeadState, Oid, Ref, RefKind, Stash, split_remote};
 
+use crate::Operation;
+
 /// A commit row the user opened a menu on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitTarget {
@@ -10,6 +12,10 @@ pub struct CommitTarget {
     /// True when the commit is HEAD or reachable from it (the graph draws the
     /// others muted, S7).
     pub is_head_ancestor: bool,
+    /// True when HEAD reaches the commit through first parents without
+    /// passing a merge commit: an interactive rebase from it edits a
+    /// straight line of commits.
+    pub linear_to_head: bool,
 }
 
 impl CommitTarget {
@@ -90,6 +96,8 @@ pub struct MenuContext {
     pub branch_filter: Vec<String>,
     /// The commit marked with "Select for Compare", if any.
     pub compare_base: Option<Oid>,
+    /// The merge, rebase, cherry-pick or revert git stopped in the middle of.
+    pub operation: Option<Operation>,
 }
 
 impl MenuContext {
@@ -220,6 +228,7 @@ mod tests {
             subject: "s".into(),
             parent_count,
             is_head_ancestor: true,
+            linear_to_head: true,
         };
         assert!(commit(0).is_root());
         assert!(!commit(1).is_merge());

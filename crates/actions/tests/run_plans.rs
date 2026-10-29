@@ -470,6 +470,7 @@ fn every_git_entry_of_the_sample_menus_plans_valid_git() {
         remotes: vec!["origin".into()],
         branch_filter: Vec::new(),
         compare_base: None,
+        operation: None,
     };
     let login = repo.git(&["rev-parse", "feature/login"]);
     let targets = [
@@ -482,6 +483,7 @@ fn every_git_entry_of_the_sample_menus_plans_valid_git() {
             subject: "Add login".into(),
             parent_count: 1,
             is_head_ancestor: false,
+            linear_to_head: false,
         }),
     ];
     for target in &targets {

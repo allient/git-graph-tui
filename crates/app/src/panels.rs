@@ -1,14 +1,18 @@
 //! Full-screen and modal panels drawn over the graph: the info dialog, the
-//! git output view, the reflog view and the worktrees view.
+//! git output view, the reflog view, the worktrees view and the interactive
+//! rebase panel.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
+use tgg_actions::TodoAction;
 use tgg_ui::{Theme, fit, format_date};
 
-use crate::state::{GitOutput, Info, OutputLine, ReflogView, WorktreeEntry, WorktreesView};
+use crate::state::{
+    GitOutput, Info, OutputLine, RebaseView, ReflogView, WorktreeEntry, WorktreesView,
+};
 
 /// Widest the info dialog gets.
 const INFO_WIDTH: u16 = 72;
@@ -240,4 +244,74 @@ fn worktree_flags(entry: &WorktreeEntry) -> String {
     .flatten()
     .collect::<Vec<_>>()
     .join(" · ")
+}
+
+/// Keys of the interactive rebase panel, after the preview count.
+const REBASE_KEYS: &str = "p pick · s squash · f fixup · d drop · space cycle · J/K move";
+
+/// The interactive rebase panel over `area`: one commit per line, oldest
+/// first (git's todo order), with its action, short hash and subject; the
+/// preview count and the keys on the last line. Returns the rows' area,
+/// for clicks and paging.
+pub fn draw_rebase(frame: &mut Frame<'_>, area: Rect, view: &RebaseView, theme: &Theme) -> Rect {
+    Clear.render(area, frame.buffer_mut());
+    let block = Block::bordered().title(format!(
+        " interactive rebase onto {} · enter start · esc cancel ",
+        view.rebase.base.short(SHORT_HASH)
+    ));
+    let inner = block.inner(area);
+    block.render(area, frame.buffer_mut());
+    let rows = Rect {
+        height: inner.height.saturating_sub(1),
+        ..inner
+    };
+    let footer = Rect {
+        y: rows.bottom(),
+        height: inner.height.min(1),
+        ..inner
+    };
+    let page = usize::from(rows.height).max(1);
+    let items = &view.rebase.items;
+    let offset = view.offset.min(items.len().saturating_sub(page));
+    let text: Vec<Line<'_>> = items
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(page)
+        .map(|(index, item)| {
+            let (color, subject_style) = match item.action {
+                TodoAction::Pick => (theme.text, Style::new().fg(theme.text)),
+                TodoAction::Squash | TodoAction::Fixup => {
+                    (theme.lane(3), Style::new().fg(theme.text))
+                }
+                TodoAction::Drop => (
+                    theme.muted,
+                    Style::new()
+                        .fg(theme.muted)
+                        .add_modifier(Modifier::CROSSED_OUT),
+                ),
+            };
+            let action = format!("{:<7}", item.action.word());
+            let hash = format!("{} ", item.id.short(SHORT_HASH));
+            let used = action.len() + hash.len();
+            let subject = fit(&item.subject, usize::from(rows.width).saturating_sub(used));
+            let line = Line::from(vec![
+                Span::styled(action, Style::new().fg(color).add_modifier(Modifier::BOLD)),
+                Span::styled(hash, Style::new().fg(theme.hash)),
+                Span::styled(subject, subject_style),
+            ]);
+            if index == view.selected {
+                line.style(Style::new().bg(theme.selected_bg))
+            } else {
+                line
+            }
+        })
+        .collect();
+    Paragraph::new(text).render(rows, frame.buffer_mut());
+    Paragraph::new(Line::styled(
+        format!("{} · {REBASE_KEYS}", view.rebase.preview()),
+        Style::new().fg(theme.muted),
+    ))
+    .render(footer, frame.buffer_mut());
+    rows
 }

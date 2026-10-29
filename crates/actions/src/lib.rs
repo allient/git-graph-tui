@@ -31,5 +31,7 @@ mod repo;
 pub use repo::{PickPurpose, PullMode, RepoAction};
 mod operation;
 pub use operation::{Operation, OperationAction};
+mod rebase;
+pub use rebase::{Direction, InteractiveRebase, RebaseError, TodoAction, TodoItem};
 mod forge;
 pub use forge::{IssueRef, issue_refs, issue_url, pull_request_url};
