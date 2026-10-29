@@ -9,7 +9,7 @@ use tgg_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
 };
 
-use super::{AppState, Command, Request};
+use super::{AppState, Command, Comparison, Request};
 
 /// A modal dialog on top of everything else.
 #[derive(Debug)]
@@ -137,6 +137,18 @@ impl AppState {
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
             Plan::Ui(UiEffect::CreatePullRequest { remote, branch }) => {
                 vec![Command::Git(Request::RemoteUrl { remote, branch })]
+            }
+            Plan::Ui(UiEffect::SelectForCompare { commit }) => {
+                self.select_for_compare(commit);
+                Vec::new()
+            }
+            Plan::Ui(UiEffect::CompareWithSelected { base, commit }) => {
+                let other = Some(commit.clone());
+                self.open_comparison(commit, Comparison { base, other })
+            }
+            Plan::Ui(UiEffect::CompareWithWorkingTree { commit }) => {
+                let base = commit.clone();
+                self.open_comparison(commit, Comparison { base, other: None })
             }
         }
     }

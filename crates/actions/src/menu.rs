@@ -1,4 +1,4 @@
-use tgg_model::Stash;
+use tgg_model::{Oid, Stash};
 
 use crate::{
     Action, CommitTarget, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
@@ -268,7 +268,10 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
                 },
             )
         }),
-        Some(MenuItem::Separator),
+    ]
+    .into_iter()
+    .chain(compare_entries(id, ctx))
+    .chain([
         entry(
             "Copy Commit Hash to Clipboard",
             Action::CopyCommitHash { commit: id.clone() },
@@ -279,6 +282,36 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
                 subject: subject.clone(),
             },
         ),
+    ])
+    .collect()
+}
+
+/// "Select for Compare", then "Compare with Selected" when another commit
+/// is marked, then "Compare with Working Tree" (S12), between separators.
+fn compare_entries(id: &Oid, ctx: &MenuContext) -> [Option<MenuItem>; 5] {
+    [
+        Some(MenuItem::Separator),
+        entry(
+            "Select for Compare",
+            Action::Ui(UiEffect::SelectForCompare { commit: id.clone() }),
+        ),
+        ctx.compare_base
+            .as_ref()
+            .filter(|base| *base != id)
+            .and_then(|base| {
+                entry(
+                    "Compare with Selected",
+                    Action::Ui(UiEffect::CompareWithSelected {
+                        base: base.clone(),
+                        commit: id.clone(),
+                    }),
+                )
+            }),
+        entry(
+            "Compare with Working Tree",
+            Action::Ui(UiEffect::CompareWithWorkingTree { commit: id.clone() }),
+        ),
+        Some(MenuItem::Separator),
     ]
 }
 

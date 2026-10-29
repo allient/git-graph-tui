@@ -215,6 +215,19 @@ pub enum UiEffect {
         remote: String,
         branch: String,
     },
+    /// Mark `commit` as the older side of a later "Compare with Selected".
+    SelectForCompare {
+        commit: Oid,
+    },
+    /// List what changed from the marked commit `base` to `commit`.
+    CompareWithSelected {
+        base: Oid,
+        commit: Oid,
+    },
+    /// List what changed from `commit` to the working tree.
+    CompareWithWorkingTree {
+        commit: Oid,
+    },
 }
 
 /// The dialog shown before an action runs (S13).

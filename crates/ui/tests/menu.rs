@@ -18,6 +18,7 @@ fn ctx() -> MenuContext {
         head_commit: Some(oid('a')),
         remotes: vec!["origin".into()],
         branch_filter: Vec::new(),
+        compare_base: None,
     }
 }
 

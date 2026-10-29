@@ -88,6 +88,8 @@ pub struct MenuContext {
     /// Branches currently selected in the "Branches:" dropdown (short names,
     /// `origin/x` for remote branches). Empty means "Show All".
     pub branch_filter: Vec<String>,
+    /// The commit marked with "Select for Compare", if any.
+    pub compare_base: Option<Oid>,
 }
 
 impl MenuContext {

@@ -74,7 +74,12 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
             Some(view.render(area, frame.buffer_mut(), theme))
         } else {
             Clear.render(area, frame.buffer_mut());
-            Paragraph::new(" Loading commit details…".dim()).render(area, frame.buffer_mut());
+            let loading = if details.compare.is_some() {
+                " Loading the comparison…"
+            } else {
+                " Loading commit details…"
+            };
+            Paragraph::new(loading.dim()).render(area, frame.buffer_mut());
             None
         };
     }

@@ -18,6 +18,7 @@ fn ctx() -> MenuContext {
         head_commit: Some(oid('a')),
         remotes: vec!["origin".into()],
         branch_filter: Vec::new(),
+        compare_base: None,
     }
 }
 
@@ -276,6 +277,9 @@ fn commit_menu_matches_the_vs_code_order() {
             "Rebase current branch on this Commit...",
             "Reset current branch to this Commit...",
             "---",
+            "Select for Compare",
+            "Compare with Working Tree",
+            "---",
             "Copy Commit Hash to Clipboard",
             "Copy Commit Subject to Clipboard",
         ]
@@ -297,6 +301,9 @@ fn commit_on_the_current_branch_can_be_dropped_but_not_merged_or_picked() {
             "Rebase current branch on this Commit...",
             "Reset current branch to this Commit...",
             "---",
+            "Select for Compare",
+            "Compare with Working Tree",
+            "---",
             "Copy Commit Hash to Clipboard",
             "Copy Commit Subject to Clipboard",
         ]
@@ -315,9 +322,56 @@ fn head_commit_menu() {
             "Revert...",
             "Drop...",
             "---",
+            "Select for Compare",
+            "Compare with Working Tree",
+            "---",
             "Copy Commit Hash to Clipboard",
             "Copy Commit Subject to Clipboard",
         ]
+    );
+}
+
+#[test]
+fn compare_entries_mark_a_commit_and_compare_it_with_another() {
+    let menu = menu_for(&commit('c', 1, false), &ctx());
+    assert_eq!(
+        action(&menu, "Select for Compare"),
+        &Action::Ui(UiEffect::SelectForCompare { commit: oid('c') })
+    );
+    assert_eq!(
+        action(&menu, "Compare with Working Tree"),
+        &Action::Ui(UiEffect::CompareWithWorkingTree { commit: oid('c') })
+    );
+
+    // With another commit marked, "Compare with Selected" follows "Select for Compare".
+    let marked = MenuContext {
+        compare_base: Some(oid('b')),
+        ..ctx()
+    };
+    let menu = menu_for(&commit('c', 1, false), &marked);
+    let names = labels(&menu);
+    let select = names
+        .iter()
+        .position(|l| l == "Select for Compare")
+        .unwrap();
+    assert_eq!(names[select + 1], "Compare with Selected");
+    assert_eq!(
+        action(&menu, "Compare with Selected"),
+        &Action::Ui(UiEffect::CompareWithSelected {
+            base: oid('b'),
+            commit: oid('c'),
+        })
+    );
+
+    // Not on the marked commit itself.
+    let names = labels(&menu_for(&commit('b', 1, false), &marked));
+    assert!(
+        names.contains(&"Select for Compare".to_owned()),
+        "{names:?}"
+    );
+    assert!(
+        !names.contains(&"Compare with Selected".to_owned()),
+        "{names:?}"
     );
 }
 
@@ -670,6 +724,7 @@ fn empty_submenus_are_dropped() {
         head_commit: None,
         remotes: Vec::new(),
         branch_filter: Vec::new(),
+        compare_base: None,
     };
     let menu = menu_for(&Target::Repository, &ctx);
     assert!(

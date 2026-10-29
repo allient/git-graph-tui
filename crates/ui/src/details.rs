@@ -16,6 +16,8 @@ const PARENT_HASH: usize = 8;
 const LABEL: usize = 11;
 /// Keys for the selected file, beside the changed-files title.
 const KEY_HINTS: &str = "enter diff  v view file";
+/// The same for a comparison, which has no single commit to view a file at.
+const COMPARISON_HINTS: &str = "enter diff  esc close";
 
 /// A row of the changed-files tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,13 +89,23 @@ impl DetailsHitMap {
     }
 }
 
+/// What the panel shows above or beside its file tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Header {
+    /// One commit's metadata and message, on the left half.
+    Commit(CommitDetails),
+    /// A comparison of two revisions: only this title, over the files.
+    Comparison(String),
+}
+
 /// The inline commit details panel (S10): metadata and message on the left,
 /// the changed files as a folder tree with `(+a -d)` counts on the right.
+/// A comparison (S12) shows only the files, under its title.
 ///
 /// The app draws it in the rows under the selected commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitDetailsView {
-    details: CommitDetails,
+    header: Header,
     files: Vec<FileChange>,
     rows: Vec<TreeRow>,
     /// Index into `rows`, always a file row.
@@ -103,19 +115,35 @@ pub struct CommitDetailsView {
 impl CommitDetailsView {
     #[must_use]
     pub fn new(details: CommitDetails, files: Vec<FileChange>) -> Self {
+        Self::with_header(Header::Commit(details), files)
+    }
+
+    /// The files that differ between two revisions, under `title`
+    /// (`Comparing abc1234..def5678`). `v` does nothing: the files belong to
+    /// no single commit.
+    #[must_use]
+    pub fn comparison(title: String, files: Vec<FileChange>) -> Self {
+        Self::with_header(Header::Comparison(title), files)
+    }
+
+    fn with_header(header: Header, files: Vec<FileChange>) -> Self {
         let rows = file_tree(&files);
         let selected = rows.iter().position(|r| matches!(r, TreeRow::File { .. }));
         Self {
-            details,
+            header,
             files,
             rows,
             selected,
         }
     }
 
+    /// The commit shown, or None for a comparison.
     #[must_use]
-    pub fn details(&self) -> &CommitDetails {
-        &self.details
+    pub fn details(&self) -> Option<&CommitDetails> {
+        match &self.header {
+            Header::Commit(details) => Some(details),
+            Header::Comparison(_) => None,
+        }
     }
 
     #[must_use]
@@ -155,7 +183,7 @@ impl CommitDetailsView {
                     return DetailsOutcome::OpenFile(file.clone());
                 }
             }
-            Key::Char('v') => {
+            Key::Char('v') if self.details().is_some() => {
                 if let Some(file) = self.selected_file() {
                     return DetailsOutcome::ViewFile(file.clone());
                 }
@@ -190,6 +218,10 @@ impl CommitDetailsView {
             return hits;
         }
         Clear.render(area, buf);
+        let Header::Commit(details) = &self.header else {
+            self.render_files(area, buf, theme, &mut hits);
+            return hits;
+        };
         let left = Rect {
             width: area.width / 2,
             ..area
@@ -202,19 +234,19 @@ impl CommitDetailsView {
         for y in area.top()..area.bottom() {
             buf.set_string(left.right(), y, "│", Style::default().fg(theme.muted));
         }
-        self.render_metadata(left, buf, theme, &mut hits);
+        Self::render_metadata(details, left, buf, theme, &mut hits);
         self.render_files(right, buf, theme, &mut hits);
         hits
     }
 
     fn render_metadata(
-        &self,
+        details: &CommitDetails,
         area: Rect,
         buf: &mut Buffer,
         theme: &Theme,
         hits: &mut DetailsHitMap,
     ) {
-        let commit = &self.details.commit;
+        let commit = &details.commit;
         let width = usize::from(area.width.saturating_sub(1));
         let label = Style::default().fg(theme.muted);
         let text = Style::default().fg(theme.text);
@@ -274,7 +306,7 @@ impl CommitDetailsView {
         }
         // Blank line, then the message (subject bold, then the body).
         y += 1;
-        for (i, line) in self.details.message.lines().enumerate() {
+        for (i, line) in details.message.lines().enumerate() {
             if y >= area.bottom() {
                 break;
             }
@@ -290,13 +322,21 @@ impl CommitDetailsView {
 
     fn render_files(&self, area: Rect, buf: &mut Buffer, theme: &Theme, hits: &mut DetailsHitMap) {
         let width = usize::from(area.width.saturating_sub(1));
-        let title = format!("Changed files ({})", self.files.len());
+        let count = self.files.len();
+        let (title, keys) = match &self.header {
+            Header::Commit(_) => (format!("Changed files ({count})"), KEY_HINTS),
+            Header::Comparison(title) => {
+                let plural = if count == 1 { "" } else { "s" };
+                let title = format!("{title} ({count} changed file{plural})");
+                (title, COMPARISON_HINTS)
+            }
+        };
         let muted = Style::default().fg(theme.muted);
         buf.set_string(area.x + 1, area.y, fit(&title, width), muted);
         // Key hints at the right of the title row, when they fit.
-        if !self.files.is_empty() && title.width() + 2 + KEY_HINTS.width() <= width {
-            let x = area.right().saturating_sub(to_u16(KEY_HINTS.width()) + 1);
-            buf.set_string(x, area.y, KEY_HINTS, muted);
+        if count > 0 && title.width() + 2 + keys.width() <= width {
+            let x = area.right().saturating_sub(to_u16(keys.width()) + 1);
+            buf.set_string(x, area.y, keys, muted);
         }
         let visible = usize::from(area.height.saturating_sub(1));
         // Scroll so the selected file stays visible.

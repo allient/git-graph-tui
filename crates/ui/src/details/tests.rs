@@ -209,3 +209,50 @@ fn long_file_lists_scroll_to_the_selection() {
     assert!(hits.file_row(29).is_some(), "last file is visible");
     assert!(hits.file_row(0).is_none());
 }
+
+fn line(buf: &Buffer, y: u16) -> String {
+    (buf.area.left()..buf.area.right())
+        .map(|x| buf[(x, y)].symbol())
+        .collect::<String>()
+        .trim_end()
+        .to_owned()
+}
+
+#[test]
+fn v_views_the_selected_file() {
+    let mut view = view();
+    assert_eq!(
+        view.handle_key(Key::Char('v')),
+        DetailsOutcome::ViewFile(file("apps/full-app/a.rs", 1, 1))
+    );
+}
+
+#[test]
+fn a_comparison_lists_its_files_across_the_whole_panel() {
+    let mut view = CommitDetailsView::comparison("Comparing aaaaaaa..bbbbbbb".into(), files());
+    assert!(view.details().is_none());
+    let (buf, hits) = render(&view, Rect::new(0, 0, 80, 6));
+    let title = line(&buf, 0);
+    assert!(
+        title.starts_with(" Comparing aaaaaaa..bbbbbbb (5 changed files) "),
+        "{title:?}"
+    );
+    assert!(title.ends_with(" enter diff  esc close"), "{title:?}");
+    assert_eq!(line(&buf, 1), " apps/");
+    assert!(
+        line(&buf, 3).starts_with("     a.rs"),
+        "{:?}",
+        line(&buf, 3)
+    );
+    // Enter opens the file; there is no single commit to view it at.
+    assert_eq!(view.handle_key(Key::Char('v')), DetailsOutcome::Stay);
+    let row = hits.file_row(2).unwrap();
+    assert_eq!(
+        view.handle_click(&hits, row.x, row.y),
+        DetailsOutcome::OpenFile(file("apps/full-app/a.rs", 1, 1))
+    );
+
+    let one = CommitDetailsView::comparison("Comparing a..b".into(), vec![file("x", 1, 0)]);
+    let (buf, _) = render(&one, Rect::new(0, 0, 80, 3));
+    assert!(line(&buf, 0).starts_with(" Comparing a..b (1 changed file) "));
+}
