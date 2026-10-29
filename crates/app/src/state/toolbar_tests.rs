@@ -419,3 +419,59 @@ fn delete_remote_branch_asks_then_deletes_it_on_the_remote() {
     accept_dialogs(&mut h);
     assert_eq!(repo.git(&["ls-remote", "origin", "refs/heads/gone"]), "");
 }
+
+fn stash_list(repo: &FixtureRepo) -> String {
+    repo.git(&["stash", "list", "--format=%gd %s"])
+}
+
+#[test]
+fn stash_submenu_stashes_then_applies_views_and_drops_a_picked_stash() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    // The sample's only change is the untracked notes.txt.
+    repo_submenu_entry(&mut h, "Stash", "Stash (Include Untracked)");
+    type_text(&mut h, "notes");
+    accept_dialogs(&mut h);
+    assert!(
+        stash_list(&repo).starts_with("stash@{0} On main: notes"),
+        "{}",
+        stash_list(&repo)
+    );
+    assert_eq!(status_of(&repo), "");
+
+    repo_submenu_entry(&mut h, "Stash", "View Stash...");
+    pick(&mut h, "stash@{0}");
+    assert!(h.state.diff.is_some(), "the stash's diff is shown");
+    press(&mut h, KeyCode::Esc);
+
+    repo_submenu_entry(&mut h, "Stash", "Apply Stash...");
+    pick(&mut h, "stash@{0}");
+    accept_dialogs(&mut h);
+    assert_eq!(status_of(&repo), "?? notes.txt");
+    assert!(!stash_list(&repo).is_empty(), "apply keeps the stash");
+
+    repo_submenu_entry(&mut h, "Stash", "Drop All Stashes...");
+    accept_dialogs(&mut h);
+    assert_eq!(stash_list(&repo), "");
+}
+
+#[test]
+fn tags_submenu_deletes_a_picked_tag_here_or_on_the_remote() {
+    let repo = FixtureRepo::sample();
+    repo.git(&["push", "--quiet", "origin", "v0.1.0"]);
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Tags", "Delete Remote Tag...");
+    pick(&mut h, "v0.1.0");
+    accept_dialogs(&mut h);
+    assert_eq!(repo.git(&["ls-remote", "--tags", "origin"]), "");
+    assert_eq!(
+        repo.git(&["tag", "--list"]),
+        "v0.1.0",
+        "the local tag stays"
+    );
+
+    repo_submenu_entry(&mut h, "Tags", "Delete Tag...");
+    pick(&mut h, "v0.1.0");
+    accept_dialogs(&mut h);
+    assert_eq!(repo.git(&["tag", "--list"]), "");
+}

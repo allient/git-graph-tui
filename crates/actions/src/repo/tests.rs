@@ -234,3 +234,11 @@ fn delete_remote_branch_pushes_a_delete_after_asking() {
         "{confirmation:?}"
     );
 }
+
+#[test]
+fn drop_all_stashes_clears_the_list_after_asking() {
+    let action = RepoAction::DropAllStashes;
+    assert_eq!(commands(&action), [write(&["stash", "clear"])]);
+    assert!(action.is_destructive());
+    assert!(action.confirmation().is_some());
+}

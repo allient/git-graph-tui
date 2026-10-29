@@ -19,6 +19,11 @@ pub enum TagAction {
         name: String,
         remote: String,
     },
+    /// Deletes the tag on `remote` only (Tags ▸ "Delete Remote Tag...").
+    DeleteRemote {
+        name: String,
+        remote: String,
+    },
     /// Shows the tag (and an annotated tag's message) in the app.
     ShowDetails {
         name: String,
@@ -57,6 +62,13 @@ impl TagAction {
                     strings(&["push", "--", remote, &refspec]),
                 )])
             }
+            Self::DeleteRemote { name, remote } => {
+                let refspec = format!("refs/tags/{name}");
+                Plan::Git(vec![GitCommand::network(
+                    repo,
+                    strings(&["push", "--delete", "--", remote, &refspec]),
+                )])
+            }
             Self::ShowDetails { name } => Plan::Ui(UiEffect::ShowTag { name: name.clone() }),
             Self::CopyName { name } => Plan::Clipboard(name.clone()),
         }
@@ -64,11 +76,20 @@ impl TagAction {
 
     #[must_use]
     pub fn is_destructive(&self) -> bool {
-        matches!(self, Self::Delete { .. })
+        matches!(self, Self::Delete { .. } | Self::DeleteRemote { .. })
     }
 
     #[must_use]
     pub fn confirmation(&self) -> Option<Confirmation> {
+        if let Self::DeleteRemote { name, remote } = self {
+            return Some(Confirmation::new(
+                "Delete Remote Tag",
+                format!(
+                    "Delete the tag '{name}' on '{remote}'? The local tag is kept; everyone who fetches from '{remote}' loses it (git push --delete {remote} refs/tags/{name})."
+                ),
+                "Delete",
+            ));
+        }
         let Self::Delete {
             name,
             remote,

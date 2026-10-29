@@ -3,7 +3,9 @@
 
 use crossterm::event::KeyEvent;
 use ratatui::layout::Position;
-use tgg_actions::{Action, MenuItem, PickPurpose, RepoAction, Rev, Target, menu_for};
+use tgg_actions::{
+    Action, MenuItem, PickPurpose, RepoAction, Rev, StashAction, TagAction, Target, menu_for,
+};
 use tgg_git::log::Revisions;
 use tgg_model::{Ref, RefKind, split_remote};
 use tgg_ui::{
@@ -257,6 +259,22 @@ impl AppState {
                 .filter(|r| r.kind == RefKind::RemoteBranch)
                 .map(|r| item(r.short_name(), "remote"))
                 .collect(),
+            PickerFor::Ref(
+                PickPurpose::ApplyStash
+                | PickPurpose::PopStash
+                | PickPurpose::DropStash
+                | PickPurpose::ViewStash,
+            ) => self
+                .stashes
+                .iter()
+                .map(|stash| item(&stash.selector(), &stash.subject))
+                .collect(),
+            PickerFor::Ref(PickPurpose::DeleteTag | PickPurpose::DeleteRemoteTag) => self
+                .refs
+                .iter()
+                .filter(|r| r.kind == RefKind::Tag)
+                .map(|r| item(r.short_name(), "tag"))
+                .collect(),
             PickerFor::Ref(PickPurpose::RemoveRemote) => self
                 .menu_context()
                 .remotes
@@ -304,6 +322,18 @@ impl AppState {
                     | PickPurpose::Rebase
                     | PickPurpose::CreateBranchFrom
                     | PickPurpose::DeleteRemoteBranch => self.picked_ref_action(purpose, &name),
+                    PickPurpose::ViewStash => {
+                        let Some(stash) = self.stashes.iter().find(|s| s.selector() == name) else {
+                            return Vec::new();
+                        };
+                        let stash = stash.clone();
+                        return self.open_stash_diff(&stash);
+                    }
+                    PickPurpose::ApplyStash
+                    | PickPurpose::PopStash
+                    | PickPurpose::DropStash
+                    | PickPurpose::DeleteTag
+                    | PickPurpose::DeleteRemoteTag => self.picked_action(purpose, &name),
                     PickPurpose::DeleteBranch | PickPurpose::RemoveRemote => {
                         purpose.action_for(&name)
                     }
@@ -317,6 +347,34 @@ impl AppState {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// What the Stash and Tags submenus' pickers do with the picked stash
+    /// (`stash@{n}`) or tag.
+    fn picked_action(&self, purpose: PickPurpose, name: &str) -> Option<Action> {
+        let stash = || self.stashes.iter().find(|s| s.selector() == name).cloned();
+        let remote = self.menu_context().default_remote().map(str::to_owned);
+        Some(match purpose {
+            PickPurpose::ApplyStash => Action::Stash(StashAction::Apply {
+                stash: stash()?,
+                reinstate_index: false,
+            }),
+            PickPurpose::PopStash => Action::Stash(StashAction::Pop {
+                stash: stash()?,
+                reinstate_index: false,
+            }),
+            PickPurpose::DropStash => Action::Stash(StashAction::Drop { stash: stash()? }),
+            PickPurpose::DeleteTag => Action::Tag(TagAction::Delete {
+                name: name.to_owned(),
+                remote,
+                on_remote: false,
+            }),
+            PickPurpose::DeleteRemoteTag => Action::Tag(TagAction::DeleteRemote {
+                name: name.to_owned(),
+                remote: remote?,
+            }),
+            _ => return None,
+        })
     }
 
     /// What Branch ▸ Merge, Rebase Branch, Create Branch From and Delete
@@ -398,6 +456,12 @@ fn picker_title(purpose: PickPurpose) -> &'static str {
         PickPurpose::Rebase => "Rebase onto",
         PickPurpose::CreateBranchFrom => "Create Branch From",
         PickPurpose::DeleteRemoteBranch => "Delete Remote Branch",
+        PickPurpose::ApplyStash => "Apply Stash",
+        PickPurpose::PopStash => "Pop Stash",
+        PickPurpose::DropStash => "Drop Stash",
+        PickPurpose::ViewStash => "View Stash",
+        PickPurpose::DeleteTag => "Delete Tag",
+        PickPurpose::DeleteRemoteTag => "Delete Remote Tag",
         PickPurpose::RemoveRemote => "Remove Remote",
     }
 }

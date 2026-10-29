@@ -756,11 +756,32 @@ fn repository_menu_matches_the_vs_code_order() {
     );
     assert_eq!(
         labels(submenu(&menu, "Stash")),
-        ["Stash Changes...", "Apply Latest Stash", "Pop Latest Stash"]
+        [
+            "Stash",
+            "Stash (Include Untracked)",
+            "Stash Staged",
+            "---",
+            "Apply Latest Stash",
+            "Apply Stash...",
+            "---",
+            "Pop Latest Stash",
+            "Pop Stash...",
+            "---",
+            "Drop Stash...",
+            "Drop All Stashes...",
+            "---",
+            "View Stash...",
+        ]
     );
     assert_eq!(
         labels(submenu(&menu, "Tags")),
-        ["Create Tag...", "Push All Tags"]
+        [
+            "Create Tag...",
+            "Delete Tag...",
+            "Delete Remote Tag...",
+            "---",
+            "Push Tags"
+        ]
     );
 }
 
@@ -964,6 +985,68 @@ fn remote_branch_menu_deletes_and_pulls_like_vs_code() {
 }
 
 #[test]
+fn stash_and_tags_submenus_stash_or_pick() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    let stash = submenu(&menu, "Stash");
+    let pick_for = |purpose| Action::Ui(UiEffect::PickRef { purpose });
+    assert_eq!(
+        action(stash, "Stash"),
+        &Action::WorkingTree(WorkingTreeAction::Stash {
+            message: String::new(),
+            include_untracked: false
+        })
+    );
+    assert_eq!(
+        action(stash, "Stash (Include Untracked)"),
+        &Action::WorkingTree(WorkingTreeAction::Stash {
+            message: String::new(),
+            include_untracked: true
+        })
+    );
+    assert_eq!(
+        action(stash, "Stash Staged"),
+        &Action::WorkingTree(WorkingTreeAction::StashStaged {
+            message: String::new()
+        })
+    );
+    assert_eq!(
+        action(stash, "Apply Stash..."),
+        &pick_for(PickPurpose::ApplyStash)
+    );
+    assert_eq!(
+        action(stash, "Pop Stash..."),
+        &pick_for(PickPurpose::PopStash)
+    );
+    assert_eq!(
+        action(stash, "Drop Stash..."),
+        &pick_for(PickPurpose::DropStash)
+    );
+    assert_eq!(
+        action(stash, "Drop All Stashes..."),
+        &Action::Repo(RepoAction::DropAllStashes)
+    );
+    assert_eq!(
+        action(stash, "View Stash..."),
+        &pick_for(PickPurpose::ViewStash)
+    );
+    let tags = submenu(&menu, "Tags");
+    assert_eq!(
+        action(tags, "Delete Tag..."),
+        &pick_for(PickPurpose::DeleteTag)
+    );
+    assert_eq!(
+        action(tags, "Delete Remote Tag..."),
+        &pick_for(PickPurpose::DeleteRemoteTag)
+    );
+    assert_eq!(
+        action(tags, "Push Tags"),
+        &Action::Repo(RepoAction::PushTags {
+            remote: "origin".into()
+        })
+    );
+}
+
+#[test]
 fn abort_rebase_and_undo_depend_on_the_repository_state() {
     let rebasing = MenuContext {
         operation: Some(Operation::Rebase),
@@ -1074,7 +1157,10 @@ fn repository_menu_without_remotes_or_branch() {
         ]
     );
     assert_eq!(labels(submenu(&menu, "Remote")), ["Add Remote..."]);
-    assert_eq!(labels(submenu(&menu, "Tags")), ["Create Tag..."]);
+    assert_eq!(
+        labels(submenu(&menu, "Tags")),
+        ["Create Tag...", "Delete Tag..."]
+    );
 }
 
 #[test]

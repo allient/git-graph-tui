@@ -20,15 +20,24 @@ pub enum PickPurpose {
     CreateBranchFrom,
     /// Branch ▸ "Delete Remote Branch...": a remote branch.
     DeleteRemoteBranch,
+    /// Stash ▸ "Apply Stash...", "Pop Stash...", "Drop Stash..." and
+    /// "View Stash...": a stash.
+    ApplyStash,
+    PopStash,
+    DropStash,
+    ViewStash,
+    /// Tags ▸ "Delete Tag..." and "Delete Remote Tag...": a tag.
+    DeleteTag,
+    DeleteRemoteTag,
     /// Remote ▸ "Remove Remote...": a remote.
     RemoveRemote,
 }
 
 impl PickPurpose {
     /// The action for the picked name, when the name alone decides it.
-    /// Purposes that depend on the picked ref's kind or commit (checkout,
-    /// merge, rebase, create from, delete remote) return `None`: the app
-    /// builds those from the picked ref.
+    /// Purposes that depend on the picked ref's kind or commit, or on the
+    /// picked stash or the default remote, return `None`: the app builds
+    /// those from what was picked.
     #[must_use]
     pub fn action_for(self, name: &str) -> Option<Action> {
         match self {
@@ -36,7 +45,13 @@ impl PickPurpose {
             | Self::Merge
             | Self::Rebase
             | Self::CreateBranchFrom
-            | Self::DeleteRemoteBranch => None,
+            | Self::DeleteRemoteBranch
+            | Self::ApplyStash
+            | Self::PopStash
+            | Self::DropStash
+            | Self::ViewStash
+            | Self::DeleteTag
+            | Self::DeleteRemoteTag => None,
             Self::DeleteBranch => Some(Action::DeleteBranch {
                 name: name.to_owned(),
                 force: false,
@@ -94,6 +109,8 @@ pub enum RepoAction {
     },
     ApplyLatestStash,
     PopLatestStash,
+    /// Deletes every stash (`git stash clear`).
+    DropAllStashes,
 }
 
 impl RepoAction {
@@ -145,6 +162,7 @@ impl RepoAction {
             Self::PushTags { remote } => vec![network(strings(&["push", "--tags", "--", remote]))],
             Self::ApplyLatestStash => vec![write(strings(&["stash", "apply"]))],
             Self::PopLatestStash => vec![write(strings(&["stash", "pop"]))],
+            Self::DropAllStashes => vec![write(strings(&["stash", "clear"]))],
         };
         Plan::Git(commands)
     }
@@ -153,12 +171,19 @@ impl RepoAction {
     pub fn is_destructive(&self) -> bool {
         matches!(
             self,
-            Self::RemoveRemote { .. } | Self::DeleteRemoteBranch { .. }
+            Self::RemoveRemote { .. } | Self::DeleteRemoteBranch { .. } | Self::DropAllStashes
         )
     }
 
     #[must_use]
     pub fn confirmation(&self) -> Option<Confirmation> {
+        if let Self::DropAllStashes = self {
+            return Some(Confirmation::new(
+                "Drop All Stashes",
+                "Drop EVERY stash? Their changes are deleted (git stash clear).".to_owned(),
+                "Drop All",
+            ));
+        }
         if let Self::DeleteRemoteBranch { remote, branch } = self {
             return Some(Confirmation::new(
                 "Delete Remote Branch",
