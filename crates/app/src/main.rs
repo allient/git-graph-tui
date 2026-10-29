@@ -3,6 +3,7 @@
 mod browser;
 mod cli;
 mod clipboard;
+mod config;
 mod git;
 mod panels;
 mod state;
@@ -28,15 +29,44 @@ const INPUT_POLL: Duration = Duration::from_millis(50);
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let icons = cli.icons(&|name| std::env::var(name).ok())?;
+    let env = |name: &str| std::env::var(name).ok();
+    let config_path = config::path(&env);
+    let config = match &config_path {
+        Some(path) => config::load(path)?,
+        None => config::Config::default(),
+    };
+    let icons = cli.icons(&env, config.icons)?;
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    ratatui::run(|terminal| run(terminal, repo, icons))
+    let layout = ratatui::run(|terminal| run(terminal, repo, icons, config.layout))?;
+    // Remember resized panes and columns for next time.
+    if let Some(path) = config_path.filter(|_| layout != config.layout) {
+        save_layout(&path, layout);
+    }
+    Ok(())
 }
 
-fn run(terminal: &mut DefaultTerminal, repo: PathBuf, icons: Icons) -> Result<()> {
+/// Saves the layout after the terminal is restored. A failure doesn't fail
+/// the run: it is only reported.
+#[expect(
+    clippy::print_stderr,
+    reason = "the terminal is restored and the app is exiting; stderr is all that is left"
+)]
+fn save_layout(path: &std::path::Path, layout: config::Layout) {
+    if let Err(err) = config::save_layout(path, layout) {
+        eprintln!("tui-git-graph: could not save the layout: {err:#}");
+    }
+}
+
+/// Runs the app until it quits and returns the final pane and column widths.
+fn run(
+    terminal: &mut DefaultTerminal,
+    repo: PathBuf,
+    icons: Icons,
+    layout: config::Layout,
+) -> Result<config::Layout> {
     let _mouse = MouseCapture::enable()?;
     let (runner, results) = Runner::new(ProcessExecutor::new());
     let theme = Theme {
@@ -44,6 +74,7 @@ fn run(terminal: &mut DefaultTerminal, repo: PathBuf, icons: Icons) -> Result<()
         ..Theme::default()
     };
     let mut state = AppState::new(repo);
+    state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
 
     loop {
@@ -51,7 +82,7 @@ fn run(terminal: &mut DefaultTerminal, repo: PathBuf, icons: Icons) -> Result<()
             view::draw(frame, &mut state, &theme);
         })?;
         if state.should_quit {
-            return Ok(());
+            return Ok(state.layout());
         }
         if event::poll(INPUT_POLL)? {
             match event::read()? {

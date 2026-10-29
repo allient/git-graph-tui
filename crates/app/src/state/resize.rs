@@ -4,6 +4,8 @@
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use tgg_ui::{ColumnDivider, ColumnWidths};
 
+use crate::config::Layout;
+
 use super::{AppState, Command};
 
 /// A divider being dragged with the left button.
@@ -59,5 +61,33 @@ impl AppState {
             _ => return None,
         }
         Some(Vec::new())
+    }
+}
+
+impl AppState {
+    /// Uses the widths saved in the config file.
+    pub fn apply_layout(&mut self, layout: Layout) {
+        let default = ColumnWidths::default();
+        self.source_control.width = layout.source_control_width;
+        self.columns = ColumnWidths {
+            graph: layout.graph_column,
+            date: layout.date_column.unwrap_or(default.date),
+            author: layout.author_column.unwrap_or(default.author),
+            hash: layout.hash_column.unwrap_or(default.hash),
+        };
+    }
+
+    /// The current widths, for saving; default widths are left out.
+    #[must_use]
+    pub fn layout(&self) -> Layout {
+        let default = ColumnWidths::default();
+        let changed = |value: u16, default: u16| (value != default).then_some(value);
+        Layout {
+            source_control_width: self.source_control.width,
+            graph_column: self.columns.graph,
+            date_column: changed(self.columns.date, default.date),
+            author_column: changed(self.columns.author, default.author),
+            hash_column: changed(self.columns.hash, default.hash),
+        }
     }
 }
