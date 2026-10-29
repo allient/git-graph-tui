@@ -102,6 +102,11 @@ impl AppState {
                 self.open_repo_menu(anchor);
                 return Vec::new();
             }
+            SourceControlOutcome::OpenDiff(file) => return self.open_working_diff(&file),
+            SourceControlOutcome::OpenChanges { staged, files } => {
+                return self.open_section_diff(staged, files);
+            }
+            SourceControlOutcome::OpenFile(file) => return self.open_in_editor(&file),
             SourceControlOutcome::Discard { paths, untracked } => {
                 ("Discard", WorkingTreeAction::Discard { paths, untracked })
             }

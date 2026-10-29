@@ -8,6 +8,6 @@ expression: "graph.join(\"\\n\")"
                               │    ┇
            ✓ Commit           │  ●     feature/login  Add login                                       82f432c
                               │  ┃
-▾ Changes               ↶ + 1 │  ●     develop  Return a value                                        6681ca2
-  notes.txt             ↶ + U │  ┃
+▾ Changes             ⧉ ↶ + 1 │  ●     develop  Return a value                                        6681ca2
+  notes.txt           ↗ ↶ + U │  ┃
                               │  ┃╭●   main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f

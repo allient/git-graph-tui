@@ -33,6 +33,31 @@ pub enum SourceControlOutcome {
     Refresh,
     /// Open the repository menu ("..."), anchored below the header button.
     More(Position),
+    /// Show one file's diff (Enter, or a click on its row).
+    OpenDiff(PaneFile),
+    /// Show the diffs of every file of a section, one after the other
+    /// ("Open Changes": `o`, or the header's button).
+    OpenChanges {
+        staged: bool,
+        files: Vec<PaneFile>,
+    },
+    /// Open a file in the editor ("Open File": `e`, or the row's button).
+    OpenFile(PaneFile),
+}
+
+/// A file as listed in one section of the pane.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaneFile {
+    pub path: String,
+    /// Path before a rename.
+    pub orig_path: Option<String>,
+    /// What changed, in the section the file is listed in.
+    pub change: Change,
+    /// Listed under "Staged Changes" (the index against HEAD), not under
+    /// "Changes" (the working tree against the index).
+    pub staged: bool,
+    /// The file exists in the working tree (it wasn't deleted).
+    pub on_disk: bool,
 }
 
 /// Where the keyboard is inside the pane.
@@ -69,6 +94,10 @@ enum Hit {
     Toggle(usize),
     /// The discard button of an item.
     Discard(usize),
+    /// The "Open Changes" button of a section header.
+    OpenChanges(usize),
+    /// The "Open File" button of a file row.
+    OpenFile(usize),
 }
 
 /// The pane's regions from the last frame.
@@ -212,7 +241,10 @@ impl SourceControl {
                     }
                     Key::Home => self.selected = 0,
                     Key::End => self.selected = last,
-                    Key::Enter | Key::Char(' ') => return self.toggle(self.selected),
+                    Key::Enter => return self.open(self.selected),
+                    Key::Char(' ') => return self.toggle(self.selected),
+                    Key::Char('o') => return self.open_changes(self.selected),
+                    Key::Char('e') => return self.open_file(self.selected),
                     Key::Char('+' | 's') => return self.only(self.selected, true),
                     Key::Char('-' | 'u') => return self.only(self.selected, false),
                     Key::Char('d') | Key::Delete => return self.discard(self.selected),
@@ -241,7 +273,24 @@ impl SourceControl {
                 self.focus = Focus::Commit;
                 return self.commit();
             }
-            Some(Hit::Row(item)) => self.select(item),
+            Some(Hit::Row(item)) => {
+                self.select(item);
+                // A file row opens its diff, a header only takes the selection.
+                if matches!(
+                    self.items().get(item),
+                    Some(Item::Staged(_) | Item::Unstaged(_))
+                ) {
+                    return self.open(item);
+                }
+            }
+            Some(Hit::OpenChanges(item)) => {
+                self.select(item);
+                return self.open_changes(item);
+            }
+            Some(Hit::OpenFile(item)) => {
+                self.select(item);
+                return self.open_file(item);
+            }
             Some(Hit::Toggle(item)) => {
                 self.select(item);
                 return self.toggle(item);
@@ -287,6 +336,59 @@ impl SourceControl {
         }
         self.message.set_cursor(cursor);
         true
+    }
+
+    /// The file an item lists, as its section sees it; None for headers.
+    fn pane_file(&self, item: usize) -> Option<PaneFile> {
+        let (i, staged) = match self.items().get(item)? {
+            Item::Staged(i) => (*i, true),
+            Item::Unstaged(i) => (*i, false),
+            _ => return None,
+        };
+        let file = &self.changes[i];
+        let change = if staged { file.staged } else { file.unstaged }?;
+        let deleted = file.unstaged == Some(Change::Deleted)
+            || (file.staged == Some(Change::Deleted) && file.unstaged.is_none());
+        Some(PaneFile {
+            path: file.path.clone(),
+            orig_path: file.orig_path.clone(),
+            change,
+            staged,
+            on_disk: !deleted,
+        })
+    }
+
+    /// Enter: a file's diff, or a header's whole section.
+    fn open(&self, item: usize) -> SourceControlOutcome {
+        match self.pane_file(item) {
+            Some(file) => SourceControlOutcome::OpenDiff(file),
+            None => self.open_changes(item),
+        }
+    }
+
+    /// The diffs of the section an item (a header or a file) is in.
+    fn open_changes(&self, item: usize) -> SourceControlOutcome {
+        let items = self.items();
+        let staged = match items.get(item) {
+            Some(Item::StagedHeader | Item::Staged(_)) => true,
+            Some(Item::ChangesHeader | Item::Unstaged(_)) => false,
+            Some(Item::Gap) | None => return SourceControlOutcome::Stay,
+        };
+        let files = (0..items.len())
+            .filter(|&i| match items[i] {
+                Item::Staged(_) => staged,
+                Item::Unstaged(_) => !staged,
+                _ => false,
+            })
+            .filter_map(|i| self.pane_file(i))
+            .collect();
+        SourceControlOutcome::OpenChanges { staged, files }
+    }
+
+    /// A file row's file, to open in the editor.
+    fn open_file(&self, item: usize) -> SourceControlOutcome {
+        self.pane_file(item)
+            .map_or(SourceControlOutcome::Stay, SourceControlOutcome::OpenFile)
     }
 
     /// Stages an unstaged item, unstages a staged one.
@@ -559,14 +661,8 @@ impl SourceControl {
                     usize::from(area.width),
                     text.add_modifier(Modifier::BOLD),
                 );
-                let buttons = if staged {
-                    vec![(Glyph::Remove, Hit::Toggle(index))]
-                } else {
-                    vec![
-                        (Glyph::Discard, Hit::Discard(index)),
-                        (Glyph::Add, Hit::Toggle(index)),
-                    ]
-                };
+                let mut buttons = vec![(Glyph::OpenChanges, Hit::OpenChanges(index))];
+                buttons.extend(stage_buttons(staged, index));
                 (None, (count.to_string(), muted), buttons)
             }
             Item::Staged(i) | Item::Unstaged(i) => {
@@ -581,19 +677,15 @@ impl SourceControl {
                     || (String::new(), muted),
                     |c| (c.letter().to_string(), Style::new().fg(theme.change(c))),
                 );
-                let buttons = if staged {
-                    vec![(Glyph::Remove, Hit::Toggle(index))]
-                } else {
-                    vec![
-                        (Glyph::Discard, Hit::Discard(index)),
-                        (Glyph::Add, Hit::Toggle(index)),
-                    ]
-                };
+                let mut buttons = vec![(Glyph::OpenFile, Hit::OpenFile(index))];
+                buttons.extend(stage_buttons(staged, index));
                 (Some((name, dir)), letter, buttons)
             }
         };
 
-        // Lay the right side out from the right edge, one blank column in.
+        // Lay the right side out from the right edge, one blank column in;
+        // a blank cell follows every button, room for a Nerd Font icon
+        // drawn wider than its cell.
         let tail_width = u16::try_from(unicode_width::UnicodeWidthStr::width(tail.0.as_str()))
             .unwrap_or(1)
             .max(1);
@@ -618,6 +710,18 @@ impl SourceControl {
                 buf.set_stringn(cx + 1, area.y, dir, room - used - 1, muted);
             }
         }
+    }
+}
+
+/// The `−` of a staged row, or the `↶ +` of an unstaged one.
+fn stage_buttons(staged: bool, index: usize) -> Vec<(Glyph, Hit)> {
+    if staged {
+        vec![(Glyph::Remove, Hit::Toggle(index))]
+    } else {
+        vec![
+            (Glyph::Discard, Hit::Discard(index)),
+            (Glyph::Add, Hit::Toggle(index)),
+        ]
     }
 }
 

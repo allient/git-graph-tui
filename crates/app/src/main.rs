@@ -39,13 +39,16 @@ fn main() -> Result<()> {
     };
     let icons = cli.icons(&env, config.icons)?;
     let pager = external::pager(&env, config.diff.pager);
+    let editor = external::editor(&env);
     let issues = config.issues;
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    let (before, after) =
-        ratatui::run(|terminal| run(terminal, repo, icons, config.layout, pager, issues))?;
+    let (before, after) = ratatui::run(|terminal| {
+        let programs = Programs { pager, editor };
+        run(terminal, repo, icons, config.layout, programs, issues)
+    })?;
     // Remember resized panes and columns for next time.
     if let Some(path) = config_path.filter(|_| after != before) {
         save_layout(&path, after);
@@ -65,6 +68,14 @@ fn save_layout(path: &std::path::Path, layout: config::Layout) {
     }
 }
 
+/// The programs the app hands the terminal to.
+struct Programs {
+    /// Diff pager (S12); None uses the built-in diff view.
+    pager: Option<String>,
+    /// Editor for "Open File" in the Source Control pane.
+    editor: String,
+}
+
 /// Runs the app until it quits. Returns the pane and column widths it started
 /// with and those it ended with.
 fn run(
@@ -72,7 +83,7 @@ fn run(
     repo: PathBuf,
     icons: Icons,
     layout: config::Layout,
-    pager: Option<String>,
+    programs: Programs,
     issues: config::Issues,
 ) -> Result<(config::Layout, config::Layout)> {
     let _mouse = MouseCapture::enable()?;
@@ -82,7 +93,8 @@ fn run(
         ..Theme::default()
     };
     let mut state = AppState::new(repo);
-    state.pager = pager;
+    state.pager = programs.pager;
+    state.editor = programs.editor;
     state.issues = issues;
     let before = state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
@@ -107,6 +119,10 @@ fn run(
         for program in external {
             if let Some(message) = hand_over(terminal, &program)? {
                 state.message = Some(message);
+            }
+            // An editor may have changed files: show them as they are now.
+            if program.refresh {
+                dispatch(&mut state, &runner, Event::Refresh);
             }
         }
         while let Ok(result) = results.try_recv() {

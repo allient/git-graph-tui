@@ -48,6 +48,10 @@ pub enum Glyph {
     Folder,
     /// A file row of a file tree.
     File,
+    /// Opens the diffs of a whole Source Control section ("Open Changes").
+    OpenChanges,
+    /// Opens a changed file in the editor ("Open File").
+    OpenFile,
 }
 
 impl Icons {
@@ -63,6 +67,8 @@ impl Icons {
             (Self::Unicode, Glyph::Remove) => '−',
             (Self::Unicode, Glyph::Folder) => '▾',
             (Self::Unicode, Glyph::File) => '·',
+            (Self::Unicode, Glyph::OpenChanges) => '⧉',
+            (Self::Unicode, Glyph::OpenFile) => '↗',
             (Self::Nerd, Glyph::Check) => '\u{eab2}',
             (Self::Nerd, Glyph::Refresh) => '\u{eb37}',
             (Self::Nerd, Glyph::More) => '\u{ea7c}',
@@ -72,6 +78,22 @@ impl Icons {
             // cod-folder, cod-file
             (Self::Nerd, Glyph::Folder) => '\u{ea83}',
             (Self::Nerd, Glyph::File) => '\u{ea7b}',
+            // cod-diff_multiple and cod-go_to_file, as in VS Code.
+            (Self::Nerd, Glyph::OpenChanges) => '\u{ec23}',
+            (Self::Nerd, Glyph::OpenFile) => '\u{ea94}',
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_changes_and_open_file_have_both_styles() {
+        assert_eq!(Icons::Unicode.glyph(Glyph::OpenChanges), '⧉');
+        assert_eq!(Icons::Unicode.glyph(Glyph::OpenFile), '↗');
+        assert_eq!(Icons::Nerd.glyph(Glyph::OpenChanges), '\u{ec23}');
+        assert_eq!(Icons::Nerd.glyph(Glyph::OpenFile), '\u{ea94}');
     }
 }
