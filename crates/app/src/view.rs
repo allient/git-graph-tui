@@ -199,6 +199,7 @@ fn draw_find(frame: &mut Frame<'_>, area: Rect, find: &Find, theme: &Theme) {
     let label = " Find: ";
     let count = match (find.query.text().is_empty(), find.matches.len()) {
         (true, _) => String::new(),
+        _ if find.searching.is_some() => "Searching older history…".to_owned(),
         (false, 0) => "No matches".to_owned(),
         (false, n) => format!("{} of {n}", find.current + 1),
     };

@@ -9,7 +9,7 @@ use tgg_ui::{
 };
 
 use super::compare::Comparison;
-use super::{AppState, Command, Job, Request, SCROLL_LINES, actions::widget_key};
+use super::{AppState, Command, Request, SCROLL_LINES, actions::widget_key};
 use crate::external;
 
 /// The details of one commit, filled in as its two reads arrive; or a
@@ -238,15 +238,7 @@ impl AppState {
             return Some(Vec::new());
         }
         self.message = Some(format!("Loading older commits to find {}…", id.short(8)));
-        let loading_log = self
-            .pending
-            .values()
-            .any(|(job, _)| matches!(job, Job::Read(Request::Log { .. })));
-        Some(if loading_log {
-            Vec::new()
-        } else {
-            self.log_request(self.commits.len()).into_iter().collect()
-        })
+        Some(self.next_log_page())
     }
 
     /// Applies a details read. Results for a panel that has since closed or
