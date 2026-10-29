@@ -17,6 +17,10 @@ categories = ["command-line-utilities", "development-tools"]
 name = "tui-git-graph"
 path = "src/main.rs"
 
+# Not published to crates.io (`publish = false`), but released as binaries.
+[package.metadata.dist]
+dist = true
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
