@@ -4,7 +4,7 @@ use tgg_model::{HeadState, Oid, Stash};
 use super::*;
 use crate::{
     Action, CommitScope, CommitTarget, GraphColumn, Operation, OperationAction, PickPurpose,
-    PullMode, RepoAction, ResetMode, Rev, StashAction, TagAction, UiEffect, WorkingTreeAction,
+    RepoAction, ResetMode, Rev, StashAction, TagAction, UiEffect, WorkingTreeAction,
     WorktreeAction,
 };
 use tgg_git::worktree::Worktree;
@@ -714,13 +714,14 @@ fn repository_menu_matches_the_vs_code_order() {
     assert_eq!(
         labels(&menu),
         [
-            "Pull...",
-            "Push...",
+            "Pull",
+            "Push",
             "Checkout to...",
             "Fetch",
             "---",
             "Commit ▸",
             "Changes ▸",
+            "Pull, Push ▸",
             "Branch ▸",
             "Remote ▸",
             "Stash ▸",
@@ -824,6 +825,66 @@ fn commit_and_changes_submenus_match_vs_code() {
 }
 
 #[test]
+fn pull_push_submenu_matches_vs_code() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    let sub = submenu(&menu, "Pull, Push");
+    assert_eq!(
+        labels(sub),
+        [
+            "Sync",
+            "---",
+            "Pull",
+            "Pull (Rebase)",
+            "Pull from...",
+            "---",
+            "Push",
+            "Push to...",
+            "---",
+            "Fetch",
+            "Fetch (Prune)",
+            "Fetch From All Remotes",
+        ]
+    );
+    assert_eq!(action(sub, "Sync"), &Action::Repo(RepoAction::Sync));
+    assert_eq!(
+        action(sub, "Pull (Rebase)"),
+        &Action::Repo(RepoAction::PullUpstream { rebase: true })
+    );
+    assert_eq!(
+        action(sub, "Pull from..."),
+        &Action::Repo(RepoAction::PullFrom {
+            remote: "origin".into(),
+            branch: "main".into(),
+        })
+    );
+    assert_eq!(
+        action(sub, "Push to..."),
+        &Action::PushBranch {
+            branch: "main".into(),
+            remote: "origin".into(),
+            set_upstream: true,
+            force_with_lease: false
+        }
+    );
+    assert_eq!(
+        action(sub, "Fetch (Prune)"),
+        &Action::Repo(RepoAction::FetchDefault { prune: true })
+    );
+    assert_eq!(
+        action(sub, "Fetch From All Remotes"),
+        &Action::Repo(RepoAction::Fetch { prune: false })
+    );
+
+    // Without a remote there is nothing to pull, push or fetch.
+    let local = MenuContext {
+        remotes: Vec::new(),
+        ..ctx()
+    };
+    let names = labels(&menu_for(&Target::Repository, &local));
+    assert!(!names.iter().any(|l| l.starts_with("Pull")), "{names:?}");
+}
+
+#[test]
 fn abort_rebase_and_undo_depend_on_the_repository_state() {
     let rebasing = MenuContext {
         operation: Some(Operation::Rebase),
@@ -850,20 +911,13 @@ fn abort_rebase_and_undo_depend_on_the_repository_state() {
 fn repository_actions_are_prefilled() {
     let menu = menu_for(&Target::Repository, &ctx());
     assert_eq!(
-        action(&menu, "Pull..."),
-        &Action::Repo(RepoAction::Pull {
-            branch: "main".into(),
-            mode: PullMode::FastForwardOnly
-        })
+        action(&menu, "Pull"),
+        &Action::Repo(RepoAction::PullUpstream { rebase: false })
     );
+    assert_eq!(action(&menu, "Push"), &Action::Repo(RepoAction::Push));
     assert_eq!(
-        action(&menu, "Push..."),
-        &Action::PushBranch {
-            branch: "main".into(),
-            remote: "origin".into(),
-            set_upstream: true,
-            force_with_lease: false
-        }
+        action(&menu, "Fetch"),
+        &Action::Repo(RepoAction::FetchDefault { prune: false })
     );
     assert_eq!(
         action(&menu, "Checkout to..."),

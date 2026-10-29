@@ -571,7 +571,9 @@ impl Action {
                         | StashAction::CreateBranch { .. }
                 )
                 | Self::Repo(
-                    RepoAction::Pull { .. }
+                    RepoAction::Sync
+                        | RepoAction::PullUpstream { .. }
+                        | RepoAction::PullFrom { .. }
                         | RepoAction::ApplyLatestStash
                         | RepoAction::PopLatestStash
                 )

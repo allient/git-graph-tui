@@ -28,7 +28,7 @@ pub use working_tree::{CommitScope, WorkingTreeAction};
 mod worktree;
 pub use worktree::WorktreeAction;
 mod repo;
-pub use repo::{PickPurpose, PullMode, RepoAction};
+pub use repo::{PickPurpose, RepoAction};
 mod operation;
 pub use operation::{Operation, OperationAction};
 mod rebase;

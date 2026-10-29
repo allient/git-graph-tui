@@ -30,44 +30,6 @@ fn write(argv: &[&str]) -> (CommandKind, Vec<String>) {
     )
 }
 
-fn pull(mode: PullMode) -> RepoAction {
-    RepoAction::Pull {
-        branch: "main".into(),
-        mode,
-    }
-}
-
-#[test]
-fn pull_is_fast_forward_only_by_default() {
-    assert_eq!(PullMode::default(), PullMode::FastForwardOnly);
-    assert_eq!(
-        commands(&pull(PullMode::FastForwardOnly)),
-        [network(&["pull", "--ff-only"])]
-    );
-    assert_eq!(
-        commands(&pull(PullMode::Rebase)),
-        [network(&["pull", "--rebase"])]
-    );
-    assert_eq!(
-        commands(&pull(PullMode::Merge)),
-        [network(&["pull", "--no-rebase"])]
-    );
-}
-
-#[test]
-fn pull_mode_is_a_choice() {
-    let mut action = pull(PullMode::FastForwardOnly);
-    assert_eq!(action.inputs()[0].id, InputId::Mode);
-    action
-        .set_input(InputId::Mode, InputValue::Text("rebase".into()))
-        .unwrap();
-    assert_eq!(action, pull(PullMode::Rebase));
-    assert_eq!(
-        action.set_input(InputId::Mode, InputValue::Text("squash".into())),
-        Err(InputError::NotAChoice("squash".into()))
-    );
-}
-
 #[test]
 fn fetch_and_prune_talk_to_every_remote() {
     assert_eq!(
@@ -160,7 +122,7 @@ fn tags_and_latest_stash() {
 #[test]
 fn only_remove_remote_needs_confirmation() {
     for action in [
-        pull(PullMode::Rebase),
+        RepoAction::PullUpstream { rebase: true },
         RepoAction::Fetch { prune: true },
         RepoAction::PushTags {
             remote: "origin".into(),
@@ -192,4 +154,59 @@ fn picked_names_become_actions() {
         None,
         "checkout depends on the ref kind, which the app knows"
     );
+}
+
+#[test]
+fn pull_push_and_fetch_follow_the_git_config_without_a_dialog() {
+    assert_eq!(
+        commands(&RepoAction::Sync),
+        [network(&["pull"]), network(&["push"])]
+    );
+    assert_eq!(
+        commands(&RepoAction::PullUpstream { rebase: false }),
+        [network(&["pull"])]
+    );
+    assert_eq!(
+        commands(&RepoAction::PullUpstream { rebase: true }),
+        [network(&["pull", "--rebase"])]
+    );
+    assert_eq!(commands(&RepoAction::Push), [network(&["push"])]);
+    assert_eq!(
+        commands(&RepoAction::FetchDefault { prune: false }),
+        [network(&["fetch"])]
+    );
+    assert_eq!(
+        commands(&RepoAction::FetchDefault { prune: true }),
+        [network(&["fetch", "--prune"])]
+    );
+    for action in [
+        RepoAction::Sync,
+        RepoAction::PullUpstream { rebase: true },
+        RepoAction::Push,
+        RepoAction::FetchDefault { prune: true },
+    ] {
+        assert!(action.inputs().is_empty(), "{action:?}");
+        assert!(action.confirmation().is_none(), "{action:?}");
+    }
+}
+
+#[test]
+fn pull_from_asks_for_the_remote_and_branch() {
+    let mut action = RepoAction::PullFrom {
+        remote: "origin".into(),
+        branch: "main".into(),
+    };
+    let ids: Vec<InputId> = action.inputs().iter().map(|i| i.id).collect();
+    assert_eq!(ids, [InputId::Remote, InputId::Name]);
+    action
+        .set_input(InputId::Name, InputValue::Text("develop".into()))
+        .unwrap();
+    assert_eq!(
+        commands(&action),
+        [network(&["pull", "--", "origin", "develop"])]
+    );
+    assert!(matches!(
+        action.set_input(InputId::Name, InputValue::Text("bad name".into())),
+        Err(InputError::InvalidName(_))
+    ));
 }
