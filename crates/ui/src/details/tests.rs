@@ -2,7 +2,7 @@ use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use tgg_git::show::{CommitDetails, FileChange, Numstat};
-use tgg_model::{Commit, Oid, Signature};
+use tgg_model::{Change, Commit, Oid, Signature};
 
 use super::*;
 use crate::{Key, Theme};
@@ -15,7 +15,7 @@ fn file(path: &str, added: u32, deleted: u32) -> FileChange {
     FileChange {
         path: path.into(),
         old_path: None,
-        status: tgg_model::Change::Modified,
+        status: Change::Modified,
         stat: Numstat::Lines { added, deleted },
     }
 }
@@ -93,7 +93,7 @@ fn file_labels_show_counts_renames_and_binaries() {
     let renamed = FileChange {
         path: "src/new.rs".into(),
         old_path: Some("src/old.rs".into()),
-        status: tgg_model::Change::Renamed,
+        status: Change::Renamed,
         stat: Numstat::Lines {
             added: 1,
             deleted: 2,
@@ -102,7 +102,7 @@ fn file_labels_show_counts_renames_and_binaries() {
     let moved = FileChange {
         path: "lib/new.rs".into(),
         old_path: Some("src/old.rs".into()),
-        status: tgg_model::Change::Renamed,
+        status: Change::Renamed,
         stat: Numstat::Binary,
     };
     assert_eq!(
@@ -244,9 +244,9 @@ fn a_comparison_lists_its_files_across_the_whole_panel() {
         title.ends_with(" enter diff  t difftool  esc close"),
         "{title:?}"
     );
-    assert_eq!(line(&buf, 1), " apps/");
+    assert_eq!(line(&buf, 1), " ▾ apps/");
     assert!(
-        line(&buf, 3).starts_with("     a.rs"),
+        line(&buf, 3).starts_with("     · a.rs"),
         "{:?}",
         line(&buf, 3)
     );
@@ -332,5 +332,126 @@ fn a_link_cut_off_by_the_panel_edge_is_not_clickable() {
             DetailsOutcome::Stay,
             "x={x}"
         );
+    }
+}
+
+// ---- Git Graph look ----
+
+fn render_with(view: &CommitDetailsView, area: Rect, theme: &Theme) -> Buffer {
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf, theme);
+    buf
+}
+
+/// The right half of a 100-column panel (the file tree), from `x = 51`.
+fn tree(buf: &Buffer, y: u16) -> String {
+    line(buf, y).chars().skip(51).collect()
+}
+
+#[test]
+fn field_labels_are_bold_and_values_are_plain() {
+    let (buf, _) = render(&view(), Rect::new(0, 0, 100, 12));
+    for label in ["Commit:", "Parents:", "Author:", "Committer:", "Date:"] {
+        let (x, y) = position(&buf, label);
+        for dx in 0..u16::try_from(label.len()).unwrap() {
+            let cell = &buf[(x + dx, y)];
+            assert!(cell.modifier.contains(Modifier::BOLD), "{label} x={dx}");
+        }
+    }
+    let (x, y) = position(&buf, "Ann <");
+    assert!(!buf[(x, y)].modifier.contains(Modifier::BOLD));
+    assert_eq!(buf[(x, y)].fg, Theme::default().text);
+}
+
+#[test]
+fn parent_hashes_and_emails_are_underlined_links() {
+    let theme = Theme::default();
+    let (buf, hits) = render(&view(), Rect::new(0, 0, 100, 12));
+    let parent = hits.parent(&oid('c')).unwrap();
+    for dx in 0..parent.width {
+        let cell = &buf[(parent.x + dx, parent.y)];
+        assert_eq!(cell.fg, theme.link, "x={dx}");
+        assert!(cell.modifier.contains(Modifier::UNDERLINED));
+    }
+    for email in ["ann@x.io", "com@x.io"] {
+        let (x, y) = position(&buf, email);
+        for dx in 0..u16::try_from(email.len()).unwrap() {
+            let cell = &buf[(x + dx, y)];
+            assert_eq!(cell.fg, theme.link, "{email} x={dx}");
+            assert!(cell.modifier.contains(Modifier::UNDERLINED), "{email}");
+        }
+        let around = [&buf[(x - 1, y)], &buf[(x + 8, y)]];
+        assert!(
+            around
+                .iter()
+                .all(|c| !c.modifier.contains(Modifier::UNDERLINED)),
+            "only the address: {email}"
+        );
+    }
+    let (x, y) = position(&buf, "Ann <");
+    assert!(!buf[(x, y)].modifier.contains(Modifier::UNDERLINED));
+}
+
+#[test]
+fn folders_and_files_have_their_icons() {
+    let (buf, _) = render(&view(), Rect::new(0, 0, 100, 12));
+    assert!(tree(&buf, 1).starts_with(" ▾ apps/"), "{:?}", tree(&buf, 1));
+    assert!(
+        tree(&buf, 2).starts_with("   ▾ full-app/"),
+        "{:?}",
+        tree(&buf, 2)
+    );
+    assert!(
+        tree(&buf, 3).starts_with("     · a.rs"),
+        "{:?}",
+        tree(&buf, 3)
+    );
+
+    let nerd = Theme {
+        icons: crate::Icons::Nerd,
+        ..Theme::default()
+    };
+    let buf = render_with(&view(), Rect::new(0, 0, 100, 12), &nerd);
+    assert!(
+        tree(&buf, 1).starts_with(" \u{ea83} apps/"),
+        "{:?}",
+        tree(&buf, 1)
+    );
+    assert!(
+        tree(&buf, 3).starts_with("     \u{ea7b} a.rs"),
+        "{:?}",
+        tree(&buf, 3)
+    );
+}
+
+#[test]
+fn file_names_are_colored_by_what_the_commit_did() {
+    let theme = Theme::default();
+    let with = |path: &str, status| FileChange {
+        status,
+        ..file(path, 1, 0)
+    };
+    let files = vec![
+        with("added.rs", Change::Added),
+        with("deleted.rs", Change::Deleted),
+        with("modified.rs", Change::Modified),
+        FileChange {
+            old_path: Some("old.rs".into()),
+            ..with("renamed.rs", Change::Renamed)
+        },
+    ];
+    let view = CommitDetailsView::comparison("Comparing a..b".into(), files);
+    let (buf, _) = render(&view, Rect::new(0, 0, 80, 6));
+    let counts = position(&buf, "(+1 -0)").0;
+    for (name, color) in [
+        ("added.rs", theme.added),
+        ("deleted.rs", theme.deleted),
+        ("modified.rs", theme.modified),
+        ("old.rs → renamed.rs", theme.renamed),
+    ] {
+        let (x, y) = position(&buf, name);
+        assert_eq!(buf[(x, y)].fg, color, "{name}");
+        assert_eq!(buf[(x + 3, y)].fg, color, "{name}");
+        assert_eq!(buf[(counts, y)].fg, theme.text, "counts stay plain: {name}");
     }
 }

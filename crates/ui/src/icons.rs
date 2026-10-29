@@ -34,7 +34,8 @@ impl Icons {
     }
 }
 
-/// A small icon button in the Source Control pane.
+/// A small icon: a button in the Source Control pane, or a row of the
+/// details panel's file tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Glyph {
     Check,
@@ -43,6 +44,10 @@ pub enum Glyph {
     Discard,
     Add,
     Remove,
+    /// A folder row of a file tree.
+    Folder,
+    /// A file row of a file tree.
+    File,
 }
 
 impl Icons {
@@ -56,12 +61,17 @@ impl Icons {
             (Self::Unicode, Glyph::Discard) => '↶',
             (Self::Unicode, Glyph::Add) => '+',
             (Self::Unicode, Glyph::Remove) => '−',
+            (Self::Unicode, Glyph::Folder) => '▾',
+            (Self::Unicode, Glyph::File) => '·',
             (Self::Nerd, Glyph::Check) => '\u{eab2}',
             (Self::Nerd, Glyph::Refresh) => '\u{eb37}',
             (Self::Nerd, Glyph::More) => '\u{ea7c}',
             (Self::Nerd, Glyph::Discard) => '\u{eae2}',
             (Self::Nerd, Glyph::Add) => '\u{ea60}',
             (Self::Nerd, Glyph::Remove) => '\u{eb3b}',
+            // cod-folder, cod-file
+            (Self::Nerd, Glyph::Folder) => '\u{ea83}',
+            (Self::Nerd, Glyph::File) => '\u{ea7b}',
         }
     }
 }
