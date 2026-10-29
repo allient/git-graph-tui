@@ -389,9 +389,11 @@ fn a_commit_made_after_the_panel_opened_is_never_dropped_silently() {
     // Git stops before replaying anything (rebase.missingCommitsCheck).
     assert_eq!(
         message(&h),
-        "Interactive Rebase failed: Warning: some commits may have been dropped accidentally."
+        "The branch changed after the rebase panel opened, so nothing was rewritten. \
+         Abort the rebase (A) and open the panel again."
     );
     assert_eq!(h.state.operation, Some(Operation::Rebase));
+    find(&h, "Rebase in progress");
     press(&mut h, KeyCode::Char('A'));
     press(&mut h, KeyCode::Left);
     press(&mut h, KeyCode::Enter);

@@ -9,6 +9,9 @@ pub enum Failure {
     AuthenticationFailed,
     AlreadyExists,
     NotFullyMerged,
+    /// A rebase todo list leaves out commits and `missingCommitsCheck=error`
+    /// stopped the rebase before it replayed anything.
+    CommitsMissingFromTodo,
     /// Anything else: the first `fatal:` / `error:` line (or first non-hint line).
     Other(String),
 }
@@ -22,6 +25,8 @@ impl Failure {
             Self::NotARepository
         } else if has("would be overwritten by") {
             Self::LocalChangesWouldBeOverwritten
+        } else if has("some commits may have been dropped accidentally") {
+            Self::CommitsMissingFromTodo
         } else if has("CONFLICT (") || has("fix conflicts and then commit") {
             Self::Conflict
         } else if has("non-fast-forward") || has("[rejected]") {
@@ -59,6 +64,11 @@ impl Failure {
             Self::AlreadyExists => "A ref with that name already exists.".into(),
             Self::NotFullyMerged => {
                 "The branch is not fully merged. Delete it anyway with force delete.".into()
+            }
+            Self::CommitsMissingFromTodo => {
+                "The rebase todo list leaves out commits, so git stopped before rewriting \
+                 anything. Abort the rebase and try again."
+                    .into()
             }
             Self::Other(line) => line.clone(),
         }
@@ -113,6 +123,10 @@ mod tests {
             (
                 "error: The branch 'dev' is not fully merged.",
                 Failure::NotFullyMerged,
+            ),
+            (
+                "Warning: some commits may have been dropped accidentally.\nDropped commits (newer to older):\n - 1a2b3c4 Add echo\nTo avoid this message, use \"drop\" to explicitly remove a commit.\n",
+                Failure::CommitsMissingFromTodo,
             ),
         ];
         for (stderr, expected) in cases {
