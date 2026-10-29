@@ -193,3 +193,18 @@ fn pathspec_characters_in_names_are_literal() {
     let diff = show::parse_diff(&run(&repo, show::diff_args(&head, &star)));
     assert_eq!(diff.added(), 1, "only star*.txt, not starry.txt");
 }
+
+#[test]
+fn file_at_a_revision_is_its_content_then() {
+    let repo = FixtureRepo::new();
+    let first = Oid::parse(&repo.commit_file("src/a b.txt", "one\ntwo\n", "Base")).unwrap();
+    repo.commit_file("src/a b.txt", "changed\n", "Change");
+    assert_eq!(
+        show::file_at_args(&first, "src/a b.txt"),
+        ["show".to_owned(), format!("{first}:src/a b.txt")]
+    );
+    assert_eq!(
+        run(&repo, show::file_at_args(&first, "src/a b.txt")),
+        "one\ntwo\n"
+    );
+}

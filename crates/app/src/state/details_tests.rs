@@ -155,3 +155,44 @@ fn enter_on_the_uncommitted_row_does_nothing() {
     press(&mut h, KeyCode::Enter);
     assert!(h.state.details.is_none());
 }
+
+#[test]
+fn v_shows_the_selected_file_as_it_was_in_that_commit() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    select(&mut h, "Add lib");
+    press(&mut h, KeyCode::Enter);
+    assert!(h.find_on_screen("v view file").is_some(), "key hint");
+    press(&mut h, KeyCode::Char('v'));
+
+    let short = &hash(&repo, "Add lib")[..7];
+    assert!(h.state.diff.is_some());
+    assert!(h.find_on_screen(&format!("src/lib.rs @ {short}")).is_some());
+    // The content then, not the later "Return a value" version, numbered from 1.
+    assert!(h.find_on_screen("1 │ pub fn lib() {}").is_some());
+    assert!(h.find_on_screen("pub fn lib() -> u8").is_none());
+    assert_eq!(h.state.message, None);
+
+    press(&mut h, KeyCode::Esc);
+    assert!(h.state.diff.is_none());
+    assert!(h.find_on_screen("Changed files (1)").is_some());
+}
+
+#[test]
+fn v_on_a_file_the_commit_deleted_shows_the_git_error() {
+    let repo = FixtureRepo::new();
+    repo.commit_file("gone.txt", "bye\n", "Add gone");
+    repo.git(&["rm", "--quiet", "--", "gone.txt"]);
+    repo.git(&["commit", "--quiet", "--message", "Remove gone"]);
+    let mut h = open(&repo);
+    select(&mut h, "Remove gone");
+    press(&mut h, KeyCode::Enter);
+    press(&mut h, KeyCode::Char('v'));
+
+    assert!(h.state.diff.is_none());
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.contains("gone.txt"), "{message}");
+    assert!(message.contains("git show"), "{message}");
+    // The details stay open.
+    assert!(h.find_on_screen("Changed files (1)").is_some());
+}

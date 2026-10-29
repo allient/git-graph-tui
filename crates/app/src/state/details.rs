@@ -80,6 +80,7 @@ impl AppState {
         let key = match key.code {
             KeyCode::Char('j') => Key::Down,
             KeyCode::Char('k') => Key::Up,
+            KeyCode::Char('v') => Key::Char('v'),
             KeyCode::Up
             | KeyCode::Down
             | KeyCode::Home
@@ -123,6 +124,10 @@ impl AppState {
             }
             DetailsOutcome::OpenFile(file) => match &self.details {
                 Some(d) => vec![Command::Git(Request::Diff(d.commit.clone(), file))],
+                None => Vec::new(),
+            },
+            DetailsOutcome::ViewFile(file) => match &self.details {
+                Some(d) => vec![Command::Git(Request::FileAt(d.commit.clone(), file.path))],
                 None => Vec::new(),
             },
             DetailsOutcome::JumpTo(id) => {
@@ -179,6 +184,13 @@ impl AppState {
             Request::Diff(id, file) if id == details.commit => {
                 self.diff = Some(DiffPanel {
                     view: DiffView::new(&file, show::parse_diff(stdout)),
+                    hits: None,
+                });
+            }
+            Request::FileAt(id, path) if id == details.commit => {
+                let title = format!("{path} @ {}", id.short(7));
+                self.diff = Some(DiffPanel {
+                    view: DiffView::text(title, stdout),
                     hits: None,
                 });
             }

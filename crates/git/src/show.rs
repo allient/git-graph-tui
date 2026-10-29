@@ -205,6 +205,14 @@ pub fn diff_args(commit: &Oid, file: &FileChange) -> Vec<String> {
     args
 }
 
+/// Arguments for the whole content of `path` as it was in `commit`
+/// (`git show <commit>:<path>`). `path` is relative to the repository root;
+/// git fails when the file doesn't exist in that commit (it deleted it).
+#[must_use]
+pub fn file_at_args(commit: &Oid, path: &str) -> Vec<String> {
+    vec!["show".into(), format!("{commit}:{path}")]
+}
+
 /// What a diff line is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineKind {

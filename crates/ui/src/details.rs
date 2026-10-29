@@ -14,6 +14,8 @@ use crate::{Key, Theme, fit, format_date};
 const PARENT_HASH: usize = 8;
 /// Width of the `Committer: ` label column.
 const LABEL: usize = 11;
+/// Keys for the selected file, beside the changed-files title.
+const KEY_HINTS: &str = "enter diff  v view file";
 
 /// A row of the changed-files tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +33,8 @@ pub enum DetailsOutcome {
     Stay,
     /// Show this file's diff (`show::diff_args`, then a [`crate::DiffView`]).
     OpenFile(FileChange),
+    /// Show this file's whole content at the commit (`show::file_at_args`).
+    ViewFile(FileChange),
     /// Select this parent commit in the graph (S10).
     JumpTo(Oid),
     /// Collapse the details panel.
@@ -133,7 +137,7 @@ impl CommitDetailsView {
     }
 
     /// Up/Down/Home/End/PageUp/PageDown move between files, Enter opens the
-    /// selected one, Esc closes the panel.
+    /// selected one's diff, `v` shows its content, Esc closes the panel.
     pub fn handle_key(&mut self, key: Key) -> DetailsOutcome {
         match key {
             Key::Down => self.step(true),
@@ -149,6 +153,11 @@ impl CommitDetailsView {
             Key::Enter => {
                 if let Some(file) = self.selected_file() {
                     return DetailsOutcome::OpenFile(file.clone());
+                }
+            }
+            Key::Char('v') => {
+                if let Some(file) = self.selected_file() {
+                    return DetailsOutcome::ViewFile(file.clone());
                 }
             }
             Key::Esc => return DetailsOutcome::Close,
@@ -282,12 +291,13 @@ impl CommitDetailsView {
     fn render_files(&self, area: Rect, buf: &mut Buffer, theme: &Theme, hits: &mut DetailsHitMap) {
         let width = usize::from(area.width.saturating_sub(1));
         let title = format!("Changed files ({})", self.files.len());
-        buf.set_string(
-            area.x + 1,
-            area.y,
-            fit(&title, width),
-            Style::default().fg(theme.muted),
-        );
+        let muted = Style::default().fg(theme.muted);
+        buf.set_string(area.x + 1, area.y, fit(&title, width), muted);
+        // Key hints at the right of the title row, when they fit.
+        if !self.files.is_empty() && title.width() + 2 + KEY_HINTS.width() <= width {
+            let x = area.right().saturating_sub(to_u16(KEY_HINTS.width()) + 1);
+            buf.set_string(x, area.y, KEY_HINTS, muted);
+        }
         let visible = usize::from(area.height.saturating_sub(1));
         // Scroll so the selected file stays visible.
         let offset = self

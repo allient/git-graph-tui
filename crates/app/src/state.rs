@@ -90,6 +90,8 @@ pub enum Request {
     Files(Oid),
     /// The diff of one file in a commit.
     Diff(Oid, FileChange),
+    /// A file's whole content as it was in a commit (`v` in the details).
+    FileAt(Oid, String),
     /// A tag's target and annotation, for its info dialog.
     Tag(String),
     /// A remote's URL, to open a pull request page for `branch`.
@@ -121,6 +123,7 @@ impl Request {
             Self::Details(id) => GitCommand::read(repo, show::details_args(id)),
             Self::Files(id) => GitCommand::read(repo, show::files_args(id)),
             Self::Diff(id, file) => GitCommand::read(repo, show::diff_args(id, file)),
+            Self::FileAt(id, path) => GitCommand::read(repo, show::file_at_args(id, path)),
             Self::Tag(name) => GitCommand::read(repo, tgg_git::tag::args(name)),
             Self::RemoteUrl { remote, .. } => {
                 GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
@@ -603,7 +606,13 @@ impl AppState {
             (Request::RemoteUrl { remote, branch }, Ok(out)) => {
                 self.on_remote_url(&remote, &branch, &out.stdout)
             }
-            (request @ (Request::Details(_) | Request::Files(_) | Request::Diff(..)), Ok(out)) => {
+            (
+                request @ (Request::Details(_)
+                | Request::Files(_)
+                | Request::Diff(..)
+                | Request::FileAt(..)),
+                Ok(out),
+            ) => {
                 self.on_details_read(request, &out.stdout);
                 Vec::new()
             }
