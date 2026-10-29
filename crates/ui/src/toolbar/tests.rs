@@ -45,14 +45,14 @@ fn full_layout_on_a_wide_terminal() {
     let (line, _) = render(&toolbar(), 100);
     assert_eq!(
         line,
-        " Branches: [main, develop ▾]  [x] Show Remote Branches                                [↻] [⇣] [...]"
+        "                       Branches: [main, develop ▾]  [x] Show Remote Branches          [⇣] [↻] [...]"
     );
 }
 
 #[test]
 fn compact_layout_on_a_narrow_terminal() {
     let (line, _) = render(&Toolbar::new(&[], false), 53);
-    assert_eq!(line, " [Show All ▾]  [ ] Remotes             [↻] [⇣] [...]");
+    assert_eq!(line, "            [Show All ▾]  [ ] Remotes  [⇣] [↻] [...]");
 }
 
 #[test]
@@ -125,8 +125,11 @@ fn keyboard_focus_moves_between_buttons_and_activates_them() {
     toolbar.handle_key(Key::Left, &hits);
     assert_eq!(toolbar.focus(), Some(ToolbarButton::RepoMenu));
     toolbar.handle_key(Key::BackTab, &hits);
-    assert_eq!(toolbar.focus(), Some(ToolbarButton::Fetch));
-    assert_eq!(toolbar.handle_key(Key::Enter, &hits), ToolbarOutcome::Fetch);
+    assert_eq!(toolbar.focus(), Some(ToolbarButton::Refresh));
+    assert_eq!(
+        toolbar.handle_key(Key::Enter, &hits),
+        ToolbarOutcome::Refresh
+    );
     assert_eq!(toolbar.handle_key(Key::Esc, &hits), ToolbarOutcome::Leave);
     assert_eq!(toolbar.focus(), None);
 }
@@ -163,9 +166,9 @@ fn nerd_font_icons_replace_the_plain_buttons() {
         ..Theme::default()
     };
     let (line, hits) = render_with(&toolbar(), 100, &theme);
-    // Codicons: refresh, cloud-download, ellipsis.
+    // Codicons: cloud-download, refresh, ellipsis.
     assert!(
-        line.ends_with(" \u{eb37}   \u{eac2}   \u{ea7c}"),
+        line.ends_with(" \u{eac2}   \u{eb37}   \u{ea7c}"),
         "{line:?}"
     );
     assert!(!line.contains("[↻]"), "{line:?}");
@@ -177,17 +180,31 @@ fn nerd_font_icons_replace_the_plain_buttons() {
 fn plain_icons_are_the_default() {
     assert_eq!(Theme::default().icons, Icons::Unicode);
     let (line, _) = render(&toolbar(), 100);
-    assert!(line.ends_with("[↻] [⇣] [...]"), "{line:?}");
+    assert!(line.ends_with("[⇣] [↻] [...]"), "{line:?}");
 }
 
 #[test]
 fn the_more_button_can_live_elsewhere() {
     let mut toolbar = toolbar().without_more();
     let (line, hits) = render(&toolbar, 100);
-    assert!(line.ends_with("[↻] [⇣]"), "{line:?}");
+    assert!(line.ends_with("[⇣] [↻]"), "{line:?}");
     assert!(hits.button(ToolbarButton::RepoMenu).is_none());
-    // Arrows skip the missing button: Fetch wraps around to the branch filter.
-    toolbar.set_focus(Some(ToolbarButton::Fetch));
+    // Arrows skip the missing button: Refresh wraps around to the branch filter.
+    toolbar.set_focus(Some(ToolbarButton::Refresh));
     toolbar.handle_key(Key::Right, &hits);
     assert_eq!(toolbar.focus(), Some(ToolbarButton::BranchFilter));
+}
+
+#[test]
+fn the_branch_controls_sit_in_the_center() {
+    let (line, _) = render(&toolbar(), 100);
+    let start = line.find("Branches:").unwrap();
+    let group = "Branches: [main, develop ▾]  [x] Show Remote Branches";
+    assert!(line[start..].starts_with(group), "{line:?}");
+    let before = line[..start].chars().count();
+    let after = 100 - before - group.chars().count();
+    assert!(
+        before.abs_diff(after) <= 1,
+        "{before} cells before, {after} after: {line:?}"
+    );
 }

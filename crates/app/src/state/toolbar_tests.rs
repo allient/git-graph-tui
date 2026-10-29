@@ -208,8 +208,8 @@ fn tab_moves_to_the_toolbar_and_enter_presses_a_button() {
     let mut h = open(&repo);
     press(&mut h, KeyCode::Tab);
     assert!(h.state.toolbar.focus.is_some());
-    // Branch filter → remotes → refresh → fetch.
-    for _ in 0..3 {
+    // Branch filter → remotes → fetch.
+    for _ in 0..2 {
         press(&mut h, KeyCode::Right);
     }
     press(&mut h, KeyCode::Enter);
