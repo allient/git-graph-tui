@@ -19,6 +19,10 @@ pub struct SourceControlState {
     pub hits: SourceControlHitMap,
     /// The last frame was wide enough to show the pane.
     pub visible: bool,
+    /// Width set by dragging the divider; None uses the default.
+    pub width: Option<u16>,
+    /// Column of the divider as last drawn.
+    pub divider: Option<u16>,
 }
 
 impl AppState {

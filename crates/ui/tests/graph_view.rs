@@ -10,7 +10,7 @@ use tgg_git::{log, refs, status};
 use tgg_graph::{Graph, Row};
 use tgg_model::{Commit, Oid, Ref, WorkingTreeStatus};
 use tgg_testkit::FixtureRepo;
-use tgg_ui::{Gap, GraphView, HitTarget, Theme};
+use tgg_ui::{ColumnDivider, ColumnWidths, Gap, GraphView, HitTarget, Theme};
 
 struct Loaded {
     commits: Vec<Commit>,
@@ -55,6 +55,7 @@ fn view(l: &Loaded) -> GraphView<'_> {
         offset: 0,
         selected: 0,
         gap: None,
+        widths: ColumnWidths::default(),
     }
 }
 
@@ -93,7 +94,10 @@ fn the_first_line_names_the_columns() {
     let loaded = load(&repo);
     let (buf, _) = render(&view(&loaded), 110, 10);
     let header = text(&buf).lines().next().unwrap().to_owned();
-    let names: Vec<&str> = header.split_whitespace().collect();
+    let names: Vec<&str> = header
+        .split(|c: char| c.is_whitespace() || c == '│')
+        .filter(|w| !w.is_empty())
+        .collect();
     assert_eq!(names, ["Graph", "Description", "Date", "Author", "Commit"]);
     assert_eq!(buf[(0, 0)].bg, Theme::default().header_bg);
 }
@@ -276,4 +280,51 @@ fn a_gap_is_clipped_at_the_bottom_and_skipped_when_its_row_is_off_screen() {
     };
     let (_, hits) = render(&hidden, 100, 6);
     assert_eq!(hits.gap(), None);
+}
+
+#[test]
+fn header_dividers_separate_the_columns_and_can_be_grabbed() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, hits) = render(&view(&loaded), 110, 10);
+    // Graph 0..7, description 7..69, then date, author and hash, each after a divider.
+    for (x, divider) in [
+        (6, ColumnDivider::AfterGraph),
+        (69, ColumnDivider::AfterDescription),
+        (86, ColumnDivider::AfterDate),
+        (101, ColumnDivider::AfterAuthor),
+    ] {
+        assert_eq!(buf[(x, 0)].symbol(), "│", "x={x}");
+        assert_eq!(hits.divider_at(x, 0), Some(divider), "x={x}");
+    }
+    assert_eq!(
+        hits.divider_at(6, 1),
+        None,
+        "only the header line has dividers"
+    );
+    assert_eq!(hits.divider_at(7, 0), None);
+    assert_eq!(hits.graph_width(), 7);
+}
+
+#[test]
+fn column_widths_move_the_columns() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let wide = GraphView {
+        widths: ColumnWidths {
+            graph: Some(12),
+            date: 20,
+            ..ColumnWidths::default()
+        },
+        ..view(&loaded)
+    };
+    let (buf, hits) = render(&wide, 110, 10);
+    assert_eq!(hits.divider_at(11, 0), Some(ColumnDivider::AfterGraph));
+    // The date column is 20 wide, so it starts 4 columns further left.
+    assert_eq!(
+        hits.divider_at(65, 0),
+        Some(ColumnDivider::AfterDescription)
+    );
+    let line: String = (66..86).map(|x| buf[(x, 3)].symbol()).collect();
+    assert!(line.starts_with("2026-01-01 00:07"), "{line:?}");
 }
