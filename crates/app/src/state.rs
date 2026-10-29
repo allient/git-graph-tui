@@ -558,6 +558,9 @@ impl AppState {
         if let Some(commands) = self.on_resize_mouse(mouse) {
             return commands;
         }
+        if let Some(commands) = self.on_details_wheel(mouse) {
+            return commands;
+        }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left)
             && let Some(commands) = self
                 .on_source_control_click(x, y)

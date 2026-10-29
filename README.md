@@ -86,7 +86,9 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Stash, reset, clean
 
 ### Commit details
-- [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files: bold labels, parent hashes and email addresses as links, and a folder tree whose file names are colored by change (added green, modified yellow, deleted red, renamed blue)
+- [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files: bold labels, parent hashes and email addresses as links, and a folder tree whose file names are colored by change (added green, modified yellow, deleted red, renamed blue), with `(+added | -deleted)` counts in green and red (new files show none)
+- [x] The details open below the commit like in VS Code: the lanes keep running through them, the text starts at the Description column, and the message and the file list scroll on their own (mouse wheel, or `J`/`K` for the message)
+- [x] Buttons at the details' right edge: close, find (filter the files by name), tree view and list view (full paths)
 - [x] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
 - [x] View a file at that revision
 - [x] Compare any two commits, or a commit with the working tree
@@ -182,6 +184,9 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
 | Click `#123` (in the details) | Issue references in the commit message are underlined; clicking one opens the issue in the browser: on origin's GitHub, GitLab or Bitbucket page, or the page set by `[issues] url` in the config file. `abc#12` is not a reference |
+| `f` / find button (in the details) | Filter the changed files by name (ignoring case): type to narrow the list, `Backspace` deletes, `Enter` keeps the filter, `Esc` clears it. While the filter is edited every key types into it |
+| `l` / tree and list buttons (in the details) | Show the changed files as a folder tree or as a flat list of full paths; the button of the layout shown is highlighted. The close button (or `Esc`) closes the details |
+| `J` `K` / mouse wheel (in the details) | Scroll the commit's fields and message (`J` down, `K` up); the wheel scrolls whichever side it is over, message or files, and leaves the graph where it is |
 | `t` (in the details) | Open the selected file in your configured `git difftool` (against the commit's first parent, or between the two sides of a comparison). The app steps aside until the tool exits |
 | `s` (in a diff) | Show old and new side by side (old lines and numbers on the left, new on the right, deleted and added runs paired line by line), or back to one column. Needs a diff at least 100 columns wide; the choice holds for every diff until you press `s` again or quit |
 | Diff pager | With a pager configured (`[diff] pager` in the config file, or `TUI_GIT_GRAPH_PAGER`), `Enter` on a file pipes its colored diff into it, for example `delta`, instead of the built-in diff view. The app steps aside until the pager exits; if it fails, the status bar says so |
@@ -206,7 +211,7 @@ Push, pull and fetch never prompt for a password: use SSH keys or a git credenti
 
 ### Icons
 
-The toolbar, the Source Control pane and the details panel's file tree show VS Code's own icons (Codicons, such as `cod-folder` and `cod-file` before folders and files, `cod-diff_multiple` for "Open Changes" and `cod-go_to_file` for "Open File") when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu, `▾` folder, `·` file, `⧉` Open Changes, `↗` Open File). Every icon button has a blank cell after it, so a Codicon drawn wider than its cell doesn't run into the next one. The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
+The toolbar, the Source Control pane and the details panel's file tree show VS Code's own icons (Codicons, such as `cod-folder` and `cod-file` before folders and files, `cod-diff_multiple` for "Open Changes" and `cod-go_to_file` for "Open File", `cod-close`, `cod-search`, `cod-list_tree` and `cod-list_flat` for the details' buttons) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu, `▾` folder, `·` file, `⧉` Open Changes, `↗` Open File, `✕` close, `⌕` find, `├` tree, `≡` list). Every icon button has a blank cell after it, so a Codicon drawn wider than its cell doesn't run into the next one. The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
 
 1. Install a Nerd Font, for example JetBrains Mono:
 
