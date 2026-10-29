@@ -88,6 +88,7 @@ fn branch_menu_matches_the_vs_code_order() {
             "Merge into current branch...",
             "Rebase current branch on Branch...",
             "Push Branch...",
+            "Create Pull Request",
             "---",
             "Create Archive",
             "Select in Branches Dropdown",
@@ -104,6 +105,7 @@ fn current_branch_menu_hides_what_does_not_apply() {
         [
             "Rename Branch...",
             "Push Branch...",
+            "Create Pull Request",
             "---",
             "Create Archive",
             "Select in Branches Dropdown",
@@ -121,6 +123,10 @@ fn without_remotes_there_is_nothing_to_push_to() {
     };
     let menu = labels(&menu_for(&local("develop"), &ctx));
     assert!(!menu.contains(&"Push Branch...".to_owned()), "{menu:?}");
+    assert!(
+        !menu.contains(&"Create Pull Request".to_owned()),
+        "{menu:?}"
+    );
 }
 
 #[test]
@@ -136,6 +142,7 @@ fn detached_head_has_no_current_branch_to_merge_into() {
             "Rename Branch...",
             "Delete Branch...",
             "Push Branch...",
+            "Create Pull Request",
             "---",
             "Create Archive",
             "Select in Branches Dropdown",
@@ -225,6 +232,7 @@ fn remote_branch_menu_checks_out_a_tracking_branch() {
             "Checkout Branch...",
             "Merge into current branch...",
             "Rebase current branch on Branch...",
+            "Create Pull Request",
             "---",
             "Create Archive",
             "Select in Branches Dropdown",
@@ -668,5 +676,29 @@ fn empty_submenus_are_dropped() {
         !labels(&menu).contains(&"Tags ▸".to_owned()),
         "{:?}",
         labels(&menu)
+    );
+}
+
+#[test]
+fn create_pull_request_targets_the_branch_on_its_remote() {
+    let menu = menu_for(&local("develop"), &ctx());
+    assert_eq!(
+        action(&menu, "Create Pull Request"),
+        &Action::Ui(UiEffect::CreatePullRequest {
+            remote: "origin".into(),
+            branch: "develop".into()
+        })
+    );
+    let remote = Target::RemoteBranch {
+        remote: "upstream".into(),
+        branch: "feature/x".into(),
+        target: oid('b'),
+    };
+    assert_eq!(
+        action(&menu_for(&remote, &ctx()), "Create Pull Request"),
+        &Action::Ui(UiEffect::CreatePullRequest {
+            remote: "upstream".into(),
+            branch: "feature/x".into()
+        })
     );
 }

@@ -313,3 +313,35 @@ fn a_click_outside_every_menu_level_closes_the_menu() {
     click(&mut h, MouseButton::Left, W - 1, H - 2);
     assert!(h.state.menu.is_none());
 }
+
+#[test]
+fn create_pull_request_opens_the_forge_page_for_the_branch() {
+    let repo = FixtureRepo::sample();
+    repo.git(&[
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:allient/demo.git",
+    ]);
+    let mut h = open(&repo);
+    choose(&mut h, "develop", "Create Pull Request");
+    assert_eq!(
+        h.opened,
+        ["https://github.com/allient/demo/compare/develop?expand=1"]
+    );
+    assert!(h.state.running.is_none(), "no git action ran");
+}
+
+#[test]
+fn create_pull_request_explains_unsupported_remotes() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    choose(&mut h, "develop", "Create Pull Request");
+    assert!(h.opened.is_empty());
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(
+        message.starts_with("Can't open a pull request page for 'origin'"),
+        "{message}"
+    );
+    assert!(message.contains("GitHub, GitLab or Bitbucket"), "{message}");
+}

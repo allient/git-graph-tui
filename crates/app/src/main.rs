@@ -1,5 +1,6 @@
 //! `tui-git-graph`: a Git Graph for the terminal.
 
+mod browser;
 mod cli;
 mod clipboard;
 mod git;
@@ -80,6 +81,11 @@ fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event
             Command::Clipboard(text) => {
                 if let Err(err) = clipboard::copy(&text) {
                     state.message = Some(format!("Could not copy to the clipboard: {err}"));
+                }
+            }
+            Command::OpenUrl(url) => {
+                if let Err(err) = browser::open(&url) {
+                    state.message = Some(format!("Could not open {url}: {err}"));
                 }
             }
         }

@@ -118,6 +118,8 @@ fn local_branch_menu(name: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 },
             )
         }),
+        ctx.default_remote()
+            .and_then(|remote| entry("Create Pull Request", pull_request(remote, name))),
         Some(MenuItem::Separator),
         entry("Create Archive", archive(rev(), name)),
         filter_toggle(name, ctx),
@@ -129,6 +131,13 @@ fn local_branch_menu(name: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
             },
         ),
     ]
+}
+
+fn pull_request(remote: &str, branch: &str) -> Action {
+    Action::Ui(UiEffect::CreatePullRequest {
+        remote: remote.to_owned(),
+        branch: branch.to_owned(),
+    })
 }
 
 fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
@@ -162,6 +171,7 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
                 current: current.clone(),
             },
         ),
+        entry("Create Pull Request", pull_request(remote, branch)),
         Some(MenuItem::Separator),
         entry("Create Archive", archive(rev(), &full)),
         filter_toggle(&full, ctx),

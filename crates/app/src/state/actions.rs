@@ -9,7 +9,7 @@ use tgg_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
 };
 
-use super::{AppState, Command};
+use super::{AppState, Command, Request};
 
 /// A modal dialog on top of everything else.
 #[derive(Debug)]
@@ -135,6 +135,9 @@ impl AppState {
                 Vec::new()
             }
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
+            Plan::Ui(UiEffect::CreatePullRequest { remote, branch }) => {
+                vec![Command::Git(Request::RemoteUrl { remote, branch })]
+            }
         }
     }
 
@@ -279,4 +282,19 @@ pub(super) fn widget_key(key: KeyEvent) -> Option<Key> {
         KeyCode::Char(c) => Key::Char(c),
         _ => return None,
     })
+}
+
+impl AppState {
+    /// Opens the pull request page once the remote's URL is known.
+    pub(super) fn on_remote_url(&mut self, remote: &str, branch: &str, url: &str) -> Vec<Command> {
+        let url = url.trim();
+        if let Some(page) = tgg_actions::pull_request_url(url, branch) {
+            self.message = Some(format!("Opening {page}"));
+            return vec![Command::OpenUrl(page)];
+        }
+        self.message = Some(format!(
+            "Can't open a pull request page for '{remote}' ({url}): only GitHub, GitLab or Bitbucket remotes have one."
+        ));
+        Vec::new()
+    }
 }
