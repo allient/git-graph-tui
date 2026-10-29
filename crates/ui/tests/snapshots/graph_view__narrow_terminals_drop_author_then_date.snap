@@ -3,12 +3,12 @@ source: crates/ui/tests/graph_view.rs
 expression: text(&buf)
 ---
 Graph │Description                                  Commit
-  ○    Uncommitted Changes (1)
-  ┆
-●       feature/login  Add login                    82f432c
-│
-●       develop  Return a value                     6681ca2
-│
-│ ●     main │ origin   v0.1.0  Merge branch 'devel 0b1f05f
-├─┤
-● │    Add lib                                      4351aec
+    ○  Uncommitted Changes (1)
+    ┆
+  ●     feature/login  Add login                    82f432c
+  │
+  ●     develop  Return a value                     6681ca2
+  │
+  │ ●   main │ origin   v0.1.0  Merge branch 'devel 0b1f05f
+  ├─┤
+  ● │  Add lib                                      4351aec

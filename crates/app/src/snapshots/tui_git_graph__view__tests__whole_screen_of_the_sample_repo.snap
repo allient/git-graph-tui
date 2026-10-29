@@ -4,10 +4,10 @@ expression: "graph.join(\"\\n\")"
 ---
  SOURCE CONTROL               │ Branches: [Show All ▾]  [x] Show Remote Branches                [↻] [⇣] [...]
  Message (Enter to commit on …│Graph │Description                                                     Commit
-           ✓ Commit           │  ○    Uncommitted Changes (1)
-                              │  ┆
-▾ Changes                  1 +│●       feature/login  Add login                                       82f432c
-  notes.txt                U +││
-                              │●       develop  Return a value                                        6681ca2
-                              ││
-                              ││ ●     main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f
+           ✓ Commit           │    ○  Uncommitted Changes (1)
+                              │    ┆
+▾ Changes                  1 +│  ●     feature/login  Add login                                       82f432c
+  notes.txt                U +│  │
+                              │  ●     develop  Return a value                                        6681ca2
+                              │  │
+                              │  │ ●   main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f

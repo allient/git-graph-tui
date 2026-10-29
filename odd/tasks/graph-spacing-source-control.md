@@ -13,6 +13,10 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **S6** Resizable widths: "if psisbel we can be able to resize width". Assumption: drag the column dividers in the header with the mouse, and the divider between the Source Control section and the graph.
 - **S7** Toolbar icons: "as thes e two icons" (cloud-download for Fetch, circular arrow for Refresh). Plain Unicode so it works without a Nerd Font: `↻` Refresh, `⇣` Fetch.
 - **S8** Nerd Font icons, opt-in: "ok use those icons and add of readme isntructions to isntall forst icons nerd onews" and "do thsi same That's why tools like lazygit and yazi make icons opt-in: they print plain text by default,  if icons use tehm in other case use what we have now". `--icons nerd` or `TUI_GIT_GRAPH_ICONS=nerd` shows Codicons (refresh U+EB37, cloud-download U+EAC2, ellipsis U+EA7C); the default stays the Unicode `[↻] [⇣] [...]`. README explains installing a Nerd Font.
+- **S9** Graph padding: "add more oadding at left of vlue dots". The lanes start a couple of columns in from the graph column's left edge.
+- **S10** Auto icons: "coplete teh two open item". Default `auto`: Nerd Font icons when the terminal is known to ship the Nerd Font symbols (Ghostty, WezTerm, Kitty), plain Unicode otherwise; `--icons nerd|unicode` and `TUI_GIT_GRAPH_ICONS` still force either.
+- **S11** README checklist: tick the features that work (second open item).
+- **S12** "continue with they feature not built yet", in this order: Find (search by message, author, hash, branch or tag); create a pull request from a branch (opens the browser); view a file at a revision and compare two commits or a commit with the working tree; an external diff pager such as `delta`; repository settings and a config file (persists pane and column widths).
 
 ## Tasks
 
@@ -22,6 +26,12 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 | T5 | S8 | inline | done (429 tests) | feat/graph-spacing |
 | T2 | S3 | inline | done (454 tests, pty smoke committed a file) | feat/source-control: 88f9e46, fcac605, slice 4 |
 | T4 | S6 | inline | done (462 tests, pty drag moved the divider 30→45) | feat/resize-panes |
+| T6 | S9, S10, S11 | inline | done (463 tests) | feat/graph-padding-auto-icons |
+| T7 | S12 Find | inline | pending | |
+| T8 | S12 Create PR | inline | pending | |
+| T9 | S12 file at revision, compare | inline | pending | |
+| T10 | S12 external pager | inline | pending | |
+| T11 | S12 settings and config | inline | pending | |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
 
 ## Log
@@ -39,3 +49,5 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L11** T2 plan, 4 slices on feat/source-control: (1) per-file status (`ChangedFile`, `Change`), (2) `WorkingTreeAction::{Stage, Unstage, Commit}` (`add --all`, `reset --quiet` (works unborn), `commit --message=`), (3) `SourceControlPane` widget in tgg-ui, (4) left pane plus graph pane layout, focus and wiring in the app. Slices 1 and 2 are done (434 tests).
 - **L12** T2 slice 4: the pane is on the left (a quarter of the width, 30-44 columns, hidden below 90 columns) with a divider; toolbar and graph are on the right. `c` or "Open Source Control" focuses the message; a click in the pane takes the keyboard and a click elsewhere gives it back. Commit is refused with "Type a commit message first." or "Nothing staged: stage files with + first.", and the message clears after a successful commit. At 110 columns the graph drops Date/Author (they need 100 graph columns).
 - **L13** T4: drag the pane divider (pane 20 columns to total-50, kept for the session) or the header dividers `│` (AfterGraph resizes the graph column; AfterDescription widens/narrows Date; AfterDate and AfterAuthor trade width between neighbours; 4-80 columns). A drag never selects a row. Widths are not saved between runs. Built on feat/source-control; PR after #26 merges.
+- **L14** (2026-10-28) User: "add more oadding at left of vlue dots [Image #21]. coplete teh two open item and continue with they feature not built yet"
+- **L15** T6: lanes start 2 columns in (GRAPH_PADDING). `--icons auto` is the new default: Nerd icons when TERM_PROGRAM is ghostty/wezterm, TERM is xterm-ghostty/xterm-kitty, or GHOSTTY_RESOURCES_DIR, WEZTERM_EXECUTABLE or KITTY_WINDOW_ID is set (these survive inside herdr/tmux). README: 23 checklist items ticked; still open: Find, fetch into local branch, column show/hide, create PR, external pager, file at revision, compare, issue linking, stretch goals.

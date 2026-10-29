@@ -36,50 +36,50 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 Target feature set, based on Git Graph for VS Code. The detailed specs for the first release are in [`odd/tasks/git-graph-mvp.md`](odd/tasks/git-graph-mvp.md).
 
 ### Graph view
-- [ ] Commit graph with color-coded lanes per branch and merge lines
-- [ ] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges
-- [ ] Uncommitted changes shown as a virtual row at the top
+- [x] Commit graph with color-coded lanes per branch and merge lines
+- [x] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges
+- [x] Uncommitted changes shown as a virtual row at the top
 - [ ] Columns: graph, description, date, author, commit hash (show/hide, adapt to width)
-- [ ] Highlight HEAD and mute commits that aren't ancestors of HEAD
-- [ ] Incremental loading while scrolling
-- [ ] Branch filter: show all, one or several branches, or custom glob patterns
-- [ ] Toggle remote branches on/off
+- [x] Highlight HEAD and mute commits that aren't ancestors of HEAD
+- [x] Incremental loading while scrolling
+- [x] Branch filter: show all, one or several branches, or custom glob patterns
+- [x] Toggle remote branches on/off
 - [ ] Find: search by message, author, date, hash, branch or tag name
-- [ ] Jump to HEAD, refresh, and fetch from the toolbar
+- [x] Jump to HEAD, refresh, and fetch from the toolbar
 
 ### Actions on branches (right-click a branch badge)
-- [ ] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
-- [ ] Merge into current branch, rebase current branch onto it, reset
+- [x] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
+- [x] Merge into current branch, rebase current branch onto it, reset
 - [ ] Pull, push, fetch into local branch
-- [ ] Create archive, copy branch name
+- [x] Create archive, copy branch name
 - [ ] Create a pull request (GitHub / GitLab / Bitbucket, opens the browser)
 
 ### Actions on commits (right-click a commit)
-- [ ] Add tag, create branch
-- [ ] Checkout (detached), cherry-pick, revert, drop
-- [ ] Merge into current branch, rebase current branch on this commit
-- [ ] Reset current branch to this commit (soft / mixed / hard)
-- [ ] Copy hash / subject to clipboard
+- [x] Add tag, create branch
+- [x] Checkout (detached), cherry-pick, revert, drop
+- [x] Merge into current branch, rebase current branch on this commit
+- [x] Reset current branch to this commit (soft / mixed / hard)
+- [x] Copy hash / subject to clipboard
 
 ### Repository menu ("..." in the toolbar)
-- [ ] Pull, push, fetch, "Checkout to..." (pick any branch or tag)
-- [ ] Branch, remote, stash and tag submenus; show the git command log
+- [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag)
+- [x] Branch, remote, stash and tag submenus; show the git command log
 
 ### Actions on tags and stashes
-- [ ] Add, delete and push tags; view annotated tag details
-- [ ] Apply, pop, drop stashes; create branch from stash
+- [x] Add, delete and push tags; view annotated tag details
+- [x] Apply, pop, drop stashes; create branch from stash
 
 ### Actions on uncommitted changes
-- [ ] Stash, reset, clean
+- [x] Stash, reset, clean
 
 ### Commit details
-- [ ] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
+- [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
 - [ ] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
 - [ ] View a file at that revision
 - [ ] Compare any two commits, or a commit with the working tree
 
 ### Repository settings
-- [ ] Manage remotes (add, remove, fetch, prune)
+- [x] Manage remotes (add, remove, fetch, prune)
 - [ ] Issue linking (turn `#123` into links that open in the browser)
 
 ### Stretch goals (inspired by Git Graph+)
@@ -180,7 +180,7 @@ Push, pull and fetch never prompt for a password: use SSH keys or a git credenti
 
 ### Icons
 
-The toolbar uses plain Unicode symbols by default (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu), which work in any terminal. To get VS Code's own icons (Codicons), install a [Nerd Font](https://www.nerdfonts.com/) first, then turn the icons on.
+The toolbar shows VS Code's own icons (Codicons) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu). The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
 
 1. Install a Nerd Font, for example JetBrains Mono:
 
@@ -190,14 +190,14 @@ The toolbar uses plain Unicode symbols by default (`[↻]` Refresh, `[⇣]` Fetc
 
    On Linux, download it from [nerdfonts.com/font-downloads](https://www.nerdfonts.com/font-downloads) and unzip it into `~/.local/share/fonts`, then run `fc-cache -f`.
 2. Select the font in your terminal's settings (for example "JetBrainsMono Nerd Font"). WezTerm, Kitty and Ghostty already include the Nerd Font symbols, so you can skip steps 1 and 2 there.
-3. Turn the icons on, for one run or for every run:
+3. Turn the icons on (not needed in Ghostty, WezTerm or Kitty), for one run or for every run:
 
    ```sh
    cargo run -- --icons nerd                       # one run
    export TUI_GIT_GRAPH_ICONS=nerd                 # every run (add it to ~/.zshrc or ~/.bashrc)
    ```
 
-   `--icons unicode` goes back to the plain symbols, and the flag wins over the variable. If the icons show as empty boxes, the terminal isn't using a Nerd Font.
+   `--icons unicode` always uses the plain symbols, `--icons auto` goes back to detecting the terminal, and the flag wins over the variable. If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.
 
 ## Development
 

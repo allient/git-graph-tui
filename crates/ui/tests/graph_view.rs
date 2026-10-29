@@ -108,12 +108,13 @@ fn a_line_joins_consecutive_commits() {
     let loaded = load(&repo);
     let (buf, hits) = render(&view(&loaded), 110, 10);
     let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
-    // "Add login" (line 3) and its parent "Return a value" (line 5), both on lane 0.
+    // "Add login" (line 3) and its parent "Return a value" (line 5), both on
+    // lane 0, two columns in from the left edge.
     assert!(
-        lines[3].starts_with('●') && lines[5].starts_with('●'),
+        lines[3].starts_with("  ●") && lines[5].starts_with("  ●"),
         "{lines:#?}"
     );
-    assert_eq!(lines[4], "│");
+    assert_eq!(lines[4], "  │");
     // The connector line belongs to the row above it.
     assert_eq!(hits.hit(100, 4), Some(&HitTarget::Commit(0)));
 }
