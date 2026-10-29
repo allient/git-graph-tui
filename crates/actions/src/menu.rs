@@ -1,8 +1,8 @@
 use tgg_model::{Oid, Stash};
 
 use crate::{
-    Action, CommitTarget, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
-    StashAction, TagAction, Target, UiEffect, WorkingTreeAction,
+    Action, CommitTarget, GraphColumn, MenuContext, PickPurpose, PullMode, RepoAction, ResetMode,
+    Rev, StashAction, TagAction, Target, UiEffect, WorkingTreeAction,
 };
 
 /// One row of a context menu.
@@ -60,6 +60,22 @@ pub fn menu_for(target: &Target, ctx: &MenuContext) -> Vec<MenuItem> {
         Target::Repository => repository_menu(ctx),
     };
     tidy(items)
+}
+
+/// The graph column header's menu (S20): a checked entry per optional
+/// column, which shows or hides it.
+#[must_use]
+pub fn column_menu(hidden: &[GraphColumn]) -> Vec<MenuItem> {
+    GraphColumn::ALL
+        .into_iter()
+        .map(|column| {
+            let check = if hidden.contains(&column) { " " } else { "✓" };
+            MenuItem::Entry(MenuEntry::new(
+                &format!("{check} {}", column.label()),
+                Action::Ui(UiEffect::ToggleColumn { column }),
+            ))
+        })
+        .collect()
 }
 
 /// Adds the entry only when `show` is true.

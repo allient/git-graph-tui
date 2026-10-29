@@ -228,6 +228,49 @@ pub enum UiEffect {
     CompareWithWorkingTree {
         commit: Oid,
     },
+    /// Show or hide a graph column (the column header's menu).
+    ToggleColumn {
+        column: GraphColumn,
+    },
+}
+
+/// A graph column the header's menu can hide; the graph and the
+/// description always show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum GraphColumn {
+    Date,
+    Author,
+    Commit,
+}
+
+impl GraphColumn {
+    /// In the order they appear, left to right.
+    pub const ALL: [Self; 3] = [Self::Date, Self::Author, Self::Commit];
+
+    /// The header's name for it.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Date => "Date",
+            Self::Author => "Author",
+            Self::Commit => "Commit",
+        }
+    }
+
+    /// Its name in the config file (`hidden_columns`).
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Date => "date",
+            Self::Author => "author",
+            Self::Commit => "commit",
+        }
+    }
+
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| c.name() == name)
+    }
 }
 
 /// The dialog shown before an action runs (S13).

@@ -2,7 +2,9 @@
 //! dividers (S6).
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use tgg_ui::{ColumnDivider, ColumnWidths};
+use ratatui::layout::Position;
+use tgg_actions::{GraphColumn, column_menu};
+use tgg_ui::{ColumnDivider, ColumnWidths, PopupMenu};
 
 use crate::config::Layout;
 
@@ -65,6 +67,22 @@ impl AppState {
 }
 
 impl AppState {
+    /// Shows or hides a column (the header's right-click menu, S20).
+    pub(super) fn toggle_column(&mut self, column: GraphColumn) {
+        if let Some(at) = self.hidden_columns.iter().position(|&c| c == column) {
+            self.hidden_columns.remove(at);
+        } else {
+            self.hidden_columns.push(column);
+            self.hidden_columns.sort_unstable();
+        }
+    }
+
+    /// Opens the menu that shows or hides columns, at the click.
+    pub(super) fn open_column_menu(&mut self, anchor: Position) {
+        self.menu = Some(PopupMenu::new(column_menu(&self.hidden_columns), anchor));
+        self.menu_hits = None;
+    }
+
     /// Uses the widths saved in the config file, and returns them as
     /// [`AppState::layout`] reports them, to tell later whether anything changed.
     pub fn apply_layout(&mut self, layout: Layout) -> Layout {
@@ -76,6 +94,9 @@ impl AppState {
             author: layout.author_column.unwrap_or(default.author),
             hash: layout.hash_column.unwrap_or(default.hash),
         };
+        self.hidden_columns = layout.hidden_columns.into_iter().map(Into::into).collect();
+        self.hidden_columns.sort_unstable();
+        self.hidden_columns.dedup();
         self.layout()
     }
 
@@ -90,6 +111,12 @@ impl AppState {
             date_column: changed(self.columns.date, default.date),
             author_column: changed(self.columns.author, default.author),
             hash_column: changed(self.columns.hash, default.hash),
+            hidden_columns: self
+                .hidden_columns
+                .iter()
+                .copied()
+                .map(Into::into)
+                .collect(),
         }
     }
 }
