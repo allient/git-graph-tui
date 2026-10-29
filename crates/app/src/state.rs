@@ -20,10 +20,12 @@ use crate::git::{JobHandle, JobId, JobResult};
 
 mod actions;
 mod details;
+mod find;
 mod info;
 mod output;
 mod resize;
 mod source_control;
+pub use find::Find;
 pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
 
@@ -170,6 +172,8 @@ pub struct AppState {
     pub picker: Option<OpenPicker>,
     /// The Source Control pane beside the graph.
     pub source_control: SourceControlState,
+    /// The open find bar (`/`).
+    pub find: Option<Find>,
     /// The graph's column widths, set by dragging the header dividers.
     pub columns: ColumnWidths,
     drag: Option<resize::Drag>,
@@ -212,6 +216,7 @@ impl AppState {
             toolbar: ToolbarState::default(),
             picker: None,
             source_control: SourceControlState::default(),
+            find: None,
             columns: ColumnWidths::default(),
             drag: None,
             running: None,
@@ -315,6 +320,9 @@ impl AppState {
         if self.toolbar.focus.is_some() {
             return self.on_toolbar_key(key);
         }
+        if self.find.is_some() {
+            return self.on_find_key(key);
+        }
         if self.source_control.focus {
             return self.on_source_control_key(key);
         }
@@ -342,6 +350,7 @@ impl AppState {
             (KeyCode::Enter, _) => return self.toggle_details(),
             (KeyCode::Tab, _) => self.focus_toolbar(),
             (KeyCode::Char('c'), _) => self.focus_source_control(),
+            (KeyCode::Char('/'), _) => self.open_find(),
             (KeyCode::Char('g') | KeyCode::Home, _) => self.select(0),
             (KeyCode::Char('G') | KeyCode::End, _) => self.select(last),
             (KeyCode::Char('m') | KeyCode::Menu, _) | (KeyCode::F(10), KeyModifiers::SHIFT) => {
@@ -644,6 +653,7 @@ impl AppState {
             return; // A page for a history that has since been reloaded.
         }
         self.history_complete = complete;
+        self.refind();
     }
 
     fn parsed<T>(
@@ -722,6 +732,8 @@ fn menu_key(key: KeyEvent) -> Option<Key> {
 mod action_tests;
 #[cfg(test)]
 mod details_tests;
+#[cfg(test)]
+mod find_tests;
 #[cfg(test)]
 mod info_tests;
 #[cfg(test)]

@@ -8,11 +8,11 @@ use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 use tgg_model::HeadState;
 use tgg_ui::{Gap, GraphView, SourceControlHitMap, Theme};
 
-use crate::state::{AppState, Dialog, DialogHits, MIN_WIDTH_FOR_PANE};
+use crate::state::{AppState, Dialog, DialogHits, Find, MIN_WIDTH_FOR_PANE};
 
 /// Key hints shown at the right of the status bar.
 const HINTS: &str =
-    "j/k move  enter details  m menu  c commit  tab toolbar  H head  r refresh  q quit";
+    "j/k move  enter details  m menu  / find  c commit  tab toolbar  H head  r refresh  q quit";
 
 /// Most lines the inline details panel takes.
 const DETAILS_HEIGHT: u16 = 12;
@@ -65,6 +65,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         selected: state.selected,
         gap,
         widths: state.columns,
+        matches: state.find.as_ref().map_or(&[], |f| f.matches.as_slice()),
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
     if let (Some(area), Some(details)) = (state.graph_hits.gap(), &mut state.details) {
@@ -162,7 +163,34 @@ fn draw_source_control(
     rest
 }
 
+/// The find bar, on the status line while find is open.
+fn draw_find(frame: &mut Frame<'_>, area: Rect, find: &Find, theme: &Theme) {
+    let label = " Find: ";
+    let count = match (find.query.text().is_empty(), find.matches.len()) {
+        (true, _) => String::new(),
+        (false, 0) => "No matches".to_owned(),
+        (false, n) => format!("{} of {n}", find.current + 1),
+    };
+    let line = Line::from(vec![
+        Span::styled(label, Style::new().add_modifier(Modifier::BOLD)),
+        Span::raw(find.query.text().to_owned()),
+        Span::raw("  "),
+        Span::styled(count, Style::new().fg(theme.tag)),
+    ]);
+    frame.render_widget(line, area);
+    frame.render_widget(
+        Line::from("enter next  ↑ previous  esc close ".dim()).right_aligned(),
+        area,
+    );
+    let cursor = label.len() + find.query.width_before_cursor();
+    frame.set_cursor_position((area.x + u16::try_from(cursor).unwrap_or(u16::MAX), area.y));
+}
+
 fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Theme) {
+    if let Some(find) = &state.find {
+        draw_find(frame, area, find, theme);
+        return;
+    }
     let branch = match &state.status.head {
         HeadState::Branch(name) => name.clone(),
         HeadState::Detached => "detached HEAD".to_owned(),

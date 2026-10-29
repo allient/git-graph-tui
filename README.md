@@ -44,7 +44,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
 - [x] Toggle remote branches on/off
-- [ ] Find: search by message, author, date, hash, branch or tag name
+- [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
 
 ### Actions on branches (right-click a branch badge)
@@ -170,6 +170,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file and `Enter` opens its diff |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch, `...` repository menu); arrows move, `Enter` presses |
+| `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |
 | `c` | Move to the Source Control pane on the left (shown from 90 columns): type the commit message and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files; `Space` or `Enter` stages or unstages a file or a whole section, as do `+` and `-`; `Esc` goes back to the graph. Clicking a row's `+`/`−` does the same |
 | `r` | Refresh |
 | Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |

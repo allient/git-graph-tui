@@ -177,6 +177,8 @@ pub struct GraphView<'a> {
     /// Blank lines opened below one row, for the inline details panel.
     pub gap: Option<Gap>,
     pub widths: ColumnWidths,
+    /// Commits matching the find bar, ascending; their subjects are highlighted.
+    pub matches: &'a [usize],
 }
 
 /// Blank lines opened below display row `after`; rows below it move down.
@@ -364,7 +366,12 @@ impl GraphView<'_> {
             }
             x = put(buf, x, y, right, " ", Style::new());
         }
-        put(buf, x, y, right, &commit.subject, text_style);
+        let subject_style = if self.matches.binary_search(&index).is_ok() {
+            Style::new().fg(theme.tag).add_modifier(Modifier::BOLD)
+        } else {
+            text_style
+        };
+        put(buf, x, y, right, &commit.subject, subject_style);
 
         let muted_or = |color| Style::new().fg(if muted { theme.muted } else { color });
         if let Some(area) = cols.date {
