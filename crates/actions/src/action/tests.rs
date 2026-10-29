@@ -268,28 +268,75 @@ fn create_archive_lets_git_pick_the_format_from_the_extension() {
     );
 }
 
-#[test]
-fn add_tag_lightweight_or_annotated() {
-    let mut action = Action::AddTag {
+fn add_tag(remote: Option<&str>) -> Action {
+    Action::AddTag {
         at: oid(),
         name: "v1.0".into(),
+        annotated: true,
         message: String::new(),
-    };
-    assert_eq!(single(&action), write(&["tag", "--", "v1.0", HASH]));
+        remote: remote.map(str::to_owned),
+        push: false,
+    }
+}
+
+fn annotated(message: &str) -> (CommandKind, Vec<String>) {
+    write(&[
+        "tag",
+        "--annotate",
+        "--message",
+        message,
+        "--",
+        "v1.0",
+        HASH,
+    ])
+}
+
+#[test]
+fn add_tag_is_annotated_unless_lightweight_is_chosen() {
+    let mut action = add_tag(None);
+    // As in VS Code, an annotated tag's message is optional.
+    assert_eq!(single(&action), annotated(""));
     action
         .set_input(InputId::Message, InputValue::Text("Release".into()))
         .unwrap();
+    assert_eq!(single(&action), annotated("Release"));
+    action
+        .set_input(InputId::TagType, InputValue::Text("Lightweight".into()))
+        .unwrap();
+    assert_eq!(single(&action), write(&["tag", "--", "v1.0", HASH]));
     assert_eq!(
-        single(&action),
-        write(&[
-            "tag",
-            "--annotate",
-            "--message",
-            "Release",
-            "--",
-            "v1.0",
-            HASH
-        ])
+        action.set_input(InputId::TagType, InputValue::Text("Signed".into())),
+        Err(InputError::NotAChoice("Signed".into()))
+    );
+}
+
+#[test]
+fn add_tag_can_push_it_to_the_remote() {
+    let mut action = add_tag(Some("origin"));
+    action
+        .set_input(InputId::PushToRemote, InputValue::Bool(true))
+        .unwrap();
+    let Plan::Git(commands) = action.plan(repo()) else {
+        panic!("expected git commands");
+    };
+    let steps: Vec<_> = commands
+        .iter()
+        .map(|c| (c.kind(), c.argv()[6..].to_vec()))
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            annotated(""),
+            (
+                CommandKind::Network,
+                strings(&["push", "--", "origin", "refs/tags/v1.0"])
+            ),
+        ]
+    );
+    // Without a remote there's nothing to push to.
+    assert_eq!(
+        add_tag(None).set_input(InputId::PushToRemote, InputValue::Bool(true)),
+        Err(InputError::NotAnInput(InputId::PushToRemote))
     );
 }
 
@@ -573,12 +620,17 @@ fn inputs_describe_what_each_dialog_asks() {
         [InputId::Name, InputId::Checkout]
     );
     assert_eq!(
-        ids(Action::AddTag {
-            at: oid(),
-            name: String::new(),
-            message: String::new()
-        }),
-        [InputId::Name, InputId::Message]
+        ids(add_tag(None)),
+        [InputId::Name, InputId::TagType, InputId::Message]
+    );
+    assert_eq!(
+        ids(add_tag(Some("origin"))),
+        [
+            InputId::Name,
+            InputId::TagType,
+            InputId::Message,
+            InputId::PushToRemote
+        ]
     );
     assert_eq!(
         ids(push(false)),

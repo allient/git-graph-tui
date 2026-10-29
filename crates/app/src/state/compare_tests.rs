@@ -167,6 +167,8 @@ fn a_replaced_comparison_ignores_its_late_results() {
             .any(|c| matches!(c, Command::Git(Request::CompareFiles(_)))),
         "{late:?}"
     );
+    // The click closed the menu; redraw so the rows under it are found.
+    h.draw(W, H);
     // ... when a second one replaces it.
     // HEAD: the working tree has no tracked changes.
     choose(

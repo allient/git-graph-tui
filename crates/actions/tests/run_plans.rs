@@ -331,19 +331,45 @@ fn add_lightweight_and_annotated_tags() {
     let (repo, topic) = diverged();
     let mut tag = Action::AddTag {
         at: oid(&topic),
-        name: "light".into(),
+        name: "annotated".into(),
+        annotated: true,
         message: String::new(),
+        remote: None,
+        push: false,
     };
-    ok(&repo, &tag);
-    assert_eq!(repo.git(&["cat-file", "-t", "light"]), "commit");
-
-    tag.set_input(InputId::Name, InputValue::Text("annotated".into()))
-        .unwrap();
-    tag.set_input(InputId::Message, InputValue::Text("Release".into()))
-        .unwrap();
+    // An annotated tag with no message is still annotated.
     ok(&repo, &tag);
     assert_eq!(repo.git(&["cat-file", "-t", "annotated"]), "tag");
     assert_eq!(repo.git(&["rev-parse", "annotated^{commit}"]), topic);
+
+    tag.set_input(InputId::Name, InputValue::Text("light".into()))
+        .unwrap();
+    tag.set_input(InputId::TagType, InputValue::Text("Lightweight".into()))
+        .unwrap();
+    ok(&repo, &tag);
+    assert_eq!(repo.git(&["cat-file", "-t", "light"]), "commit");
+}
+
+#[test]
+fn add_tag_and_push_it_to_the_remote() {
+    let (repo, topic) = diverged();
+    repo.add_origin();
+    let mut tag = Action::AddTag {
+        at: oid(&topic),
+        name: "v1.0".into(),
+        annotated: true,
+        message: "Release".into(),
+        remote: Some("origin".into()),
+        push: false,
+    };
+    tag.set_input(InputId::PushToRemote, InputValue::Bool(true))
+        .unwrap();
+    ok(&repo, &tag);
+    let local = repo.git(&["rev-parse", "v1.0"]);
+    assert!(
+        repo.git(&["ls-remote", "--tags", "origin"])
+            .contains(&format!("{local}\trefs/tags/v1.0")),
+    );
 }
 
 #[test]

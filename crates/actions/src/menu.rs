@@ -46,9 +46,9 @@ impl MenuEntry {
 }
 
 /// Builds the context menu for `target`, in the order of VS Code Git Graph
-/// (S8, S9 and its tag, stash and uncommitted-changes menus). Entries that
-/// can't apply are left out rather than disabled, except Drop, which
-/// explains why it isn't possible.
+/// (S8, S9 and its tag, stash and uncommitted-changes menus). Most entries
+/// that can't apply are left out; the commit menu's git actions stay and
+/// explain why they're disabled.
 #[must_use]
 pub fn menu_for(target: &Target, ctx: &MenuContext) -> Vec<MenuItem> {
     let items = match target {
@@ -83,6 +83,16 @@ pub fn column_menu(hidden: &[GraphColumn]) -> Vec<MenuItem> {
 fn entry_if(show: bool, label: &str, action: impl FnOnce() -> Action) -> Option<MenuItem> {
     show.then(|| MenuItem::Entry(MenuEntry::new(label, action())))
 }
+
+/// An entry that is always shown, disabled with `reason` when there is one,
+/// as VS Code Git Graph shows it even where it can't run.
+fn entry_unless(reason: Option<&str>, label: &str, action: Action) -> MenuItem {
+    MenuItem::Entry(MenuEntry::new(label, action).disabled_because(reason))
+}
+
+const ALREADY_ON_CURRENT: &str = "This commit is already on the current branch.";
+const ALREADY_AT_COMMIT: &str = "The current branch is already at this commit.";
+const NOT_ON_BRANCH: &str = "HEAD isn't on a branch.";
 
 /// An entry that is always shown (`Option` so it lines up with [`entry_if`]).
 fn entry(label: &str, action: Action) -> Option<MenuItem> {
@@ -230,14 +240,16 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
     let is_head = ctx.is_head_commit(id);
     let current = ctx.current_branch().map(str::to_owned);
     let detached_here = is_head && current.is_none();
-    let on_branch = current.is_some();
     vec![
         entry(
             "Add Tag...",
             Action::AddTag {
                 at: id.clone(),
                 name: String::new(),
+                annotated: true,
                 message: String::new(),
+                remote: ctx.default_remote().map(str::to_owned),
+                push: false,
             },
         ),
         entry(
@@ -254,13 +266,15 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
             subject: subject.clone(),
         }),
         // Already in HEAD's history: picking it again would be empty.
-        entry_if(!commit.is_head_ancestor, "Cherry Pick...", || {
+        Some(entry_unless(
+            commit.is_head_ancestor.then_some(ALREADY_ON_CURRENT),
+            "Cherry Pick...",
             Action::CherryPick {
                 commit: id.clone(),
                 subject: subject.clone(),
                 is_merge: commit.is_merge(),
-            }
-        }),
+            },
+        )),
         entry(
             "Revert...",
             Action::Revert {
@@ -281,37 +295,9 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
             .disabled_because(why_not_droppable(commit)),
         )),
         Some(MenuItem::Separator),
-        entry_if(
-            on_branch && !commit.is_head_ancestor,
-            "Merge into current branch...",
-            || Action::MergeIntoCurrent {
-                source: Rev::Commit(id.clone()),
-                current: current.clone(),
-                no_ff: true,
-            },
-        ),
-        entry_if(
-            on_branch && !is_head,
-            "Rebase current branch on this Commit...",
-            || Action::RebaseCurrentOnto {
-                onto: Rev::Commit(id.clone()),
-                current: current.clone(),
-            },
-        ),
-        Some(interactive_rebase_entry(commit, ctx)),
-        current.as_ref().filter(|_| !is_head).and_then(|branch| {
-            entry(
-                "Reset current branch to this Commit...",
-                Action::ResetCurrentTo {
-                    commit: id.clone(),
-                    subject: subject.clone(),
-                    current: branch.clone(),
-                    mode: ResetMode::default(),
-                },
-            )
-        }),
     ]
     .into_iter()
+    .chain(current_branch_entries(commit, ctx))
     .chain(compare_entries(id, ctx))
     .chain([
         entry(
@@ -326,6 +312,46 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
         ),
     ])
     .collect()
+}
+
+/// Merge, rebase and reset of the current branch with `commit`, plus
+/// interactive rebase; disabled with the reason where they can't run.
+fn current_branch_entries(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let id = &commit.id;
+    let subject = &commit.subject;
+    let is_head = ctx.is_head_commit(id);
+    let current = ctx.current_branch().map(str::to_owned);
+    let not_on_branch = current.is_none().then_some(NOT_ON_BRANCH);
+    vec![
+        Some(entry_unless(
+            not_on_branch.or(commit.is_head_ancestor.then_some(ALREADY_ON_CURRENT)),
+            "Merge into current branch...",
+            Action::MergeIntoCurrent {
+                source: Rev::Commit(id.clone()),
+                current: current.clone(),
+                no_ff: true,
+            },
+        )),
+        Some(entry_unless(
+            not_on_branch.or(is_head.then_some(ALREADY_AT_COMMIT)),
+            "Rebase current branch on this Commit...",
+            Action::RebaseCurrentOnto {
+                onto: Rev::Commit(id.clone()),
+                current: current.clone(),
+            },
+        )),
+        Some(interactive_rebase_entry(commit, ctx)),
+        Some(entry_unless(
+            not_on_branch.or(is_head.then_some(ALREADY_AT_COMMIT)),
+            "Reset current branch to this Commit...",
+            Action::ResetCurrentTo {
+                commit: id.clone(),
+                subject: subject.clone(),
+                current: current.clone().unwrap_or_default(),
+                mode: ResetMode::default(),
+            },
+        )),
+    ]
 }
 
 /// "Select for Compare", then "Compare with Selected" when another commit
@@ -685,7 +711,10 @@ fn tags_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 Action::AddTag {
                     at: at.clone(),
                     name: String::new(),
+                    annotated: true,
                     message: String::new(),
+                    remote: ctx.default_remote().map(str::to_owned),
+                    push: false,
                 },
             )
         }),

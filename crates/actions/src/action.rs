@@ -79,6 +79,9 @@ impl ResetMode {
     }
 }
 
+/// The Add Tag dialog's types; the first is the default, as in VS Code.
+const TAG_TYPES: &[&str] = &["Annotated", "Lightweight"];
+
 /// Something the app does in response to a menu entry, as data.
 ///
 /// Fields hold both what git needs and what the confirmation text names
@@ -139,11 +142,16 @@ pub enum Action {
         rev: Rev,
         output: String,
     },
-    /// An empty `message` makes a lightweight tag.
+    /// Tags `at`; an annotated tag's `message` may be empty, a lightweight
+    /// tag has none. With `push`, also pushes the tag to `remote` (the
+    /// default remote; `None` when the repository has none).
     AddTag {
         at: Oid,
         name: String,
+        annotated: bool,
         message: String,
+        remote: Option<String>,
+        push: bool,
     },
     CheckoutCommit {
         commit: Oid,
@@ -360,6 +368,18 @@ impl Action {
             Self::PushBranch { .. } | Self::FetchIntoLocal { .. } => {
                 Plan::Git(vec![GitCommand::network(repo, self.git_args())])
             }
+            Self::AddTag {
+                name,
+                remote: Some(remote),
+                push: true,
+                ..
+            } => Plan::Git(vec![
+                GitCommand::write(repo, self.git_args()),
+                GitCommand::network(
+                    repo,
+                    strings(&["push", "--", remote, &format!("refs/tags/{name}")]),
+                ),
+            ]),
             Self::Tag(action) => action.plan(repo),
             Self::Stash(action) => action.plan(repo),
             Self::WorkingTree(action) => action.plan(repo),
@@ -463,9 +483,15 @@ impl Action {
             Self::CreateArchive { rev, output } => {
                 strings(&["archive", &format!("--output={output}"), "--", &rev.arg()])
             }
-            Self::AddTag { at, name, message } => {
+            Self::AddTag {
+                at,
+                name,
+                annotated,
+                message,
+                ..
+            } => {
                 let mut argv = strings(&["tag"]);
-                if !message.is_empty() {
+                if *annotated {
                     argv.extend(strings(&["--annotate", "--message", message]));
                 }
                 argv.extend(strings(&["--", name, at.as_str()]));
@@ -662,10 +688,49 @@ impl Action {
         Some(confirmation)
     }
 
+    /// Name, type, message and, with a remote, "Push to remote", as in
+    /// VS Code's Add Tag dialog.
+    fn add_tag_inputs(&self) -> Vec<InputSpec> {
+        let Self::AddTag {
+            name,
+            annotated,
+            message,
+            remote,
+            push,
+            ..
+        } = self
+        else {
+            return Vec::new();
+        };
+        let mut inputs = vec![
+            InputSpec::text(InputId::Name, "Tag name", InputKind::RefName, name),
+            InputSpec::text(
+                InputId::TagType,
+                "Type",
+                InputKind::Choice(TAG_TYPES),
+                TAG_TYPES[usize::from(!annotated)],
+            ),
+            InputSpec::text(
+                InputId::Message,
+                "Message (optional, annotated tags only)",
+                InputKind::Text,
+                message,
+            ),
+        ];
+        if remote.is_some() {
+            inputs.push(InputSpec::toggle(
+                InputId::PushToRemote,
+                "Push to remote",
+                *push,
+            ));
+        }
+        inputs
+    }
+
     /// The fields its dialog asks for, prefilled with the current values.
     #[must_use]
     pub fn inputs(&self) -> Vec<InputSpec> {
-        use InputKind::{Path, RefName, Remote, Text};
+        use InputKind::{Path, RefName, Remote};
         match self {
             Self::CheckoutRemoteBranch { local_name, .. } => vec![InputSpec::text(
                 InputId::Name,
@@ -723,15 +788,7 @@ impl Action {
                     output,
                 )]
             }
-            Self::AddTag { name, message, .. } => vec![
-                InputSpec::text(InputId::Name, "Tag name", RefName, name),
-                InputSpec::text(
-                    InputId::Message,
-                    "Message (empty for a lightweight tag)",
-                    Text,
-                    message,
-                ),
-            ],
+            Self::AddTag { .. } => self.add_tag_inputs(),
             Self::ResetCurrentTo { mode, .. } => vec![InputSpec::text(
                 InputId::Mode,
                 "Mode",
@@ -766,6 +823,21 @@ impl Action {
                 *remote = input::ref_name(id, value)?;
             }
             (Self::AddTag { message, .. }, InputId::Message) => *message = input::text(id, value)?,
+            (Self::AddTag { annotated, .. }, InputId::TagType) => {
+                let name = input::text(id, value)?;
+                *annotated = match TAG_TYPES.iter().position(|t| *t == name) {
+                    Some(index) => index == 0,
+                    None => return Err(InputError::NotAChoice(name)),
+                };
+            }
+            (
+                Self::AddTag {
+                    remote: Some(_),
+                    push,
+                    ..
+                },
+                InputId::PushToRemote,
+            ) => *push = input::toggle(id, &value)?,
             (Self::CreateArchive { output, .. }, InputId::Output) => {
                 *output = input::required(id, value)?;
             }
