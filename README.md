@@ -172,6 +172,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch, `...` repository menu); arrows move, `Enter` presses |
 | `c` | Move to the Source Control pane on the left (shown from 90 columns): type the commit message and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files; `Space` or `Enter` stages or unstages a file or a whole section, as do `+` and `-`; `Esc` goes back to the graph. Clicking a row's `+`/`−` does the same |
 | `r` | Refresh |
+| Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
 | `q` | Quit (closes the diff first when one is open) |
 

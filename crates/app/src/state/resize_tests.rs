@@ -1,0 +1,100 @@
+//! Resizing the Source Control pane and the graph's columns by dragging their
+//! dividers (S6).
+
+use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use pretty_assertions::assert_eq;
+use tgg_testkit::FixtureRepo;
+
+use super::*;
+use crate::testing::Harness;
+
+const H: u16 = 24;
+
+fn open(repo: &FixtureRepo, width: u16) -> Harness {
+    let mut h = Harness::open(repo);
+    h.draw(width, H);
+    h
+}
+
+fn mouse(h: &mut Harness, kind: MouseEventKind, x: u16, y: u16, width: u16) {
+    let commands = h.state.update(Event::Mouse(MouseEvent {
+        kind,
+        column: x,
+        row: y,
+        modifiers: KeyModifiers::NONE,
+    }));
+    h.settle(commands);
+    h.draw(width, H);
+}
+
+fn drag(h: &mut Harness, from: (u16, u16), to_x: u16, width: u16) {
+    let left = MouseButton::Left;
+    mouse(h, MouseEventKind::Down(left), from.0, from.1, width);
+    mouse(h, MouseEventKind::Drag(left), to_x, from.1, width);
+    mouse(h, MouseEventKind::Up(left), to_x, from.1, width);
+}
+
+fn find(h: &Harness, text: &str) -> (u16, u16) {
+    h.find_on_screen(text)
+        .unwrap_or_else(|| panic!("{text:?} not on screen"))
+}
+
+fn cell(h: &Harness, x: u16, y: u16) -> &str {
+    h.screen[(x, y)].symbol()
+}
+
+#[test]
+fn dragging_the_divider_between_the_panes_resizes_source_control() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo, 110);
+    // A quarter of 110 is under the 30-column minimum default.
+    assert_eq!(cell(&h, 30, 5), "│");
+    assert_eq!(find(&h, "Graph").0, 31);
+
+    drag(&mut h, (30, 5), 40, 110);
+    assert_eq!(cell(&h, 40, 5), "│");
+    assert_eq!(find(&h, "Graph").0, 41);
+    assert!(h.state.source_control.width.is_some());
+
+    // The pane keeps at least 20 columns and the graph at least 50.
+    drag(&mut h, (40, 5), 3, 110);
+    assert_eq!(cell(&h, 20, 5), "│");
+    drag(&mut h, (20, 5), 105, 110);
+    assert_eq!(cell(&h, 60, 5), "│");
+}
+
+#[test]
+fn dragging_a_header_divider_resizes_the_columns() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo, 150);
+    let selected = h.state.selected;
+    let (x, y) = find(&h, "│Date");
+    let (author_x, _) = find(&h, "│Author");
+
+    drag(&mut h, (x, y), x - 4, 150);
+    assert_eq!(find(&h, "│Date"), (x - 4, y), "the date column is 4 wider");
+    assert_eq!(
+        find(&h, "│Author").0,
+        author_x,
+        "the columns on the right stay"
+    );
+    assert_eq!(h.state.selected, selected, "a drag doesn't select a row");
+    assert!(h.state.details.is_none(), "nor open details");
+
+    let (graph_x, _) = find(&h, "│Description");
+    drag(&mut h, (graph_x, y), graph_x + 6, 150);
+    assert_eq!(
+        find(&h, "│Description").0,
+        graph_x + 6,
+        "a wider graph column"
+    );
+}
+
+#[test]
+fn moving_the_mouse_without_grabbing_a_divider_resizes_nothing() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo, 110);
+    mouse(&mut h, MouseEventKind::Drag(MouseButton::Left), 50, 5, 110);
+    assert_eq!(cell(&h, 30, 5), "│");
+    assert!(h.state.source_control.width.is_none());
+}

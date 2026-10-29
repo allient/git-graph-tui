@@ -14,7 +14,7 @@ use tgg_git::show::{self, FileChange};
 use tgg_git::{CancelToken, ExecError, GitCommand, log, refs, status};
 use tgg_graph::Graph;
 use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
-use tgg_ui::{HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
+use tgg_ui::{ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
 
 use crate::git::{JobHandle, JobId, JobResult};
 
@@ -22,6 +22,7 @@ mod actions;
 mod details;
 mod info;
 mod output;
+mod resize;
 mod source_control;
 pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
@@ -169,6 +170,9 @@ pub struct AppState {
     pub picker: Option<OpenPicker>,
     /// The Source Control pane beside the graph.
     pub source_control: SourceControlState,
+    /// The graph's column widths, set by dragging the header dividers.
+    pub columns: ColumnWidths,
+    drag: Option<resize::Drag>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
@@ -208,6 +212,8 @@ impl AppState {
             toolbar: ToolbarState::default(),
             picker: None,
             source_control: SourceControlState::default(),
+            columns: ColumnWidths::default(),
+            drag: None,
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
@@ -391,6 +397,9 @@ impl AppState {
         }
         if self.diff.is_some() {
             return self.on_diff_mouse(mouse);
+        }
+        if let Some(commands) = self.on_resize_mouse(mouse) {
+            return commands;
         }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left)
             && let Some(commands) = self
@@ -721,6 +730,8 @@ mod jump_tests;
 mod mouse_tests;
 #[cfg(test)]
 mod output_tests;
+#[cfg(test)]
+mod resize_tests;
 #[cfg(test)]
 mod source_control_tests;
 #[cfg(test)]

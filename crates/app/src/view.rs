@@ -20,9 +20,18 @@ const DETAILS_HEIGHT: u16 = 12;
 /// Graph lines kept visible above and below an open details panel.
 const MIN_GRAPH_LINES: u16 = 3;
 
-/// Width of the Source Control pane: a quarter of the terminal, within bounds.
-fn pane_width(total: u16) -> u16 {
-    (total / 4).clamp(30, 44)
+/// Narrowest the Source Control pane gets when dragged.
+const MIN_PANE_WIDTH: u16 = 20;
+/// Columns always left for the graph beside the pane.
+const MIN_GRAPH_AREA: u16 = 50;
+
+/// Width of the Source Control pane: the dragged width, or a quarter of the
+/// terminal; within bounds either way.
+fn pane_width(total: u16, chosen: Option<u16>) -> u16 {
+    chosen.unwrap_or((total / 4).clamp(30, 44)).clamp(
+        MIN_PANE_WIDTH,
+        total.saturating_sub(MIN_GRAPH_AREA).max(MIN_PANE_WIDTH),
+    )
 }
 
 /// Draws the Source Control pane and, beside it, the toolbar and the graph;
@@ -55,6 +64,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         offset: state.offset,
         selected: state.selected,
         gap,
+        widths: state.columns,
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
     if let (Some(area), Some(details)) = (state.graph_hits.gap(), &mut state.details) {
@@ -118,12 +128,17 @@ fn draw_source_control(
 ) -> Rect {
     state.source_control.visible = area.width >= MIN_WIDTH_FOR_PANE;
     if !state.source_control.visible {
+        state.source_control.divider = None;
         state.source_control.focus = false;
         state.source_control.hits = SourceControlHitMap::default();
         return area;
     }
+    let width = pane_width(area.width, state.source_control.width);
+    if state.source_control.width.is_some() {
+        state.source_control.width = Some(width);
+    }
     let [pane, divider, rest] = Layout::horizontal([
-        Constraint::Length(pane_width(area.width)),
+        Constraint::Length(width),
         Constraint::Length(1),
         Constraint::Fill(1),
     ])
@@ -138,6 +153,7 @@ fn draw_source_control(
         frame.set_cursor_position(cursor);
     }
     state.source_control.hits = hits;
+    state.source_control.divider = Some(divider.x);
     for y in divider.top()..divider.bottom() {
         frame.buffer_mut()[(divider.x, y)]
             .set_char('│')
