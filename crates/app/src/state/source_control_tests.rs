@@ -44,11 +44,16 @@ fn find(h: &Harness, text: &str) -> (u16, u16) {
 }
 
 /// The `+`/`−` button at the end of the pane line showing `text`.
-fn button_of(h: &Harness, text: &str) -> (u16, u16) {
+/// A button (`+`, `−`, `↶`) on the pane line showing `text`.
+fn button_on(h: &Harness, text: &str, button: &str) -> (u16, u16) {
     let (_, y) = find(h, text);
     let pane = h.state.source_control.hits.clone();
-    let right = (0..W).take_while(|&x| pane.contains(x, y)).last().unwrap();
-    (right, y)
+    let x = (0..W)
+        .take_while(|&x| pane.contains(x, y))
+        .filter(|&x| h.screen[(x, y)].symbol() == button)
+        .last()
+        .unwrap_or_else(|| panic!("no {button:?} on the {text:?} line"));
+    (x, y)
 }
 
 fn status(repo: &FixtureRepo) -> String {
@@ -77,7 +82,7 @@ fn source_control_and_the_graph_sit_side_by_side() {
 fn stage_a_file_type_a_message_and_commit() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    let (x, y) = button_of(&h, "notes.txt");
+    let (x, y) = button_on(&h, "notes.txt", "+");
     click(&mut h, x, y);
     assert_eq!(status(&repo), "A  notes.txt");
     assert!(h.find_on_screen("▾ Staged Changes").is_some());
@@ -203,5 +208,54 @@ fn a_narrow_terminal_hides_the_pane() {
     assert_eq!(
         h.state.message.as_deref(),
         Some("Widen the terminal to at least 90 columns to show Source Control.")
+    );
+}
+
+#[test]
+fn discard_asks_first_then_throws_the_change_away() {
+    let repo = FixtureRepo::sample();
+    repo.write_file("README.md", "changed\n");
+    let mut h = open(&repo);
+    let (x, y) = button_on(&h, "README.md", "↶");
+    click(&mut h, x, y);
+    assert!(matches!(h.state.dialog, Some(Dialog::Confirm { .. })));
+    assert!(status(&repo).contains(" M README.md"), "nothing yet");
+    // Destructive: focus starts on Cancel.
+    press(&mut h, KeyCode::Left);
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(status(&repo), "?? notes.txt");
+}
+
+#[test]
+fn header_buttons_refresh_and_open_the_repository_menu() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    repo.write_file("later.txt", "x\n");
+    let (x, y) = find(&h, "✓ ↻ …");
+    click(&mut h, x + 2, y);
+    assert!(h.find_on_screen("later.txt").is_some(), "refreshed");
+    click(&mut h, x + 4, y);
+    assert!(h.state.menu.is_some(), "the repository menu");
+    assert!(h.find_on_screen("Checkout to...").is_some());
+}
+
+#[test]
+fn alt_enter_writes_a_multi_line_commit_message() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let (x, y) = button_on(&h, "notes.txt", "+");
+    click(&mut h, x, y);
+    let (x, y) = find(&h, " Message");
+    click(&mut h, x + 2, y);
+    type_text(&mut h, "Add notes");
+    let commands = h
+        .state
+        .update(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT)));
+    h.settle(commands);
+    type_text(&mut h, "With a body.");
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(
+        repo.git(&["log", "-1", "--format=%B"]),
+        "Add notes\nWith a body."
     );
 }

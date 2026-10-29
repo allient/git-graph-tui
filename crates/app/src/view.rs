@@ -41,6 +41,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let [main_area, status_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
     let right_area = draw_source_control(frame, main_area, state, theme);
+    state.toolbar.more = !state.source_control.visible;
     let [toolbar_area, graph_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(right_area);
     state.toolbar.hits = state

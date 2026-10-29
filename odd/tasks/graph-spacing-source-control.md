@@ -36,7 +36,7 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 | T9 | S12 file at revision, compare | delegated (parallel units: T9 and T12 have disjoint surfaces; isolated worktree) | pending | |
 | T10 | S12 external pager | inline | pending | |
 | T11 | S12 settings and config | inline | pending | |
-| T12 | S13, S14, S15, S16 | inline | in progress | feat/graph-padding-auto-icons |
+| T12 | S13, S14, S15, S16 | inline | done (492 tests) | feat/graph-padding-auto-icons: c3923c6 + pane commit |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
 
 ## Log
@@ -59,3 +59,4 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L16** T7 Find: `/` opens a find bar on the status line. It matches loaded commits case-insensitively on subject, author name/email, the formatted date, a hash prefix, and branch/tag short names on the commit. It selects the first match, highlights matching subjects (theme.tag, bold), Enter/↓ next, ↑ previous (wrapping), Esc closes, and re-runs when history pages load. It only searches commits already loaded.
 - **L17** T8 Create Pull Request: on local branches (default remote) and remote branches. `git remote get-url`, then tgg_actions::pull_request_url builds the GitHub compare / GitLab merge_requests/new / Bitbucket pull-requests/new link from https, ssh:// and scp-like URLs (hosts recognised by name, ports dropped, branch percent-encoded); Command::OpenUrl opens it with open/xdg-open/explorer. Other hosts get an explanation instead of a link.
 - **L18** (2026-10-28) User: "notice thsi the three dots shoudl be lcoated ate source ocntrol [Image #22] also a refresh one and commit [Image #23] as a check. also a discragd button [Image #24] and + buttons . make text input to name teh commit a text area. source control also need to have chages and stages areas [Image #25]. you can cask sub agent to work on thsi if neede or @w2"
+- **L19** T12: header `✓ ↻ …` (commit, refresh, repository menu; the toolbar drops `[...]` while the pane shows); rows `↶ + M` / `− M`, Changes header `↶ + n`, Staged header `− n`; `d` or Delete discards (WorkingTreeAction::Discard: restore --worktree for tracked, clean --force for untracked, with a confirmation); the message is a 3-line wrapping text area: Enter commits, Alt/Shift+Enter or Ctrl+J add a newline; `m` opens the repository menu from the pane. Codicons in Nerd mode (check eab2, discard eae2, add ea60, remove eb3b).

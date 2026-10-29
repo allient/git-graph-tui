@@ -169,9 +169,9 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file and `Enter` opens its diff |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
-| `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch, `...` repository menu); arrows move, `Enter` presses |
+| `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |
 | `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |
-| `c` | Move to the Source Control pane on the left (shown from 90 columns): type the commit message and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files; `Space` or `Enter` stages or unstages a file or a whole section, as do `+` and `-`; `Esc` goes back to the graph. Clicking a row's `+`/`−` does the same |
+| `c` | Move to the Source Control pane on the left (shown from 90 columns). Type the commit message (`Alt+Enter`, `Shift+Enter` or `Ctrl+J` starts a new line) and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files: `Space`/`Enter` stages or unstages a file or a whole section, as do `+` and `-`; `d` discards a file's changes (or the whole Changes section) after asking; `m` opens the repository menu; `Esc` goes back to the graph. The header's `✓` `↻` `…` commit, refresh and open the repository menu; each row's `↶` `+` `−` discard, stage and unstage |
 | `r` | Refresh |
 | Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |

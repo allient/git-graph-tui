@@ -76,6 +76,9 @@ pub struct Toolbar {
     summary: String,
     show_remotes: bool,
     focus: Option<ToolbarButton>,
+    /// Whether the "..." repository menu button is here (the Source Control
+    /// pane shows it when visible).
+    more: bool,
 }
 
 /// The dropdown text for the selected branches: `Show All` when none are,
@@ -96,7 +99,23 @@ impl Toolbar {
             summary: filter_summary(branch_filter),
             show_remotes,
             focus: None,
+            more: true,
         }
+    }
+
+    /// Leaves out the "..." button.
+    #[must_use]
+    pub fn without_more(mut self) -> Self {
+        self.more = false;
+        self
+    }
+
+    /// The buttons in keyboard order.
+    fn buttons(&self) -> Vec<ToolbarButton> {
+        ORDER
+            .into_iter()
+            .filter(|b| self.more || *b != ToolbarButton::RepoMenu)
+            .collect()
     }
 
     #[must_use]
@@ -158,15 +177,16 @@ impl Toolbar {
     }
 
     fn step(&mut self, delta: isize) {
+        let order = self.buttons();
         let current = self
             .focus
-            .and_then(|f| ORDER.iter().position(|b| *b == f))
+            .and_then(|f| order.iter().position(|b| *b == f))
             .unwrap_or(0);
-        let len = ORDER.len().cast_signed();
+        let len = order.len().cast_signed();
         let next = (current.cast_signed() + delta)
             .rem_euclid(len)
             .cast_unsigned();
-        self.focus = Some(ORDER[next]);
+        self.focus = Some(order[next]);
     }
 
     /// Draws the toolbar on the first row of `area`.
@@ -176,11 +196,14 @@ impl Toolbar {
             return hits;
         }
         let y = area.y;
-        let right: [(ToolbarButton, &str); 3] = [
+        let right: Vec<(ToolbarButton, &str)> = [
             (ToolbarButton::Refresh, theme.icons.refresh()),
             (ToolbarButton::Fetch, theme.icons.fetch()),
             (ToolbarButton::RepoMenu, theme.icons.more()),
-        ];
+        ]
+        .into_iter()
+        .filter(|(b, _)| self.more || *b != ToolbarButton::RepoMenu)
+        .collect();
         let right_width: usize = right.iter().map(|(_, l)| l.width() + 1).sum::<usize>() - 1;
         let width = usize::from(area.width);
         // One column of margin on each side.

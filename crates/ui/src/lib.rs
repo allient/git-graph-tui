@@ -16,7 +16,7 @@ mod theme;
 pub use badges::{Badge, BadgeKind, badges_for};
 pub use glyphs::{GlyphCell, connector_glyphs, lane_glyphs};
 pub use graph_view::{ColumnDivider, ColumnWidths, Gap, GraphView, HitMap, HitTarget, ROW_HEIGHT};
-pub use icons::Icons;
+pub use icons::{Glyph, Icons};
 pub use source_control::{SourceControl, SourceControlHitMap, SourceControlOutcome};
 pub use text::{fit, format_date};
 pub use theme::Theme;
