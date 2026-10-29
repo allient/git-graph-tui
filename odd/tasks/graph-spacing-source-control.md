@@ -27,7 +27,7 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 | T2 | S3 | inline | done (454 tests, pty smoke committed a file) | feat/source-control: 88f9e46, fcac605, slice 4 |
 | T4 | S6 | inline | done (462 tests, pty drag moved the divider 30→45) | feat/resize-panes |
 | T6 | S9, S10, S11 | inline | done (463 tests) | feat/graph-padding-auto-icons |
-| T7 | S12 Find | inline | pending | |
+| T7 | S12 Find | inline | done (470 tests) | feat/graph-padding-auto-icons |
 | T8 | S12 Create PR | inline | pending | |
 | T9 | S12 file at revision, compare | inline | pending | |
 | T10 | S12 external pager | inline | pending | |
@@ -51,3 +51,4 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L13** T4: drag the pane divider (pane 20 columns to total-50, kept for the session) or the header dividers `│` (AfterGraph resizes the graph column; AfterDescription widens/narrows Date; AfterDate and AfterAuthor trade width between neighbours; 4-80 columns). A drag never selects a row. Widths are not saved between runs. Built on feat/source-control; PR after #26 merges.
 - **L14** (2026-10-28) User: "add more oadding at left of vlue dots [Image #21]. coplete teh two open item and continue with they feature not built yet"
 - **L15** T6: lanes start 2 columns in (GRAPH_PADDING). `--icons auto` is the new default: Nerd icons when TERM_PROGRAM is ghostty/wezterm, TERM is xterm-ghostty/xterm-kitty, or GHOSTTY_RESOURCES_DIR, WEZTERM_EXECUTABLE or KITTY_WINDOW_ID is set (these survive inside herdr/tmux). README: 23 checklist items ticked; still open: Find, fetch into local branch, column show/hide, create PR, external pager, file at revision, compare, issue linking, stretch goals.
+- **L16** T7 Find: `/` opens a find bar on the status line. It matches loaded commits case-insensitively on subject, author name/email, the formatted date, a hash prefix, and branch/tag short names on the commit. It selects the first match, highlights matching subjects (theme.tag, bold), Enter/↓ next, ↑ previous (wrapping), Esc closes, and re-runs when history pages load. It only searches commits already loaded.

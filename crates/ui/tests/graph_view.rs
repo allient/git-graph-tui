@@ -56,6 +56,7 @@ fn view(l: &Loaded) -> GraphView<'_> {
         selected: 0,
         gap: None,
         widths: ColumnWidths::default(),
+        matches: &[],
     }
 }
 
