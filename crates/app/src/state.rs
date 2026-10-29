@@ -10,12 +10,14 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Target, menu_for};
+use tgg_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Operation, Target, menu_for};
 use tgg_git::show::{self, FileChange};
-use tgg_git::{CancelToken, ExecError, GitCommand, log, refs, status};
+use tgg_git::{CancelToken, ExecError, GitCommand, in_progress, log, refs, status};
 use tgg_graph::Graph;
 use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
-use tgg_ui::{ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu};
+use tgg_ui::{
+    BannerHitMap, ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu,
+};
 
 use crate::external::External;
 use crate::git::{JobHandle, JobId, JobResult};
@@ -25,6 +27,7 @@ mod compare;
 mod details;
 mod find;
 mod info;
+mod operation;
 mod output;
 mod reflog;
 mod resize;
@@ -93,6 +96,8 @@ pub enum Request {
     Head,
     Refs,
     Status,
+    /// Which merge, rebase, cherry-pick or revert is in progress.
+    InProgress,
     /// A page of history starting `skip` commits from the newest.
     Log {
         skip: usize,
@@ -133,6 +138,7 @@ impl Request {
             Self::Head => GitCommand::read(repo, ["rev-parse", "--verify", "--quiet", "HEAD"]),
             Self::Refs => GitCommand::read(repo, refs::args()),
             Self::Status => GitCommand::read(repo, status::args()),
+            Self::InProgress => GitCommand::read(repo, in_progress::args()),
             Self::Log {
                 skip,
                 max_count,
@@ -164,7 +170,7 @@ impl Request {
     fn is_refresh(&self) -> bool {
         matches!(
             self,
-            Self::Head | Self::Refs | Self::Status | Self::Log { .. }
+            Self::Head | Self::Refs | Self::Status | Self::InProgress | Self::Log { .. }
         )
     }
 }
@@ -232,6 +238,10 @@ pub struct AppState {
     pub pager: Option<String>,
     /// Where issue references in commit messages link to (S20).
     pub issues: crate::config::Issues,
+    /// The merge, rebase, cherry-pick or revert git stopped in the middle of.
+    pub operation: Option<Operation>,
+    /// The conflict banner's buttons as last drawn.
+    pub banner_hits: BannerHitMap,
     drag: Option<resize::Drag>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
@@ -281,6 +291,8 @@ impl AppState {
             compare_base: None,
             pager: None,
             issues: crate::config::Issues::default(),
+            operation: None,
+            banner_hits: BannerHitMap::default(),
             drag: None,
             running: None,
             pending: HashMap::new(),
@@ -351,11 +363,16 @@ impl AppState {
         self.refreshing_head = None;
         // An open reflog view reloads too: actions add entries to it.
         let reflog = self.reflog.is_some().then_some(Request::Reflog);
-        [Request::Head, Request::Refs, Request::Status]
-            .into_iter()
-            .chain(reflog)
-            .map(Command::Git)
-            .collect()
+        [
+            Request::Head,
+            Request::Refs,
+            Request::Status,
+            Request::InProgress,
+        ]
+        .into_iter()
+        .chain(reflog)
+        .map(Command::Git)
+        .collect()
     }
 
     fn on_key(&mut self, key: KeyEvent) -> Vec<Command> {
@@ -419,6 +436,8 @@ impl AppState {
             (KeyCode::Enter, _) => return self.toggle_details(),
             (KeyCode::Tab, _) => self.focus_toolbar(),
             (KeyCode::Char('c'), _) => self.focus_source_control(),
+            (KeyCode::Char('C'), _) => return self.continue_operation(),
+            (KeyCode::Char('A'), _) => return self.abort_operation(),
             (KeyCode::Char('/'), _) => self.open_find(),
             (KeyCode::Char('g') | KeyCode::Home, _) => self.select(0),
             (KeyCode::Char('G') | KeyCode::End, _) => self.select(last),
@@ -486,6 +505,7 @@ impl AppState {
             && let Some(commands) = self
                 .on_source_control_click(x, y)
                 .or_else(|| self.on_toolbar_click(x, y))
+                .or_else(|| self.on_banner_click(x, y))
                 .or_else(|| self.on_details_click(x, y))
         {
             return commands;
@@ -691,6 +711,10 @@ impl AppState {
                 self.parsed(status::parse(&out.stdout), Self::apply_status);
                 Vec::new()
             }
+            (Request::InProgress, Ok(out)) => {
+                self.on_in_progress(&out.stdout);
+                Vec::new()
+            }
             (Request::Log { skip, .. }, Ok(out)) => {
                 match log::parse(&out.stdout) {
                     Ok(page) => self.on_log_page(skip, page),
@@ -877,6 +901,8 @@ mod info_tests;
 mod jump_tests;
 #[cfg(test)]
 mod mouse_tests;
+#[cfg(test)]
+mod operation_tests;
 #[cfg(test)]
 mod output_tests;
 #[cfg(test)]

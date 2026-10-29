@@ -6,6 +6,8 @@
 //! mouse clicks and right-clicks against exactly what was drawn.
 
 mod badges;
+mod banner;
+pub use banner::{Banner, BannerButton, BannerHitMap};
 mod glyphs;
 mod graph_view;
 mod icons;

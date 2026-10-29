@@ -76,6 +76,10 @@ impl AppState {
             self.message = Some("Wait for the current action to finish.".into());
             return Vec::new();
         }
+        if let Some(why) = self.refused_during_operation(&action) {
+            self.message = Some(why);
+            return Vec::new();
+        }
         if let Some(view) = InputDialog::for_action(&label, &action) {
             let view = view.with_remotes(&self.menu_context().remotes);
             self.open_dialog(Dialog::Input {
