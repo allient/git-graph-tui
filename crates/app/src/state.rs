@@ -27,6 +27,7 @@ mod compare;
 mod details;
 mod find;
 mod info;
+mod list;
 mod operation;
 mod output;
 mod reflog;
@@ -35,6 +36,7 @@ mod source_control;
 pub use find::Find;
 pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
+mod worktrees;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
@@ -44,6 +46,7 @@ pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
 pub use reflog::ReflogView;
 pub use toolbar::{OpenPicker, ToolbarState};
+pub use worktrees::{WorktreeEntry, WorktreesView};
 
 /// Commits loaded per `git log` call.
 pub const DEFAULT_PAGE_SIZE: usize = 500;
@@ -129,6 +132,8 @@ pub enum Request {
     },
     /// HEAD's newest reflog entries, for the reflog view (S20).
     Reflog,
+    /// The repository's worktrees, for the worktrees view (S20).
+    Worktrees,
 }
 
 impl Request {
@@ -163,6 +168,7 @@ impl Request {
             }
             Self::IssueUrl { .. } => GitCommand::read(repo, ["remote", "get-url", "origin"]),
             Self::Reflog => GitCommand::read(repo, tgg_git::reflog::args(REFLOG_ENTRIES)),
+            Self::Worktrees => GitCommand::read(repo, tgg_git::worktree::args()),
         }
     }
 
@@ -216,6 +222,8 @@ pub struct AppState {
     pub output_view: Option<OutputView>,
     /// The open reflog view, drawn over the graph.
     pub reflog: Option<ReflogView>,
+    /// The open worktrees view, drawn over the graph.
+    pub worktrees: Option<WorktreesView>,
     /// The toolbar's branch filter, remote toggle and keyboard focus.
     pub toolbar: ToolbarState,
     /// The open ref picker (branch filter, "Checkout to...", ...), above any menu.
@@ -280,6 +288,7 @@ impl AppState {
             git_output: GitOutput::default(),
             output_view: None,
             reflog: None,
+            worktrees: None,
             toolbar: ToolbarState::default(),
             picker: None,
             source_control: SourceControlState::default(),
@@ -363,6 +372,8 @@ impl AppState {
         self.refreshing_head = None;
         // An open reflog view reloads too: actions add entries to it.
         let reflog = self.reflog.is_some().then_some(Request::Reflog);
+        // So does an open worktrees view: worktree actions change it.
+        let worktrees = self.worktrees.is_some().then_some(Request::Worktrees);
         [
             Request::Head,
             Request::Refs,
@@ -371,6 +382,7 @@ impl AppState {
         ]
         .into_iter()
         .chain(reflog)
+        .chain(worktrees)
         .map(Command::Git)
         .collect()
     }
@@ -396,6 +408,9 @@ impl AppState {
         }
         if self.reflog.is_some() {
             return self.on_reflog_key(key);
+        }
+        if self.worktrees.is_some() {
+            return self.on_worktrees_key(key);
         }
         if self.output_view.is_some() {
             return self.on_output_key(key);
@@ -491,6 +506,9 @@ impl AppState {
         }
         if self.reflog.is_some() {
             return self.on_reflog_mouse(mouse);
+        }
+        if self.worktrees.is_some() {
+            return self.on_worktrees_mouse(mouse);
         }
         if self.output_view.is_some() {
             return self.on_output_mouse(mouse);
@@ -728,6 +746,10 @@ impl AppState {
                 self.on_reflog_read(&out.stdout);
                 Vec::new()
             }
+            (Request::Worktrees, Ok(out)) => {
+                self.on_worktrees_read(&out.stdout);
+                Vec::new()
+            }
             (Request::Tag(name), Ok(out)) => {
                 self.on_tag_read(&name, &out.stdout);
                 Vec::new()
@@ -917,3 +939,5 @@ mod source_control_tests;
 mod tests;
 #[cfg(test)]
 mod toolbar_tests;
+#[cfg(test)]
+mod worktrees_tests;

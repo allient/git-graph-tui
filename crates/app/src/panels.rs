@@ -1,5 +1,5 @@
 //! Full-screen and modal panels drawn over the graph: the info dialog, the
-//! git output view and the reflog view.
+//! git output view, the reflog view and the worktrees view.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -8,7 +8,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
 use tgg_ui::{Theme, fit, format_date};
 
-use crate::state::{GitOutput, Info, OutputLine, ReflogView};
+use crate::state::{GitOutput, Info, OutputLine, ReflogView, WorktreeEntry, WorktreesView};
 
 /// Widest the info dialog gets.
 const INFO_WIDTH: u16 = 72;
@@ -139,4 +139,105 @@ pub fn draw_reflog(frame: &mut Frame<'_>, area: Rect, view: &ReflogView, theme: 
         .collect();
     Paragraph::new(text).render(inner, frame.buffer_mut());
     inner
+}
+
+/// Widest the worktrees view's branch column gets.
+const BRANCH_WIDTH: usize = 30;
+
+/// The worktrees view over `area`, one worktree per line: a `*` on the one
+/// the app runs in, short hash, branch (or what HEAD is), folder and flags.
+/// Returns the rows' area, for clicks and paging.
+pub fn draw_worktrees(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &WorktreesView,
+    theme: &Theme,
+) -> Rect {
+    Clear.render(area, frame.buffer_mut());
+    let block = Block::bordered().title(" worktrees · enter actions · a add · esc closes ");
+    let inner = block.inner(area);
+    block.render(area, frame.buffer_mut());
+    let page = usize::from(inner.height).max(1);
+    let offset = view.offset.min(view.entries.len().saturating_sub(page));
+    let branch_width = view
+        .entries
+        .iter()
+        .map(|e| branch_label(e).chars().count())
+        .max()
+        .unwrap_or(0)
+        .min(BRANCH_WIDTH);
+    let text: Vec<Line<'_>> = view
+        .entries
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(page)
+        .map(|(index, entry)| {
+            let worktree = &entry.worktree;
+            let mark = if entry.is_current { "* " } else { "  " };
+            let hash = worktree.head.as_ref().map_or_else(
+                || " ".repeat(SHORT_HASH + 1),
+                |id| format!("{} ", id.short(SHORT_HASH)),
+            );
+            let branch = format!("{} ", fit(&branch_label(entry), branch_width));
+            let flags = worktree_flags(entry);
+            let flags = if flags.is_empty() {
+                String::new()
+            } else {
+                format!(" {flags}")
+            };
+            // The folder takes what's left, so the flags line up on the right.
+            let used = mark.len() + hash.len() + branch.chars().count() + flags.chars().count();
+            let path = fit(
+                &worktree.path,
+                usize::from(inner.width).saturating_sub(used),
+            );
+            let line = Line::from(vec![
+                Span::styled(mark, Style::new().fg(theme.text)),
+                Span::styled(hash, Style::new().fg(theme.hash)),
+                Span::styled(branch, Style::new().fg(theme.text)),
+                Span::styled(path, Style::new().fg(theme.muted)),
+                Span::styled(flags, Style::new().fg(theme.date)),
+            ]);
+            if index == view.selected {
+                line.style(Style::new().bg(theme.selected_bg))
+            } else {
+                line
+            }
+        })
+        .collect();
+    Paragraph::new(text).render(inner, frame.buffer_mut());
+    inner
+}
+
+/// The branch checked out in a worktree, or what its HEAD is instead.
+fn branch_label(entry: &WorktreeEntry) -> String {
+    let worktree = &entry.worktree;
+    match &worktree.branch {
+        Some(branch) => branch.clone(),
+        None if worktree.bare => "(bare)".into(),
+        None => "(detached)".into(),
+    }
+}
+
+/// `current · main · locked (reason) · prunable`, as they apply.
+fn worktree_flags(entry: &WorktreeEntry) -> String {
+    let worktree = &entry.worktree;
+    let locked = worktree.locked.as_ref().map(|reason| {
+        if reason.is_empty() {
+            "locked".to_owned()
+        } else {
+            format!("locked ({reason})")
+        }
+    });
+    [
+        entry.is_current.then(|| "current".to_owned()),
+        worktree.is_main.then(|| "main".to_owned()),
+        locked,
+        worktree.prunable.as_ref().map(|_| "prunable".to_owned()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" · ")
 }

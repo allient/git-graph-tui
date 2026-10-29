@@ -4,8 +4,9 @@ use tgg_model::{HeadState, Oid, Stash};
 use super::*;
 use crate::{
     Action, CommitTarget, GraphColumn, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
-    StashAction, TagAction, UiEffect, WorkingTreeAction,
+    StashAction, TagAction, UiEffect, WorkingTreeAction, WorktreeAction,
 };
+use tgg_git::worktree::Worktree;
 
 fn oid(c: char) -> Oid {
     Oid::parse(&c.to_string().repeat(40)).unwrap()
@@ -650,6 +651,7 @@ fn repository_menu_matches_the_vs_code_order() {
             "---",
             "Show Git Output",
             "Show Reflog",
+            "Worktrees...",
         ]
     );
     assert_eq!(
@@ -728,6 +730,10 @@ fn repository_actions_are_prefilled() {
         action(&menu, "Show Reflog"),
         &Action::Ui(UiEffect::ShowReflog)
     );
+    assert_eq!(
+        action(&menu, "Worktrees..."),
+        &Action::Ui(UiEffect::ShowWorktrees)
+    );
 }
 
 #[test]
@@ -750,6 +756,7 @@ fn repository_menu_without_remotes_or_branch() {
             "---",
             "Show Git Output",
             "Show Reflog",
+            "Worktrees...",
         ]
     );
     assert_eq!(
@@ -887,4 +894,98 @@ fn reflog_menu_on_a_detached_head_cannot_reset_a_branch() {
         "{:?}",
         labels(&menu)
     );
+}
+
+// ---- worktree entry menu (S20 4) ----
+
+fn linked_worktree() -> Worktree {
+    Worktree {
+        path: "/src/app-dev".into(),
+        head: Some(oid('a')),
+        branch: Some("dev".into()),
+        ..Worktree::default()
+    }
+}
+
+#[test]
+fn worktree_menu_offers_copy_lock_remove_add_and_prune() {
+    let menu = worktree_menu(&linked_worktree(), false);
+    assert_eq!(
+        labels(&menu),
+        [
+            "Copy Path to Clipboard",
+            "Lock",
+            "---",
+            "Remove Worktree...",
+            "---",
+            "Add Worktree...",
+            "Prune Worktrees",
+        ]
+    );
+    let path = || "/src/app-dev".to_owned();
+    assert_eq!(
+        action(&menu, "Copy Path to Clipboard"),
+        &Action::Worktree(WorktreeAction::CopyPath { path: path() })
+    );
+    assert_eq!(
+        action(&menu, "Lock"),
+        &Action::Worktree(WorktreeAction::Lock { path: path() })
+    );
+    assert_eq!(
+        action(&menu, "Remove Worktree..."),
+        &Action::Worktree(WorktreeAction::Remove {
+            path: path(),
+            force: false,
+            locked: false
+        })
+    );
+    assert_eq!(
+        action(&menu, "Add Worktree..."),
+        &Action::Worktree(WorktreeAction::add())
+    );
+    assert_eq!(
+        action(&menu, "Prune Worktrees"),
+        &Action::Worktree(WorktreeAction::Prune)
+    );
+}
+
+#[test]
+fn a_locked_worktree_unlocks_and_removes_with_its_lock_known() {
+    let locked = Worktree {
+        locked: Some("usb".into()),
+        ..linked_worktree()
+    };
+    let menu = worktree_menu(&locked, false);
+    assert_eq!(
+        action(&menu, "Unlock"),
+        &Action::Worktree(WorktreeAction::Unlock {
+            path: "/src/app-dev".into()
+        })
+    );
+    assert!(matches!(
+        action(&menu, "Remove Worktree..."),
+        Action::Worktree(WorktreeAction::Remove { locked: true, .. })
+    ));
+}
+
+#[test]
+fn the_main_and_the_current_worktree_cannot_be_removed() {
+    let main = Worktree {
+        is_main: true,
+        ..linked_worktree()
+    };
+    assert_eq!(
+        labels(&worktree_menu(&main, true)),
+        [
+            "Copy Path to Clipboard",
+            "---",
+            "Remove Worktree... (disabled: The main worktree can't be removed.)",
+            "---",
+            "Add Worktree...",
+            "Prune Worktrees",
+        ]
+    );
+    assert!(labels(&worktree_menu(&linked_worktree(), true)).contains(
+        &"Remove Worktree... (disabled: tui-git-graph is running in this worktree.)".to_owned()
+    ));
 }

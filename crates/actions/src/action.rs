@@ -4,7 +4,10 @@ use tgg_git::GitCommand;
 use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
-use crate::{OperationAction, PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction};
+use crate::{
+    OperationAction, PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction,
+    WorktreeAction,
+};
 
 /// Abbreviated hash length in confirmation text (git's default).
 const SHORT: usize = 7;
@@ -187,6 +190,8 @@ pub enum Action {
     Tag(TagAction),
     Stash(StashAction),
     WorkingTree(WorkingTreeAction),
+    /// The worktrees view (S20 4).
+    Worktree(WorktreeAction),
     Repo(RepoAction),
     /// Continue or abort the operation in progress (the conflict banner).
     Operation(OperationAction),
@@ -223,6 +228,8 @@ pub enum UiEffect {
     ShowGitOutput,
     /// Show where HEAD has been (the reflog), to recover lost commits.
     ShowReflog,
+    /// Show the repository's worktrees, to add, remove or prune them.
+    ShowWorktrees,
     /// Open the hosting site's "new pull request" page for `branch` on `remote`.
     CreatePullRequest {
         remote: String,
@@ -309,6 +316,22 @@ fn commit_label(commit: &Oid, subject: &str) -> String {
     format!("commit {} \"{subject}\"", commit.short(SHORT))
 }
 
+fn reset_confirmation(commit: &Oid, subject: &str, current: &str, mode: ResetMode) -> Confirmation {
+    let target = commit_label(commit, subject);
+    let message = match mode {
+        ResetMode::Hard => format!(
+            "Hard reset '{current}' to {target}? Later commits leave '{current}' and ALL uncommitted changes are discarded."
+        ),
+        ResetMode::Soft => format!(
+            "Reset '{current}' to {target} (soft)? Later commits leave '{current}'; their changes stay staged."
+        ),
+        ResetMode::Mixed => format!(
+            "Reset '{current}' to {target} (mixed)? Later commits leave '{current}'; their changes stay in the working tree, unstaged."
+        ),
+    };
+    Confirmation::new("Reset Current Branch", message, "Reset")
+}
+
 fn branch_or_head(current: Option<&String>) -> String {
     current.map_or_else(|| "HEAD".to_owned(), |name| format!("'{name}'"))
 }
@@ -334,10 +357,36 @@ impl Action {
             Self::Stash(action) => action.plan(repo),
             Self::WorkingTree(action) => action.plan(repo),
             Self::Repo(action) => action.plan(repo),
+            Self::Worktree(action) => action.plan(repo),
             Self::Operation(action) => action.plan(repo),
             Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
+    }
+
+    /// `push [--set-upstream] [--force-with-lease] -- <remote> <refspec>`.
+    fn push_args(&self) -> Vec<String> {
+        let Self::PushBranch {
+            branch,
+            remote,
+            set_upstream,
+            force_with_lease,
+        } = self
+        else {
+            return Vec::new();
+        };
+        let mut argv = strings(&["push"]);
+        if *set_upstream {
+            argv.push("--set-upstream".into());
+        }
+        if *force_with_lease {
+            argv.push("--force-with-lease".into());
+        }
+        // An explicit refspec pushes exactly this branch, whatever
+        // push.default says.
+        let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
+        argv.extend(strings(&["--", remote, &refspec]));
+        argv
     }
 
     /// `fetch [--force] -- <remote> refs/heads/<branch>:refs/heads/<local>`:
@@ -401,25 +450,7 @@ impl Action {
                 argv
             }
             Self::RebaseCurrentOnto { onto, .. } => strings(&["rebase", "--", &onto.arg()]),
-            Self::PushBranch {
-                branch,
-                remote,
-                set_upstream,
-                force_with_lease,
-            } => {
-                let mut argv = strings(&["push"]);
-                if *set_upstream {
-                    argv.push("--set-upstream".into());
-                }
-                if *force_with_lease {
-                    argv.push("--force-with-lease".into());
-                }
-                // An explicit refspec pushes exactly this branch, whatever
-                // push.default says.
-                let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
-                argv.extend(strings(&["--", remote, &refspec]));
-                argv
-            }
+            Self::PushBranch { .. } => self.push_args(),
             Self::FetchIntoLocal { .. } => self.fetch_into_args(),
             Self::CreateArchive { rev, output } => {
                 strings(&["archive", &format!("--output={output}"), "--", &rev.arg()])
@@ -465,6 +496,7 @@ impl Action {
             | Self::Stash(_)
             | Self::WorkingTree(_)
             | Self::Repo(_)
+            | Self::Worktree(_)
             | Self::Operation(_)
             | Self::Ui(_) => Vec::new(),
         }
@@ -516,6 +548,7 @@ impl Action {
             Self::Stash(action) => action.is_destructive(),
             Self::WorkingTree(action) => action.is_destructive(),
             Self::Repo(action) => action.is_destructive(),
+            Self::Worktree(action) => action.is_destructive(),
             Self::Operation(action) => action.is_destructive(),
             _ => false,
         }
@@ -543,21 +576,7 @@ impl Action {
                 subject,
                 current,
                 mode,
-            } => {
-                let target = commit_label(commit, subject);
-                let message = match mode {
-                    ResetMode::Hard => format!(
-                        "Hard reset '{current}' to {target}? Later commits leave '{current}' and ALL uncommitted changes are discarded."
-                    ),
-                    ResetMode::Soft => format!(
-                        "Reset '{current}' to {target} (soft)? Later commits leave '{current}'; their changes stay staged."
-                    ),
-                    ResetMode::Mixed => format!(
-                        "Reset '{current}' to {target} (mixed)? Later commits leave '{current}'; their changes stay in the working tree, unstaged."
-                    ),
-                };
-                Confirmation::new("Reset Current Branch", message, "Reset")
-            }
+            } => reset_confirmation(commit, subject, current, *mode),
             Self::PushBranch {
                 branch,
                 remote,
@@ -621,6 +640,7 @@ impl Action {
             Self::Stash(action) => return action.confirmation(),
             Self::WorkingTree(action) => return action.confirmation(),
             Self::Repo(action) => return action.confirmation(),
+            Self::Worktree(action) => return action.confirmation(),
             Self::Operation(action) => return action.confirmation(),
             _ => return None,
         };
@@ -707,6 +727,7 @@ impl Action {
             Self::Stash(action) => action.inputs(),
             Self::WorkingTree(action) => action.inputs(),
             Self::Repo(action) => action.inputs(),
+            Self::Worktree(action) => action.inputs(),
             _ => Vec::new(),
         }
     }
@@ -766,6 +787,7 @@ impl Action {
             (Self::Stash(action), _) => return action.set_input(id, value),
             (Self::WorkingTree(action), _) => return action.set_input(id, value),
             (Self::Repo(action), _) => return action.set_input(id, value),
+            (Self::Worktree(action), _) => return action.set_input(id, value),
             _ => return Err(InputError::NotAnInput(id)),
         }
         Ok(())

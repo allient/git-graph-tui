@@ -27,6 +27,10 @@ pub enum InputId {
     IncludeUntracked,
     /// A remote's URL.
     Url,
+    /// A worktree's folder.
+    Path,
+    /// Create the worktree's branch instead of checking out an existing one.
+    NewBranch,
 }
 
 /// How a dialog should edit a field.
