@@ -110,13 +110,13 @@ mod tests {
 
     #[test]
     fn github_https_and_ssh_remotes() {
-        let expected = "https://github.com/allient/tui-git-graph/compare/feature/login?expand=1";
+        let expected = "https://github.com/allient/git-graph-tui/compare/feature/login?expand=1";
         for url in [
-            "https://github.com/allient/tui-git-graph.git",
-            "https://github.com/allient/tui-git-graph",
-            "git@github.com:allient/tui-git-graph.git",
-            "ssh://git@github.com/allient/tui-git-graph.git",
-            "https://user:token@github.com/allient/tui-git-graph.git\n",
+            "https://github.com/allient/git-graph-tui.git",
+            "https://github.com/allient/git-graph-tui",
+            "git@github.com:allient/git-graph-tui.git",
+            "ssh://git@github.com/allient/git-graph-tui.git",
+            "https://user:token@github.com/allient/git-graph-tui.git\n",
         ] {
             assert_eq!(
                 pull_request_url(url, "feature/login").as_deref(),

@@ -1,5 +1,5 @@
 [package]
-name = "tui-git-graph"
+name = "git-graph-tui"
 description = "A Git Graph for the terminal: colored commit graph with context menus for checkout, merge, rebase, cherry-pick, reset and more."
 version.workspace = true
 edition.workspace = true
@@ -14,7 +14,7 @@ keywords = ["git", "tui", "graph", "terminal", "ratatui"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
-name = "tui-git-graph"
+name = "git-graph-tui"
 path = "src/main.rs"
 
 # Not published to crates.io (`publish = false`), but released as binaries.

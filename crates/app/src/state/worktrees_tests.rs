@@ -251,7 +251,7 @@ fn the_main_and_the_current_worktree_cannot_be_removed() {
     assert!(h.state.dialog.is_none());
     assert_eq!(
         h.state.message.as_deref(),
-        Some("tui-git-graph is running in this worktree.")
+        Some("git-graph-tui is running in this worktree.")
     );
     assert!(linked.exists());
 }

@@ -7,7 +7,7 @@ How AI coding agents are set up for this repo. Agents read `AGENTS.md` for the p
 | Tool | What it does here | Scope |
 | --- | --- | --- |
 | [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai) `4.3.1` | Configures the agent with the **ODD** workflow, **RDD** review, Engram memory and a skill registry | Global (`~/.claude/`) + `.atl/` in this repo |
-| [Engram](https://github.com/Gentleman-Programming/engram) | Persistent memory across sessions: decisions, discoveries, ODD feature mirrors | Global, project key `tui-git-graph` |
+| [Engram](https://github.com/Gentleman-Programming/engram) | Persistent memory across sessions: decisions, discoveries, ODD feature mirrors | Global, project key `git-graph-tui` |
 | [skills.sh](https://skills.sh) skills | Task-specific instructions the agent loads on demand | This repo (`.claude/skills/`, `.agents/skills/`, `skills-lock.json`) |
 
 ## Gentle AI

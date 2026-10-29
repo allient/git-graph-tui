@@ -1,4 +1,4 @@
-//! `tui-git-graph`: a Git Graph for the terminal.
+//! `git-graph-tui`: a Git Graph for the terminal.
 
 mod browser;
 mod cli;
@@ -65,7 +65,7 @@ fn main() -> Result<()> {
 )]
 fn save_layout(path: &std::path::Path, layout: config::Layout) {
     if let Err(err) = config::save_layout(path, layout) {
-        eprintln!("tui-git-graph: could not save the layout: {err:#}");
+        eprintln!("git-graph-tui: could not save the layout: {err:#}");
     }
 }
 

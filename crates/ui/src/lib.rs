@@ -1,4 +1,4 @@
-//! ratatui widgets for tui-git-graph: the graph view, ref badges, commit
+//! ratatui widgets for git-graph-tui: the graph view, ref badges, commit
 //! details, popup menus and dialogs.
 //!
 //! Rendering is a pure function of application state. Every frame also

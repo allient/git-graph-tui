@@ -1,5 +1,5 @@
 #!/bin/sh
-# Action entrypoint: opens tui-git-graph for the active repository.
+# Action entrypoint: opens git-graph-tui for the active repository.
 #
 # Actions run headless (no terminal), so this hands over to the `graph` pane
 # entrypoint, which herdr runs in a real pane. The directory travels through
@@ -23,7 +23,7 @@ dir=$(context checkout_path)
 [ -n "$dir" ] || dir=.
 
 exec "${HERDR_BIN_PATH:-herdr}" plugin pane open \
-  --plugin tui-git-graph \
+  --plugin git-graph-tui \
   --entrypoint graph \
   --focus \
   --env "TGG_TARGET_DIR=$dir"

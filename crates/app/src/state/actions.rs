@@ -210,7 +210,7 @@ impl AppState {
                 self.message = Some(match &running.action {
                     Action::Repo(clone @ RepoAction::Clone { .. }) => {
                         let dest = clone.destination().unwrap_or_default();
-                        format!("✓ Cloned into {dest}. Open it with: tui-git-graph {dest}")
+                        format!("✓ Cloned into {dest}. Open it with: git-graph-tui {dest}")
                     }
                     _ => format!("✓ {}", running.label),
                 });

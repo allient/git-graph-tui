@@ -1,4 +1,4 @@
-//! Git access for tui-git-graph.
+//! Git access for git-graph-tui.
 //!
 //! - Builds `git` argument vectors safely (`-C <repo>`, no shell, user input
 //!   passed as separate arguments).

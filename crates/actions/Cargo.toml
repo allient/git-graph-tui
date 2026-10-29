@@ -1,6 +1,6 @@
 [package]
 name = "tgg-actions"
-description = "Git actions for tui-git-graph: argv planning, confirmations and context menus."
+description = "Git actions for git-graph-tui: argv planning, confirmations and context menus."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

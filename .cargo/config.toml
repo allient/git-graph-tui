@@ -4,4 +4,4 @@ lint = "clippy --workspace --all-targets --locked -- -D warnings"
 # cargo t      -> run the whole test suite with nextest
 t = "nextest run --workspace"
 # cargo run-app -> run the TUI (default member)
-run-app = "run -p tui-git-graph --"
+run-app = "run -p git-graph-tui --"

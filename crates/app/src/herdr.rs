@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// Environment variable that turns the routing off (`off`, `0`, `false`, `no`).
-pub const RIGHT_CLICK_ENV: &str = "TUI_GIT_GRAPH_HERDR_RIGHT_CLICK";
+pub const RIGHT_CLICK_ENV: &str = "GIT_GRAPH_TUI_HERDR_RIGHT_CLICK";
 
 /// How long one `herdr` call may take before it is given up on.
 const CALL_TIMEOUT: Duration = Duration::from_millis(500);
