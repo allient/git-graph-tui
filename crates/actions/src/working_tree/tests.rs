@@ -140,3 +140,61 @@ fn stage_unstage_and_commit_need_no_dialog() {
         assert!(action.inputs().is_empty(), "{action:?}");
     }
 }
+
+fn all_args(action: &WorkingTreeAction) -> Vec<Vec<String>> {
+    let Plan::Git(commands) = action.plan(Path::new("/r")) else {
+        panic!("expected git commands for {action:?}");
+    };
+    commands.iter().map(|c| c.argv()[6..].to_vec()).collect()
+}
+
+#[test]
+fn discard_restores_tracked_files_and_deletes_untracked_ones() {
+    let discard = WorkingTreeAction::Discard {
+        paths: vec!["a.rs".into()],
+        untracked: vec!["new file.txt".into()],
+    };
+    assert_eq!(
+        all_args(&discard),
+        [
+            vec!["restore", "--worktree", "--", ":(literal)a.rs"],
+            vec!["clean", "--force", "--", ":(literal)new file.txt"],
+        ]
+    );
+    let tracked_only = WorkingTreeAction::Discard {
+        paths: vec!["a.rs".into()],
+        untracked: Vec::new(),
+    };
+    assert_eq!(all_args(&tracked_only).len(), 1);
+}
+
+#[test]
+fn discard_is_destructive_and_names_what_it_loses() {
+    let one = WorkingTreeAction::Discard {
+        paths: vec!["src/a.rs".into()],
+        untracked: Vec::new(),
+    };
+    assert!(one.is_destructive());
+    let confirmation = one.confirmation().unwrap();
+    assert_eq!(confirmation.title, "Discard Changes");
+    assert_eq!(
+        confirmation.message,
+        "Discard the changes in 'src/a.rs'? This can't be undone."
+    );
+    let untracked = WorkingTreeAction::Discard {
+        paths: Vec::new(),
+        untracked: vec!["notes.txt".into()],
+    };
+    assert_eq!(
+        untracked.confirmation().unwrap().message,
+        "Delete the untracked file 'notes.txt'? This can't be undone."
+    );
+    let many = WorkingTreeAction::Discard {
+        paths: vec!["a".into(), "b".into()],
+        untracked: vec!["c".into()],
+    };
+    assert_eq!(
+        many.confirmation().unwrap().message,
+        "Discard the changes in 3 files? Untracked files are deleted. This can't be undone."
+    );
+}
