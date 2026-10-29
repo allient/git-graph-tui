@@ -276,14 +276,42 @@ fn a_gap_opens_blank_lines_below_its_row() {
     let plain_lines: Vec<String> = text(&plain_buf).lines().map(str::to_owned).collect();
     let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
 
-    // Header to row 1, three blank lines, then row 1's connector onwards.
+    // Header to row 1, three lines where its lane carries on, then row 1's
+    // connector onwards.
     assert_eq!(lines[..4], plain_lines[..4]);
-    assert!(lines[4..7].iter().all(String::is_empty), "{lines:#?}");
+    assert!(lines[4..7].iter().all(|l| l == "  │"), "{lines:#?}");
     assert_eq!(lines[7..], plain_lines[4..7]);
-    assert_eq!(hits.gap(), Some(Rect::new(0, 4, 100, 3)));
+    // The panel starts at the Description column, right of the lanes.
+    assert_eq!(hits.gap(), Some(Rect::new(7, 4, 93, 3)));
     // Clicks below the gap resolve to the shifted row (display 2 is commit 1).
     assert_eq!(hits.hit(40, 8), Some(&HitTarget::Commit(1)));
     assert_eq!(hits.hit(40, 5), None);
+}
+
+#[test]
+fn lanes_passing_an_opened_commit_run_straight_through_its_gap() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    // Display 3 is the merge (`├─●`): the merged line turns into it from
+    // lane 0, and both lanes go on down.
+    let gapped = GraphView {
+        gap: Some(Gap {
+            after: 3,
+            height: 2,
+        }),
+        ..view(&loaded)
+    };
+    let (buf, _) = render(&gapped, 110, 16);
+    let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
+    assert!(lines[7].starts_with("  ├─●"), "{lines:#?}");
+    assert_eq!(lines[8], "  │ │");
+    assert_eq!(lines[9], "  │ │");
+    assert_eq!(lines[10], "  │ │");
+    // Each line keeps the color it has on the commit line.
+    for x in [2, 4] {
+        assert_eq!(buf[(x, 8)].fg, buf[(x, 7)].fg, "x={x}");
+        assert_eq!(buf[(x, 9)].fg, buf[(x, 7)].fg, "x={x}");
+    }
 }
 
 #[test]
@@ -298,7 +326,7 @@ fn a_gap_is_clipped_at_the_bottom_and_skipped_when_its_row_is_off_screen() {
         ..view(&loaded)
     };
     let (_, hits) = render(&clipped, 100, 6);
-    assert_eq!(hits.gap(), Some(Rect::new(0, 4, 100, 2)));
+    assert_eq!(hits.gap(), Some(Rect::new(7, 4, 93, 2)));
 
     let hidden = GraphView {
         offset: 3,

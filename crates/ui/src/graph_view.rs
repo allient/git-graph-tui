@@ -267,7 +267,16 @@ impl GraphView<'_> {
             y += 1;
             if let Some(gap) = self.gap.filter(|g| g.after == display) {
                 let height = gap.height.min(area.bottom() - y);
-                hits.gap = Some(Rect::new(area.x, y, area.width, height));
+                // The lanes carry on through the gap, like in VS Code: the
+                // panel starts at the Description column.
+                if let Some(row) = self.commit_index(display).and_then(|i| self.rows.get(i)) {
+                    let cells = gap_glyphs(row, columns.lanes);
+                    for line in y..y + height {
+                        draw_glyphs(buf, &columns, line, &cells, theme);
+                    }
+                }
+                let x = columns.description.x;
+                hits.gap = Some(Rect::new(x, y, area.right().saturating_sub(x), height));
                 y += height;
             }
             if y < area.bottom() && display + 1 < self.len() {
@@ -467,6 +476,31 @@ fn draw_badge(
         x = put(buf, x, y, right, &end.to_string(), Style::new().fg(body_bg));
     }
     x
+}
+
+/// The lines leaving a commit, run straight down through the gap opened
+/// below it: each in the lane it leaves the commit line in (a fork already
+/// turned to its new lane there), in its color.
+fn gap_glyphs(row: &Row, width: usize) -> Vec<GlyphCell> {
+    let width = width.max(row.width()).max(1);
+    let blank = GlyphCell {
+        ch: ' ',
+        color: None,
+    };
+    let mut cells = vec![blank; 2 * width - 1];
+    let mut edges: Vec<_> = row.bottom.iter().collect();
+    // Straight lanes first, so a fork joining a lane doesn't recolor it.
+    edges.sort_by_key(|e| e.from != e.to);
+    for e in edges {
+        let lane = if e.from == row.lane { e.to } else { e.from };
+        if let Some(cell) = cells.get_mut(2 * lane).filter(|c| c.color.is_none()) {
+            *cell = GlyphCell {
+                ch: '│',
+                color: Some(e.color),
+            };
+        }
+    }
+    cells
 }
 
 fn draw_glyphs(buf: &mut Buffer, cols: &Columns, y: u16, cells: &[GlyphCell], theme: &Theme) {
