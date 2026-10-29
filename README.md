@@ -249,7 +249,7 @@ Without `[issues] url`, `#123` opens issue 123 on origin's GitHub (`/issues/123`
 
 `pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `TUI_GIT_GRAPH_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 
-Drag the pane or column dividers, or show and hide columns, and quit: the new layout is written to `[layout]` and used next time. Other settings in the file are kept, but comments are not. A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
+Drag the pane or column dividers, or show and hide columns, and quit: the new layout is written to `[layout]` and used next time. Only the `[layout]` table is rewritten: other settings, tables, blank lines and comments elsewhere in the file are kept as they are, while comments inside `[layout]` are lost (a layout set with dotted keys such as `layout.date_column = 16` makes the whole file be rewritten, without its comments). A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
 
 ## Development
 

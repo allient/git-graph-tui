@@ -158,24 +158,98 @@ pub fn load(path: &Path) -> Result<Config> {
 }
 
 /// Writes `layout` into the config file, keeping its other settings.
+///
+/// Only the text of the `[layout]` table is replaced (or appended when the
+/// file has none): comments, blank lines, key order and every other table
+/// stay byte for byte. Comments inside `[layout]` itself are lost. A file
+/// that sets the layout another way (`layout.x = 1` dotted keys, an inline
+/// `layout = { ... }`) is rewritten whole, which drops its comments.
 pub fn save_layout(path: &Path, layout: Layout) -> Result<()> {
-    let mut table: toml::Table = match fs::read_to_string(path) {
-        Ok(text) => toml::from_str(&text)
-            .with_context(|| format!("invalid config file {}", path.display()))?,
-        Err(err) if err.kind() == ErrorKind::NotFound => toml::Table::new(),
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == ErrorKind::NotFound => String::new(),
         Err(err) => return Err(err).with_context(|| format!("cannot read {}", path.display())),
     };
+    let mut table: toml::Table =
+        toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
     let layout = toml::Table::try_from(layout).context("cannot write the layout")?;
+    let mut section = toml::Table::new();
+    section.insert("layout".into(), toml::Value::Table(layout.clone()));
+    let section = toml::to_string(&section).context("cannot write the layout")?;
     table.insert("layout".into(), toml::Value::Table(layout));
+    let spliced = splice_layout(&text, &section);
+    // The splice only understands a plain `[layout]` header; when its result
+    // does not read back as the intended settings, rewrite the whole file.
+    let contents = if toml::from_str::<toml::Table>(&spliced).ok().as_ref() == Some(&table) {
+        spliced
+    } else {
+        toml::to_string(&table)?
+    };
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
     }
     // Write a sibling file and rename it over the config, so a crash or a
     // full disk never leaves a half-written config behind.
     let partial = path.with_extension("toml.partial");
-    fs::write(&partial, toml::to_string(&table)?)
-        .with_context(|| format!("cannot write {}", partial.display()))?;
+    fs::write(&partial, contents).with_context(|| format!("cannot write {}", partial.display()))?;
     fs::rename(&partial, path).with_context(|| format!("cannot write {}", path.display()))
+}
+
+/// `text` with its `[layout]` table replaced by `section`, or `section`
+/// appended. The table runs from its header to the next table header; the
+/// comments and blank lines right before that header belong to the next
+/// table and are kept.
+fn splice_layout(text: &str, section: &str) -> String {
+    let mut lines = Vec::new();
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        lines.push((offset, line));
+        offset += line.len();
+    }
+    let Some(header) = lines
+        .iter()
+        .position(|(_, line)| table_header(line) == Some("layout"))
+    else {
+        let mut out = text.to_owned();
+        if !out.is_empty() {
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push('\n');
+        }
+        out.push_str(section);
+        return out;
+    };
+    let next = lines[header + 1..]
+        .iter()
+        .position(|(_, line)| table_header(line).is_some())
+        .map_or(lines.len(), |i| header + 1 + i);
+    let mut end = next;
+    if next < lines.len() {
+        while end > header + 1 && {
+            let line = lines[end - 1].1.trim();
+            line.is_empty() || line.starts_with('#')
+        } {
+            end -= 1;
+        }
+    }
+    let start = lines[header].0;
+    let end = lines.get(end).map_or(text.len(), |(offset, _)| *offset);
+    format!("{}{section}{}", &text[..start], &text[end..])
+}
+
+/// The name in a `[name]` or `[[name]]` header line, if `line` is one.
+fn table_header(line: &str) -> Option<&str> {
+    let line = line.trim();
+    let (open, close) = if line.starts_with("[[") {
+        ("[[", "]]")
+    } else {
+        ("[", "]")
+    };
+    let rest = line.strip_prefix(open)?;
+    let (name, after) = rest.split_once(close)?;
+    let after = after.trim_start();
+    (after.is_empty() || after.starts_with('#')).then_some(name.trim())
 }
 
 #[cfg(test)]
@@ -342,6 +416,87 @@ mod tests {
         fs::write(&file, "colour = 1\n").unwrap();
         let err = format!("{:#}", load(&file).unwrap_err());
         assert!(err.contains("unknown field `colour`"), "{err}");
+    }
+
+    fn width(source_control_width: u16) -> Layout {
+        Layout {
+            source_control_width: Some(source_control_width),
+            ..Layout::default()
+        }
+    }
+
+    #[test]
+    fn saving_the_layout_keeps_comments_and_tables_around_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        let before = "# my settings\nicons = \"nerd\"   # glyphs\n\n[issues]\n# Jira\nprefix = \"PROJ-\"\n\n";
+        let after = "\n# the pager\n[diff]\npager = \"delta\"  # side by side later\n";
+        fs::write(
+            &file,
+            format!("{before}[layout]\nhash_column = 9\ndate_column = 3\n{after}"),
+        )
+        .unwrap();
+        save_layout(&file, width(40)).unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            format!("{before}[layout]\nsource_control_width = 40\n{after}")
+        );
+    }
+
+    #[test]
+    fn saving_the_layout_appends_a_missing_layout_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(&file, "# mine\n[diff]\npager = \"less\" # paging").unwrap();
+        save_layout(&file, width(30)).unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            "# mine\n[diff]\npager = \"less\" # paging\n\n[layout]\nsource_control_width = 30\n"
+        );
+    }
+
+    #[test]
+    fn saving_the_layout_replaces_it_as_the_last_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(
+            &file,
+            "icons = \"auto\" # pick\n\n[layout] # mine\nhidden_columns = [\n  \"author\",\n]\n",
+        )
+        .unwrap();
+        save_layout(&file, width(31)).unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            "icons = \"auto\" # pick\n\n[layout]\nsource_control_width = 31\n"
+        );
+    }
+
+    #[test]
+    fn a_dotted_layout_key_is_rewritten_with_the_whole_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(
+            &file,
+            "# gone\nlayout.hash_column = 9\n[diff]\npager = \"less\"\n",
+        )
+        .unwrap();
+        save_layout(&file, width(32)).unwrap();
+        let config = load(&file).unwrap();
+        assert_eq!(config.layout, width(32));
+        assert_eq!(config.diff.pager.as_deref(), Some("less"));
+    }
+
+    #[test]
+    fn saving_the_layout_refuses_an_invalid_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(&file, "icons = \n").unwrap();
+        let err = format!("{:#}", save_layout(&file, width(32)).unwrap_err());
+        assert!(
+            err.starts_with(&format!("invalid config file {}", file.display())),
+            "{err}"
+        );
+        assert_eq!(fs::read_to_string(&file).unwrap(), "icons = \n");
     }
 
     #[test]
