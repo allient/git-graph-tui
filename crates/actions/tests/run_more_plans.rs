@@ -259,6 +259,9 @@ fn stage_unstage_and_commit_files() {
         &repo,
         &Action::WorkingTree(WorkingTreeAction::Commit {
             message: "Add a b".into(),
+            all: false,
+            amend: false,
+            signoff: false,
         }),
     );
     assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "Add a b");

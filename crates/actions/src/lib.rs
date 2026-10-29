@@ -24,7 +24,7 @@ mod working_tree;
 
 pub use stash::StashAction;
 pub use tag::TagAction;
-pub use working_tree::WorkingTreeAction;
+pub use working_tree::{CommitScope, WorkingTreeAction};
 mod worktree;
 pub use worktree::WorktreeAction;
 mod repo;

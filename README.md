@@ -26,7 +26,7 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 
 ### Non-goals (for now)
 
-- Staging and committing. Use your editor or `git` for that. We show uncommitted changes and offer stash, reset and clean.
+- A full editor for commits: the Source Control pane stages, discards and commits (also amend and sign-off) with a short message; for long messages or partial staging (hunks), use your editor or `git`.
 - A text editor or a general IDE.
 - Version control systems other than Git.
 - Reusing code from the Git Graph extension. Everything is written from scratch (see [Licensing](#licensing)).
@@ -75,6 +75,8 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 ### Repository menu ("..." in the Source Control header, or the toolbar when the pane is hidden)
 - [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag)
 - [x] Branch, remote, stash and tag submenus; show the git command log
+- [x] Commit submenu, as in VS Code's Source Control: Commit (what is staged, or everything when nothing is), Commit Staged, Commit All (untracked files too), each also as Amend (an empty message keeps the last one) and Signed Off; Undo Last Commit (its changes stay staged); Abort Rebase while a rebase is stopped. The message is the one typed in the Source Control pane
+- [x] Changes submenu: Stage All, Unstage All and Discard All Changes (asks first; untracked files are deleted, staged changes kept)
 - [x] Show the reflog and recover commits from it
 - [x] Worktrees: list, add, remove, lock, unlock and prune them
 
