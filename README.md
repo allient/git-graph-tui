@@ -44,8 +44,16 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
 - [x] Toggle remote branches on/off
+- [x] Double-click a branch to check it out
+- [x] Resize the panes and columns by dragging their dividers (remembered in the config file)
 - [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
+
+### Source Control pane (left of the graph)
+- [x] Staged Changes and Changes sections with status letters (M, A, D, R, C, T, U, !)
+- [x] Stage, unstage and discard a file or a whole section, by button (`+` `−` `↶`) or key
+- [x] Multi-line commit message and a Commit button; commit, refresh and "..." buttons in the header
+- [x] Resizable by dragging the divider; hidden on terminals under 90 columns
 
 ### Actions on branches (right-click a branch badge)
 - [x] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
@@ -61,7 +69,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Reset current branch to this commit (soft / mixed / hard)
 - [x] Copy hash / subject to clipboard
 
-### Repository menu ("..." in the toolbar)
+### Repository menu ("..." in the Source Control header, or the toolbar when the pane is hidden)
 - [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag)
 - [x] Branch, remote, stash and tag submenus; show the git command log
 
@@ -242,6 +250,8 @@ Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
 **Dependencies.** Every version is declared once in `[workspace.dependencies]` in the root `Cargo.toml`. A crate opts in with `dep.workspace = true` (`cargo add -p <crate> <dep>` does this automatically) and declares only what it actually uses; `cargo machete` enforces that in CI.
 
 ## Roadmap
+
+Steps 1 to 3 are done except issue linking; step 5 is next.
 
 1. **MVP:** colored graph with badges, uncommitted row, selection, scrolling, mouse + keyboard, branch and commit context menus with checkout / switch branch, create branch, tag, cherry-pick, revert, merge, reset, copy; commit details with file diffs.
 2. **Daily driver:** branch filter, remote toggle, search, repository "..." menu, pull / push / fetch, tags and stashes, config file.
