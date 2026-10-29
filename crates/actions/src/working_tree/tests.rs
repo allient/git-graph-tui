@@ -90,3 +90,53 @@ fn reset_offers_only_mixed_and_hard() {
         .unwrap();
     assert_eq!(action, reset(ResetMode::Hard));
 }
+
+#[test]
+fn stage_unstage_and_commit_use_literal_paths_and_one_message_argument() {
+    let paths = vec!["a.rs".to_owned(), "*.md".to_owned(), "-x".to_owned()];
+    assert_eq!(
+        args(&WorkingTreeAction::Stage {
+            paths: paths.clone()
+        }),
+        [
+            "add",
+            "--all",
+            "--",
+            ":(literal)a.rs",
+            ":(literal)*.md",
+            ":(literal)-x"
+        ]
+    );
+    assert_eq!(
+        args(&WorkingTreeAction::Unstage { paths }),
+        [
+            "reset",
+            "--quiet",
+            "--",
+            ":(literal)a.rs",
+            ":(literal)*.md",
+            ":(literal)-x"
+        ]
+    );
+    assert_eq!(
+        args(&WorkingTreeAction::Commit {
+            message: "-m: fix it".into()
+        }),
+        ["commit", "--message=-m: fix it"]
+    );
+}
+
+#[test]
+fn stage_unstage_and_commit_need_no_dialog() {
+    for action in [
+        WorkingTreeAction::Stage { paths: Vec::new() },
+        WorkingTreeAction::Unstage { paths: Vec::new() },
+        WorkingTreeAction::Commit {
+            message: "x".into(),
+        },
+    ] {
+        assert!(!action.is_destructive(), "{action:?}");
+        assert!(action.confirmation().is_none(), "{action:?}");
+        assert!(action.inputs().is_empty(), "{action:?}");
+    }
+}

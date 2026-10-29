@@ -14,4 +14,4 @@ pub use commit::{Commit, Signature};
 pub use oid::{Oid, OidError};
 pub use reference::{Ref, RefKind, short_name, split_remote};
 pub use stash::Stash;
-pub use status::{HeadState, WorkingTreeStatus};
+pub use status::{Change, ChangedFile, HeadState, WorkingTreeStatus};

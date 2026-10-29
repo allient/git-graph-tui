@@ -109,6 +109,15 @@ fn status_with_staged_rename_and_unicode_path() {
     assert_eq!(status.staged, 1);
     assert_eq!(status.untracked, 1);
     assert_eq!(status.files, 2);
+    let paths: Vec<(&str, Option<&str>)> = status
+        .changes
+        .iter()
+        .map(|f| (f.path.as_str(), f.orig_path.as_deref()))
+        .collect();
+    assert_eq!(
+        paths,
+        [("nuevo año.txt", Some("old name.txt")), ("dirty.txt", None)]
+    );
 }
 
 #[test]

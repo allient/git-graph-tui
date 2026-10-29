@@ -226,3 +226,69 @@ fn clean_deletes_untracked_files_and_directories_but_not_ignored_ones() {
     assert!(!repo.path().join("build").exists());
     assert!(repo.path().join("debug.log").exists(), "ignored files stay");
 }
+
+#[test]
+fn stage_unstage_and_commit_files() {
+    let repo = FixtureRepo::sample();
+    repo.write_file("README.md", "changed\n");
+    repo.write_file("new dir/a b.txt", "x\n");
+    let stage = |paths: &[&str]| {
+        Action::WorkingTree(WorkingTreeAction::Stage {
+            paths: paths.iter().map(|p| (*p).to_owned()).collect(),
+        })
+    };
+    ok(&repo, &stage(&["README.md", "new dir/a b.txt"]));
+    assert_eq!(
+        status(&repo),
+        "M  README.md\nA  \"new dir/a b.txt\"\n?? notes.txt"
+    );
+
+    ok(
+        &repo,
+        &Action::WorkingTree(WorkingTreeAction::Unstage {
+            paths: vec!["README.md".into()],
+        }),
+    );
+    assert!(
+        status(&repo).starts_with(" M README.md"),
+        "{}",
+        status(&repo)
+    );
+
+    ok(
+        &repo,
+        &Action::WorkingTree(WorkingTreeAction::Commit {
+            message: "Add a b".into(),
+        }),
+    );
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "Add a b");
+    assert_eq!(status(&repo), " M README.md\n?? notes.txt");
+}
+
+#[test]
+fn staging_a_deleted_file_and_unstaging_in_a_repo_without_commits() {
+    let repo = FixtureRepo::sample();
+    std::fs::remove_file(repo.path().join("README.md")).unwrap();
+    ok(
+        &repo,
+        &Action::WorkingTree(WorkingTreeAction::Stage {
+            paths: vec!["README.md".into()],
+        }),
+    );
+    assert!(
+        status(&repo).starts_with("D  README.md"),
+        "{}",
+        status(&repo)
+    );
+
+    let fresh = FixtureRepo::new();
+    fresh.write_file("first.txt", "1\n");
+    fresh.git(&["add", "first.txt"]);
+    ok(
+        &fresh,
+        &Action::WorkingTree(WorkingTreeAction::Unstage {
+            paths: vec!["first.txt".into()],
+        }),
+    );
+    assert_eq!(status(&fresh), "?? first.txt");
+}

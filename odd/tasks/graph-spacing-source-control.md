@@ -20,7 +20,7 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 |----|-------|-------|--------|--------|
 | T1 | S1, S2, S5, S7 | inline | done (gate green, 421 tests) | feat/graph-spacing |
 | T5 | S8 | inline | done (429 tests) | feat/graph-spacing |
-| T2 | S3 | inline | pending | |
+| T2 | S3 | inline | in progress: per-file status and stage/unstage/commit actions done; pane widget and layout next | feat/source-control |
 | T4 | S6 | inline | pending | |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
 
@@ -36,3 +36,4 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L8** (2026-10-28) User: "ok use those icons and add of readme isntructions to isntall forst icons nerd onews"
 - **L9** (2026-10-28) User: "do thsi same That's why tools like lazygit and yazi make icons opt-in: they print plain text by default,  if icons use tehm in other case use what we have now"
 - **L10** (2026-10-28) User: "Do not forget to create 2 panes one is source controls and teho other is gitgraph [Image #20]" (T2, S3).
+- **L11** T2 plan, 4 slices on feat/source-control: (1) per-file status (`ChangedFile`, `Change`), (2) `WorkingTreeAction::{Stage, Unstage, Commit}` (`add --all`, `reset --quiet` (works unborn), `commit --message=`), (3) `SourceControlPane` widget in tgg-ui, (4) left pane plus graph pane layout, focus and wiring in the app. Slices 1 and 2 are done (434 tests).
