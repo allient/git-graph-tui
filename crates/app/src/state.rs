@@ -706,7 +706,62 @@ impl AppState {
         // Anchor just below the selected row as last drawn, in from the left edge.
         let y = self.graph_hits.area_of(&target).map_or(0, Rect::bottom);
         let anchor = Position { x: 4, y };
+        let badges = match &target {
+            HitTarget::Commit(index) => self.badge_submenus(*index),
+            HitTarget::Uncommitted | HitTarget::Ref { .. } => Vec::new(),
+        };
         self.open_menu(&target, anchor);
+        // The mouse reaches a badge's menu by right-clicking it; the keyboard
+        // gets each badge on the row as a submenu above the commit's entries.
+        if let (Some(menu), false) = (&self.menu, badges.is_empty()) {
+            let mut items = badges;
+            items.push(MenuItem::Separator);
+            items.extend(menu.items().iter().cloned());
+            self.menu = Some(PopupMenu::new(items, anchor));
+        }
+    }
+
+    /// One submenu per branch, remote branch and tag badge on commit row
+    /// `index`, named after it (`Branch main`, `Remote origin/main`).
+    fn badge_submenus(&self, index: usize) -> Vec<MenuItem> {
+        let Some(commit) = self.commits.get(index) else {
+            return Vec::new();
+        };
+        if self.stashes.iter().any(|s| s.id == commit.id) {
+            return Vec::new(); // A stash row's menu is the stash menu already.
+        }
+        let ctx = self.menu_context();
+        let mut items = Vec::new();
+        for badge in badges_for(&commit.id, &self.visible_refs()) {
+            let mut refs = vec![(badge.kind, badge.label.clone(), badge.full_name.clone())];
+            refs.extend(badge.remotes.iter().map(|remote| {
+                (
+                    BadgeKind::Remote,
+                    format!("{remote}/{}", badge.label),
+                    format!("refs/remotes/{remote}/{}", badge.label),
+                )
+            }));
+            for (kind, label, full_name) in refs {
+                let kind_name = match kind {
+                    BadgeKind::Head | BadgeKind::Branch => "Branch",
+                    BadgeKind::Remote => "Remote",
+                    BadgeKind::Tag => "Tag",
+                    BadgeKind::RemoteHead | BadgeKind::Stash => continue,
+                };
+                let hit = HitTarget::Ref {
+                    commit: index,
+                    full_name,
+                };
+                let Some(target) = self.menu_target(&hit) else {
+                    continue;
+                };
+                items.push(MenuItem::Submenu {
+                    label: format!("{kind_name} {label}"),
+                    items: menu_for(&target, &ctx),
+                });
+            }
+        }
+        items
     }
 
     fn open_menu(&mut self, target: &HitTarget, anchor: Position) {
