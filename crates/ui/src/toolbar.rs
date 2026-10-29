@@ -19,8 +19,8 @@ pub enum ToolbarButton {
 const ORDER: [ToolbarButton; 5] = [
     ToolbarButton::BranchFilter,
     ToolbarButton::ShowRemotes,
-    ToolbarButton::Refresh,
     ToolbarButton::Fetch,
+    ToolbarButton::Refresh,
     ToolbarButton::RepoMenu,
 ];
 
@@ -65,9 +65,9 @@ impl ToolbarHitMap {
     }
 }
 
-/// The one-line toolbar (S2): `Branches: [<filter> ▾]`, the
-/// `[x] Show Remote Branches` toggle, then Refresh, Fetch and `...` on the
-/// right. On narrow terminals the labels shorten.
+/// The one-line toolbar (S2): `Branches: [<filter> ▾]` and the
+/// `[x] Show Remote Branches` toggle in the center, then Fetch, Refresh and
+/// `...` on the right. On narrow terminals the labels shorten.
 ///
 /// The filter and toggle state belong to the app; the toolbar only shows
 /// them and reports what the user pressed.
@@ -197,8 +197,8 @@ impl Toolbar {
         }
         let y = area.y;
         let right: Vec<(ToolbarButton, &str)> = [
-            (ToolbarButton::Refresh, theme.icons.refresh()),
             (ToolbarButton::Fetch, theme.icons.fetch()),
+            (ToolbarButton::Refresh, theme.icons.refresh()),
             (ToolbarButton::RepoMenu, theme.icons.more()),
         ]
         .into_iter()
@@ -230,8 +230,14 @@ impl Toolbar {
             )
         };
 
+        // Centered like VS Code's, but never under the buttons on the right.
+        let group = label.width() + left[0].width() + 2 + left[1].width();
+        let start = (width.saturating_sub(group) / 2)
+            .min(right_start.saturating_sub(group + 2))
+            .max(1);
+
         let muted = Style::default().fg(theme.muted);
-        let mut x = area.x + 1;
+        let mut x = area.x + to_u16(start);
         buf.set_string(x, y, label, muted);
         x += to_u16(label.width());
         for ((button, text), gap) in [ToolbarButton::BranchFilter, ToolbarButton::ShowRemotes]

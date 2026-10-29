@@ -2,12 +2,12 @@
 source: crates/ui/tests/picker.rs
 expression: text(&buf)
 ---
- Branches: [develop ▾]  [x] Show Remote Branches                  [↻] [⇣] [...]
-           ┌ Branches ────────────────────────────────────────────────┐
-           │ > feat*                                                  │
-           ├──────────────────────────────────────────────────────────┤
-           │ [ ] Show All                                             │
-           │ [ ] feat*                                        pattern │
-           │ [ ] feature/login                                 branch │
-           │ Space: select · Enter: apply · Esc: cancel               │
-           └──────────────────────────────────────────────────────────┘
+                Branches: [develop ▾]  [x] Show Remote Branches   [⇣] [↻] [...]
+                    ┌ Branches ────────────────────────────────────────────────┐
+                    │ > feat*                                                  │
+                    ├──────────────────────────────────────────────────────────┤
+                    │ [ ] Show All                                             │
+                    │ [ ] feat*                                        pattern │
+                    │ [ ] feature/login                                 branch │
+                    │ Space: select · Enter: apply · Esc: cancel               │
+                    └──────────────────────────────────────────────────────────┘
