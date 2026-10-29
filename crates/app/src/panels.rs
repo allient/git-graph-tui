@@ -1,14 +1,14 @@
-//! Full-screen and modal panels drawn over the graph: the info dialog and
-//! the git output view.
+//! Full-screen and modal panels drawn over the graph: the info dialog, the
+//! git output view and the reflog view.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
-use tgg_ui::Theme;
+use tgg_ui::{Theme, fit, format_date};
 
-use crate::state::{GitOutput, Info, OutputLine};
+use crate::state::{GitOutput, Info, OutputLine, ReflogView};
 
 /// Widest the info dialog gets.
 const INFO_WIDTH: u16 = 72;
@@ -86,4 +86,57 @@ pub fn draw_output(
         .collect();
     Paragraph::new(text).render(inner, frame.buffer_mut());
     page
+}
+
+/// Short hash length in the reflog view, like the graph's.
+const SHORT_HASH: usize = 7;
+
+/// The reflog view over `area`, one entry per line: short hash, selector,
+/// subject and date. Returns the rows' area, for clicks and paging.
+pub fn draw_reflog(frame: &mut Frame<'_>, area: Rect, view: &ReflogView, theme: &Theme) -> Rect {
+    Clear.render(area, frame.buffer_mut());
+    let block = Block::bordered().title(" reflog · enter actions · esc closes ");
+    let inner = block.inner(area);
+    block.render(area, frame.buffer_mut());
+    if view.entries.is_empty() {
+        Paragraph::new(Line::styled(
+            "The reflog is empty.",
+            Style::new().fg(theme.muted),
+        ))
+        .render(inner, frame.buffer_mut());
+        return inner;
+    }
+    let page = usize::from(inner.height).max(1);
+    let offset = view.offset.min(view.entries.len().saturating_sub(page));
+    let text: Vec<Line<'_>> = view
+        .entries
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(page)
+        .map(|(index, entry)| {
+            let hash = format!("{} ", entry.id.short(SHORT_HASH));
+            let selector = format!("{:<11} ", entry.selector());
+            let date = format!(" {}", format_date(entry.time));
+            // The subject takes what's left, so the dates line up on the right.
+            let used = hash.len() + selector.len() + date.len();
+            let subject = fit(
+                &entry.subject,
+                usize::from(inner.width).saturating_sub(used),
+            );
+            let line = Line::from(vec![
+                Span::styled(hash, Style::new().fg(theme.hash)),
+                Span::styled(selector, Style::new().fg(theme.muted)),
+                Span::styled(subject, Style::new().fg(theme.text)),
+                Span::styled(date, Style::new().fg(theme.date)),
+            ]);
+            if index == view.selected {
+                line.style(Style::new().bg(theme.selected_bg))
+            } else {
+                line
+            }
+        })
+        .collect();
+    Paragraph::new(text).render(inner, frame.buffer_mut());
+    inner
 }

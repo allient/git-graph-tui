@@ -219,6 +219,8 @@ pub enum UiEffect {
     },
     /// Show the log of git commands and their output.
     ShowGitOutput,
+    /// Show where HEAD has been (the reflog), to recover lost commits.
+    ShowReflog,
     /// Open the hosting site's "new pull request" page for `branch` on `remote`.
     CreatePullRequest {
         remote: String,

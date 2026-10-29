@@ -649,6 +649,7 @@ fn repository_menu_matches_the_vs_code_order() {
             "Tags ▸",
             "---",
             "Show Git Output",
+            "Show Reflog",
         ]
     );
     assert_eq!(
@@ -723,6 +724,10 @@ fn repository_actions_are_prefilled() {
         action(&menu, "Show Git Output"),
         &Action::Ui(UiEffect::ShowGitOutput)
     );
+    assert_eq!(
+        action(&menu, "Show Reflog"),
+        &Action::Ui(UiEffect::ShowReflog)
+    );
 }
 
 #[test]
@@ -744,6 +749,7 @@ fn repository_menu_without_remotes_or_branch() {
             "Tags ▸",
             "---",
             "Show Git Output",
+            "Show Reflog",
         ]
     );
     assert_eq!(
@@ -822,4 +828,63 @@ fn column_names_round_trip() {
     }
     assert_eq!(GraphColumn::Commit.name(), "commit");
     assert_eq!(GraphColumn::from_name("graph"), None, "always shown");
+}
+
+// ---- reflog entry menu (S20 4) ----
+
+#[test]
+fn reflog_menu_recovers_the_entrys_commit() {
+    let menu = reflog_menu(&oid('c'), "Lost work", &ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "Create Branch Here...",
+            "Checkout (detached)...",
+            "Reset current branch to here...",
+            "---",
+            "Copy Commit Hash to Clipboard",
+        ]
+    );
+    assert_eq!(
+        action(&menu, "Create Branch Here..."),
+        &Action::CreateBranch {
+            at: oid('c'),
+            name: String::new(),
+            checkout: false
+        }
+    );
+    assert_eq!(
+        action(&menu, "Checkout (detached)..."),
+        &Action::CheckoutCommit {
+            commit: oid('c'),
+            subject: "Lost work".into()
+        }
+    );
+    assert_eq!(
+        action(&menu, "Reset current branch to here..."),
+        &Action::ResetCurrentTo {
+            commit: oid('c'),
+            subject: "Lost work".into(),
+            current: "main".into(),
+            mode: ResetMode::default()
+        }
+    );
+    assert_eq!(
+        action(&menu, "Copy Commit Hash to Clipboard"),
+        &Action::CopyCommitHash { commit: oid('c') }
+    );
+}
+
+#[test]
+fn reflog_menu_on_a_detached_head_cannot_reset_a_branch() {
+    let ctx = MenuContext {
+        head: HeadState::Detached,
+        ..ctx()
+    };
+    let menu = reflog_menu(&oid('c'), "Lost work", &ctx);
+    assert!(
+        !labels(&menu).contains(&"Reset current branch to here...".to_owned()),
+        "{:?}",
+        labels(&menu)
+    );
 }
