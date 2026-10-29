@@ -91,10 +91,31 @@ impl AppState {
 
     /// Keys for the open panel; None lets the graph handle the key.
     pub(super) fn on_details_key(&mut self, key: KeyEvent) -> Option<Vec<Command>> {
+        let filtering = self
+            .details
+            .as_ref()
+            .and_then(|d| d.view.as_ref())
+            .is_some_and(CommitDetailsView::is_filtering);
+        if filtering {
+            // Every key types into the file filter (S26), so `q` doesn't quit.
+            let outcome = match (widget_key(key), self.details_view_mut()) {
+                (Some(key), Some(view)) => view.handle_key(key),
+                _ => DetailsOutcome::Stay,
+            };
+            return Some(self.on_details_outcome(outcome));
+        }
         let key = match key.code {
             KeyCode::Char('j') => Key::Down,
             KeyCode::Char('k') => Key::Up,
-            KeyCode::Char('v') => Key::Char('v'),
+            KeyCode::Char(c @ ('v' | 'f' | 'l')) => Key::Char(c),
+            KeyCode::Char(c @ ('J' | 'K')) => {
+                // The commit's fields and message scroll by a line (S24).
+                let details = self.details.as_mut()?;
+                if let (Some(view), Some(hits)) = (&mut details.view, &details.hits) {
+                    view.scroll_message(hits, if c == 'J' { 1 } else { -1 });
+                }
+                return Some(Vec::new());
+            }
             KeyCode::Char('t') => return Some(self.difftool_selected()),
             KeyCode::Up
             | KeyCode::Down
@@ -114,6 +135,27 @@ impl AppState {
             None => DetailsOutcome::Stay,
         };
         Some(self.on_details_outcome(outcome))
+    }
+
+    fn details_view_mut(&mut self) -> Option<&mut CommitDetailsView> {
+        self.details.as_mut()?.view.as_mut()
+    }
+
+    /// The mouse wheel over the open panel scrolls the side under it, not
+    /// the graph (S24). None when the wheel is elsewhere.
+    pub(super) fn on_details_wheel(&mut self, mouse: MouseEvent) -> Option<Vec<Command>> {
+        let lines = isize::try_from(SCROLL_LINES).unwrap_or(1);
+        let lines = match mouse.kind {
+            MouseEventKind::ScrollDown => lines,
+            MouseEventKind::ScrollUp => -lines,
+            _ => return None,
+        };
+        let details = self.details.as_mut()?;
+        let (Some(view), Some(hits)) = (&mut details.view, &details.hits) else {
+            return None;
+        };
+        view.scroll(hits, mouse.column, mouse.row, lines)
+            .then(Vec::new)
     }
 
     /// `t`: opens the selected file in `git difftool` (S12).

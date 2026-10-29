@@ -292,3 +292,128 @@ fn an_issue_in_a_repository_without_origin_explains_too() {
     );
     assert!(message.contains("[issues] url"), "{message}");
 }
+
+// ---- side buttons, filter and internal scroll (S24, S26) ----
+
+fn button(h: &Harness, which: tgg_ui::DetailsButton) -> (u16, u16) {
+    let hits = h.state.details.as_ref().and_then(|d| d.hits.as_ref());
+    let rect = hits
+        .and_then(|hits| hits.button(which))
+        .expect("button drawn");
+    (rect.x, rect.y)
+}
+
+#[test]
+fn the_side_buttons_switch_to_the_list_and_close_the_panel() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    select(&mut h, "Add lib");
+    press(&mut h, KeyCode::Enter);
+    assert!(h.find_on_screen("src/lib.rs").is_none(), "tree: name only");
+
+    let (x, y) = button(&h, tgg_ui::DetailsButton::List);
+    click(&mut h, x, y);
+    assert!(h.find_on_screen("src/lib.rs").is_some(), "list: full path");
+    let (x, y) = button(&h, tgg_ui::DetailsButton::Tree);
+    click(&mut h, x, y);
+    assert!(h.find_on_screen("src/lib.rs").is_none());
+
+    // `l` does the same from the keyboard.
+    press(&mut h, KeyCode::Char('l'));
+    assert!(h.find_on_screen("src/lib.rs").is_some());
+
+    let (x, y) = button(&h, tgg_ui::DetailsButton::Close);
+    click(&mut h, x, y);
+    assert!(h.state.details.is_none());
+    assert!(h.find_on_screen("Commit:").is_none());
+}
+
+#[test]
+fn f_filters_the_files_and_typed_letters_do_not_reach_the_graph() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    select(&mut h, "Merge branch 'develop'");
+    press(&mut h, KeyCode::Enter);
+    let selected = h.state.selected;
+    press(&mut h, KeyCode::Char('f'));
+    // `q` would quit and `g` would jump to the top on the graph.
+    for c in "qg".chars() {
+        press(&mut h, KeyCode::Char(c));
+    }
+    assert!(!h.state.should_quit);
+    assert_eq!(h.state.selected, selected);
+    assert!(h.find_on_screen("find: qg").is_some());
+    // Esc clears the filter, a second one closes the panel.
+    press(&mut h, KeyCode::Esc);
+    assert!(h.find_on_screen("find:").is_none());
+    assert!(h.state.details.is_some());
+    press(&mut h, KeyCode::Esc);
+    assert!(h.state.details.is_none());
+    assert!(!h.state.should_quit);
+}
+
+#[test]
+fn the_find_button_starts_the_filter() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    select(&mut h, "Add lib");
+    press(&mut h, KeyCode::Enter);
+    let (x, y) = button(&h, tgg_ui::DetailsButton::Find);
+    click(&mut h, x, y);
+    press(&mut h, KeyCode::Char('x'));
+    assert!(
+        h.find_on_screen("Changed files (0 of 1)  find: x")
+            .is_some()
+    );
+}
+
+/// A history long enough to scroll, whose newest commit has a long message.
+fn long_history() -> FixtureRepo {
+    let repo = FixtureRepo::new();
+    for i in 0..30 {
+        repo.commit_file(&format!("f{i}.txt"), "x\n", &format!("Commit {i}"));
+    }
+    let body = (1..=30)
+        .map(|i| format!("Body line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    repo.commit_file("long.txt", "x\n", &format!("Long message\n\n{body}"));
+    repo
+}
+
+fn wheel(h: &mut Harness, kind: MouseEventKind, x: u16, y: u16) {
+    let commands = h.state.update(Event::Mouse(MouseEvent {
+        kind,
+        column: x,
+        row: y,
+        modifiers: KeyModifiers::NONE,
+    }));
+    h.settle(commands);
+    h.draw(W, H);
+}
+
+#[test]
+fn the_wheel_over_the_details_scrolls_them_and_not_the_graph() {
+    let repo = long_history();
+    let mut h = open(&repo);
+    press(&mut h, KeyCode::Char('g'));
+    press(&mut h, KeyCode::Enter);
+    let (x, y) = h.find_on_screen("Commit:").unwrap();
+    wheel(&mut h, MouseEventKind::ScrollDown, x, y + 2);
+    assert_eq!(h.state.offset, 0, "the graph stays put");
+    assert!(h.find_on_screen("Commit:").is_none(), "the fields scrolled");
+    assert!(h.find_on_screen("Long message").is_some());
+    wheel(&mut h, MouseEventKind::ScrollUp, x, y + 2);
+    assert!(h.find_on_screen("Commit:").is_some());
+
+    // `J` and `K` scroll the message from the keyboard.
+    press(&mut h, KeyCode::Char('J'));
+    assert!(h.find_on_screen("Commit:").is_none());
+    press(&mut h, KeyCode::Char('K'));
+    assert!(h.find_on_screen("Commit:").is_some());
+
+    // Elsewhere the wheel still scrolls the graph.
+    let (gx, gy) = h.find_on_screen("Commit 29").unwrap();
+    wheel(&mut h, MouseEventKind::ScrollDown, gx, gy);
+    assert!(h.state.offset > 0);
+}
