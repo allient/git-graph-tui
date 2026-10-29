@@ -12,18 +12,31 @@ pub enum PickPurpose {
     Checkout,
     /// Branch ▸ "Delete Branch...": a local branch.
     DeleteBranch,
+    /// Branch ▸ "Merge...": a branch to merge into the current one.
+    Merge,
+    /// Branch ▸ "Rebase Branch...": a branch to rebase the current one on.
+    Rebase,
+    /// Branch ▸ "Create Branch From...": the branch or tag to start from.
+    CreateBranchFrom,
+    /// Branch ▸ "Delete Remote Branch...": a remote branch.
+    DeleteRemoteBranch,
     /// Remote ▸ "Remove Remote...": a remote.
     RemoveRemote,
 }
 
 impl PickPurpose {
     /// The action for the picked name, when the name alone decides it.
-    /// `Checkout` returns `None`: local, remote and tag checkouts differ, so
-    /// the app builds it from the picked ref (e.g. via `Target::from_ref`).
+    /// Purposes that depend on the picked ref's kind or commit (checkout,
+    /// merge, rebase, create from, delete remote) return `None`: the app
+    /// builds those from the picked ref.
     #[must_use]
     pub fn action_for(self, name: &str) -> Option<Action> {
         match self {
-            Self::Checkout => None,
+            Self::Checkout
+            | Self::Merge
+            | Self::Rebase
+            | Self::CreateBranchFrom
+            | Self::DeleteRemoteBranch => None,
             Self::DeleteBranch => Some(Action::DeleteBranch {
                 name: name.to_owned(),
                 force: false,
@@ -56,6 +69,11 @@ pub enum RepoAction {
     },
     /// `git push` to the upstream, as configured.
     Push,
+    /// Deletes `branch` on `remote` (`git push --delete`).
+    DeleteRemoteBranch {
+        remote: String,
+        branch: String,
+    },
     /// `git fetch` from the default remote, optionally pruning.
     FetchDefault {
         prune: bool,
@@ -103,6 +121,12 @@ impl RepoAction {
                 vec![network(strings(&["pull", "--", remote, branch]))]
             }
             Self::Push => vec![network(strings(&["push"]))],
+            Self::DeleteRemoteBranch { remote, branch } => {
+                let refspec = format!("refs/heads/{branch}");
+                vec![network(strings(&[
+                    "push", "--delete", "--", remote, &refspec,
+                ]))]
+            }
             Self::FetchDefault { prune } => {
                 let mut args = strings(&["fetch"]);
                 if *prune {
@@ -127,11 +151,23 @@ impl RepoAction {
 
     #[must_use]
     pub fn is_destructive(&self) -> bool {
-        matches!(self, Self::RemoveRemote { .. })
+        matches!(
+            self,
+            Self::RemoveRemote { .. } | Self::DeleteRemoteBranch { .. }
+        )
     }
 
     #[must_use]
     pub fn confirmation(&self) -> Option<Confirmation> {
+        if let Self::DeleteRemoteBranch { remote, branch } = self {
+            return Some(Confirmation::new(
+                "Delete Remote Branch",
+                format!(
+                    "Delete the branch '{branch}' on '{remote}'? Everyone who fetches from '{remote}' loses it (git push --delete {remote} refs/heads/{branch})."
+                ),
+                "Delete",
+            ));
+        }
         let Self::RemoveRemote { name } = self else {
             return None;
         };

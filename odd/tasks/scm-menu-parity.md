@@ -23,7 +23,7 @@ Branch: feat/scm-menu-parity, based on fix/badge-white-text (PR #43); its PR ope
 |---|---|---|---|---|
 | T1 | S1, S2, S3 | inline | done | feat(menu): Commit and Changes submenus |
 | T2 | S4 | inline | done | feat(menu): Pull, Push submenu |
-| T3 | S5, S6 | inline | todo | |
+| T3 | S5, S6 | inline | done | feat(menu): Branch and Remote submenus |
 | T4 | S7, S8 | inline | todo | |
 | T5 | S9 | inline | todo | |
 | T6 | S10, S11 | inline | todo | |
@@ -38,3 +38,4 @@ Route evidence: one feature, units depend on the shared menu.rs, so no parallel-
 - **L4** (2026-10-29) "can you plan create a plugin for herdr I have notcied right click do nto work when I use on a cli on herdr plan thsi after you fnishe or ask @w2". Delegated planning to w2. Finding: herdr intercepts plain right-click for its own pane menu; `[ui] right_click_passthrough_modifier = "ctrl"` lets Ctrl+right-click through (herdr 0.9.5 config reference). Plan: integrations/herdr/ plugin (manifest, open.sh, run.sh, README), plus an in-app hint when `HERDR_ENV=1`. Not started; needs its own feature document.
 - **L5** (2026-10-29) T2 done: Pull, Push submenu (Sync, Pull, Pull (Rebase), Pull from..., Push, Push to..., Fetch, Fetch (Prune), Fetch From All Remotes). Top-level Pull/Push/Fetch now run without a dialog and follow the git config, as in VS Code; the old "Pull..." mode dialog (`PullMode`, ff-only default) was removed: modern git already refuses a diverged pull unless `pull.rebase`/`pull.ff` is set. Gate green, 769 tests.
 - **L6** (2026-10-29) w2 correction: plain right-click works in herdr when the pane's routing is set with `herdr pane input --current --right-click pane` (as TTT's herdr plugin does); the config modifier is only a fallback. User: "if needed ask for help to @w2 so it work on herdr plugin" → herdr plugin delegated to w2 (own worktree, own feature doc).
+- **L7** (2026-10-29) T3 done: Branch submenu (Merge..., Rebase Branch..., Create Branch... now checks out, Create Branch From..., Rename Branch..., Delete Branch..., Delete Remote Branch..., Publish Branch...) via four new picker purposes; Remote: "Remove Remote". Correction to my PR #43 report: the remote branch context menu lacked "Delete Remote Branch..." and "Pull into current branch..." (VS Code has both, image 47); added here. Gate green, 775 tests.

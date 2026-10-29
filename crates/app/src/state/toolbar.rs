@@ -3,7 +3,7 @@
 
 use crossterm::event::KeyEvent;
 use ratatui::layout::Position;
-use tgg_actions::{Action, MenuItem, PickPurpose, RepoAction, Target, menu_for};
+use tgg_actions::{Action, MenuItem, PickPurpose, RepoAction, Rev, Target, menu_for};
 use tgg_git::log::Revisions;
 use tgg_model::{Ref, RefKind, split_remote};
 use tgg_ui::{
@@ -236,6 +236,27 @@ impl AppState {
                 .filter(|r| r.kind == RefKind::LocalBranch && Some(r.short_name()) != current)
                 .map(|r| item(r.short_name(), "branch"))
                 .collect(),
+            // Branches other than the current one, local then remote.
+            PickerFor::Ref(PickPurpose::Merge | PickPurpose::Rebase) => self
+                .refs
+                .iter()
+                .filter(|r| {
+                    r.kind == RefKind::RemoteBranch
+                        || (r.kind == RefKind::LocalBranch && Some(r.short_name()) != current)
+                })
+                .filter_map(|r| Some(item(r.short_name(), kind(r)?)))
+                .collect(),
+            PickerFor::Ref(PickPurpose::CreateBranchFrom) => self
+                .refs
+                .iter()
+                .filter_map(|r| Some(item(r.short_name(), kind(r)?)))
+                .collect(),
+            PickerFor::Ref(PickPurpose::DeleteRemoteBranch) => self
+                .refs
+                .iter()
+                .filter(|r| r.kind == RefKind::RemoteBranch)
+                .map(|r| item(r.short_name(), "remote"))
+                .collect(),
             PickerFor::Ref(PickPurpose::RemoveRemote) => self
                 .menu_context()
                 .remotes
@@ -279,7 +300,13 @@ impl AppState {
             (PickerFor::Ref(purpose), PickerOutcome::Picked(name)) => {
                 let action = match purpose {
                     PickPurpose::Checkout => self.checkout_action(&name),
-                    _ => purpose.action_for(&name),
+                    PickPurpose::Merge
+                    | PickPurpose::Rebase
+                    | PickPurpose::CreateBranchFrom
+                    | PickPurpose::DeleteRemoteBranch => self.picked_ref_action(purpose, &name),
+                    PickPurpose::DeleteBranch | PickPurpose::RemoveRemote => {
+                        purpose.action_for(&name)
+                    }
                 };
                 if let Some(action) = action {
                     let label = format!("{} {name}", picker_title(purpose));
@@ -290,6 +317,47 @@ impl AppState {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// What Branch ▸ Merge, Rebase Branch, Create Branch From and Delete
+    /// Remote Branch do with the picked branch or tag.
+    fn picked_ref_action(&self, purpose: PickPurpose, name: &str) -> Option<Action> {
+        let r = self.refs.iter().find(|r| {
+            r.short_name() == name
+                && matches!(
+                    r.kind,
+                    RefKind::LocalBranch | RefKind::RemoteBranch | RefKind::Tag
+                )
+        })?;
+        let rev = match r.kind {
+            RefKind::LocalBranch => Rev::Local(name.to_owned()),
+            RefKind::RemoteBranch => {
+                let (remote, branch) = split_remote(&r.full_name)?;
+                Rev::Remote {
+                    remote: remote.to_owned(),
+                    branch: branch.to_owned(),
+                }
+            }
+            _ => Rev::Tag(name.to_owned()),
+        };
+        let current = self.menu_context().current_branch().map(str::to_owned);
+        Some(match (purpose, rev) {
+            (PickPurpose::Merge, source) => Action::MergeIntoCurrent {
+                source,
+                current,
+                no_ff: false,
+            },
+            (PickPurpose::Rebase, onto) => Action::RebaseCurrentOnto { onto, current },
+            (PickPurpose::CreateBranchFrom, _) => Action::CreateBranch {
+                at: r.target.clone(),
+                name: String::new(),
+                checkout: true,
+            },
+            (PickPurpose::DeleteRemoteBranch, Rev::Remote { remote, branch }) => {
+                Action::Repo(RepoAction::DeleteRemoteBranch { remote, branch })
+            }
+            _ => return None,
+        })
     }
 
     /// The checkout for a picked short name: a local branch, a remote branch
@@ -326,6 +394,10 @@ fn picker_title(purpose: PickPurpose) -> &'static str {
     match purpose {
         PickPurpose::Checkout => "Checkout",
         PickPurpose::DeleteBranch => "Delete Branch",
+        PickPurpose::Merge => "Merge",
+        PickPurpose::Rebase => "Rebase onto",
+        PickPurpose::CreateBranchFrom => "Create Branch From",
+        PickPurpose::DeleteRemoteBranch => "Delete Remote Branch",
         PickPurpose::RemoveRemote => "Remove Remote",
     }
 }

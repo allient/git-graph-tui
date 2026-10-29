@@ -210,3 +210,27 @@ fn pull_from_asks_for_the_remote_and_branch() {
         Err(InputError::InvalidName(_))
     ));
 }
+
+#[test]
+fn delete_remote_branch_pushes_a_delete_after_asking() {
+    let action = RepoAction::DeleteRemoteBranch {
+        remote: "origin".into(),
+        branch: "feature/x".into(),
+    };
+    assert_eq!(
+        commands(&action),
+        [network(&[
+            "push",
+            "--delete",
+            "--",
+            "origin",
+            "refs/heads/feature/x"
+        ])]
+    );
+    assert!(action.is_destructive());
+    let confirmation = action.confirmation().unwrap();
+    assert!(
+        confirmation.message.contains("'feature/x' on 'origin'"),
+        "{confirmation:?}"
+    );
+}

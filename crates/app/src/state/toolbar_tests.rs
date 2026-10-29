@@ -355,3 +355,67 @@ fn the_changes_submenu_stages_unstages_and_discards_everything() {
 fn status_of(repo: &FixtureRepo) -> String {
     repo.git(&["status", "--porcelain", "--untracked-files=all"])
 }
+
+/// Types `name` in the open ref picker and picks the first match.
+fn pick(h: &mut Harness, name: &str) {
+    assert!(h.state.picker.is_some(), "no picker open");
+    type_text(h, name);
+    press(h, KeyCode::Enter);
+}
+
+/// Presses Enter on every input dialog and the confirm button of every
+/// confirmation, until no dialog is left.
+fn accept_dialogs(h: &mut Harness) {
+    for _ in 0..4 {
+        match h.state.dialog {
+            Some(Dialog::Input { .. }) => press(h, KeyCode::Enter),
+            Some(Dialog::Confirm { .. }) => {
+                // Destructive confirmations start on Cancel.
+                press(h, KeyCode::Left);
+                press(h, KeyCode::Enter);
+            }
+            _ => return,
+        }
+    }
+}
+
+#[test]
+fn branch_submenu_merges_a_picked_branch_into_the_current_one() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Branch", "Merge...");
+    pick(&mut h, "feature/login");
+    accept_dialogs(&mut h);
+    // `git` fails the test unless feature/login is now in HEAD's history.
+    repo.git(&["merge-base", "--is-ancestor", "feature/login", "HEAD"]);
+    assert_eq!(current_branch(&repo), "main");
+}
+
+#[test]
+fn create_branch_from_a_picked_ref_checks_it_out() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Branch", "Create Branch From...");
+    pick(&mut h, "develop");
+    assert!(matches!(h.state.dialog, Some(Dialog::Input { .. })));
+    type_text(&mut h, "from-develop");
+    accept_dialogs(&mut h);
+    assert_eq!(current_branch(&repo), "from-develop");
+    assert_eq!(
+        repo.git(&["rev-parse", "HEAD"]),
+        repo.git(&["rev-parse", "develop"])
+    );
+}
+
+#[test]
+fn delete_remote_branch_asks_then_deletes_it_on_the_remote() {
+    let repo = FixtureRepo::sample();
+    repo.git(&["push", "--quiet", "origin", "develop:refs/heads/gone"]);
+    repo.git(&["fetch", "--quiet", "origin"]);
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Branch", "Delete Remote Branch...");
+    pick(&mut h, "origin/gone");
+    assert!(matches!(h.state.dialog, Some(Dialog::Confirm { .. })));
+    accept_dialogs(&mut h);
+    assert_eq!(repo.git(&["ls-remote", "origin", "refs/heads/gone"]), "");
+}
