@@ -21,6 +21,10 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **S14** File and section buttons: "also a discragd button [...] and + buttons". Each changed file has discard `↶` and stage `+` (staged files: unstage `−`); the Changes header has discard-all and stage-all, Staged Changes has unstage-all. Discarding asks for confirmation.
 - **S15** "make text input to name teh commit a text area": the commit message is multi-line.
 - **S16** "source control also need to have chages and stages areas": Staged Changes and Changes sections (already present since T2; Staged Changes shows once something is staged, as in VS Code).
+- **S17** "add a smalal gap better staged and changes [...] xsections": a blank line between Staged Changes and Changes.
+- **S18** "i ca also switch between bracnhcers with double click on vscode git graph": double-clicking a branch badge checks it out. Right-click menus on branches and commits match VS Code ("this si really important on right clik on a branch i can do this [...] rigth click out i cna do [...]"; already present, pinned by menu tests).
+- **S19** "after that pdate readme whith was was done": the README reflects what was built.
+- **S20** "ater do 1 to 4": (1) show or hide individual columns; (2) "Fetch into local branch" on remote branches; (3) issue linking (`#123` opens in the browser); (4) stretch goals: interactive rebase, conflict banner with continue/abort, worktree management, reflog view.
 
 ## Tasks
 
@@ -34,9 +38,13 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 | T7 | S12 Find | inline | done (470 tests) | feat/graph-padding-auto-icons |
 | T8 | S12 Create PR | inline | done (479 tests) | feat/graph-padding-auto-icons |
 | T9 | S12 file at revision, compare | delegated (parallel units: T9 and T12 have disjoint surfaces; isolated worktree) | done (506 tests on main + T12) | feat/compare-and-file-view: 68dbb05, 48e8707 |
-| T10 | S12 external pager | inline | pending | |
+| T10 | S12 external pager | delegated (context backstop) | in progress | |
 | T11 | S12 settings and config | inline | done (499 tests, pty: dragged width saved) | feat/settings-config |
 | T12 | S13, S14, S15, S16 | inline | done (492 tests) | feat/graph-padding-auto-icons: c3923c6 + pane commit |
+| T13 | S17, S18 | inline | done (518 tests) | feat/sc-gap-double-click: 44ed344 |
+| T14 | S19 | inline | pending (after T10) | |
+| T15 | S20 (1)-(3) | pending | pending | |
+| T16 | S20 (4) stretch goals | pending | pending | |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
 
 ## Log
@@ -63,3 +71,5 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L20** T11: config.toml at $TUI_GIT_GRAPH_CONFIG, else $XDG_CONFIG_HOME/tui-git-graph, else ~/.config/tui-git-graph. It holds `icons` (precedence: flag > env > config > auto) and `[layout]` (pane and column widths), applied at startup. The layout is written back on quit only when it changed (other keys kept, comments lost). Unknown keys or values are errors naming the file. "Repository settings" stays as the existing repository menu (remotes); issue linking is still a README stretch item. New deps for the app crate: dirs, serde, toml (already in the workspace catalog).
 - **L21** T11 verification (independent verifier): blocker: quitting rewrote a config whose column widths were set to their defaults (README example), dropping comments; fixed by comparing the normalized layout before and after the run (apply_layout returns it), pinned by `default_widths_written_in_the_config_are_not_a_change` and a pty quit probe (file byte-identical). CI cargo-deny rejected `option-ext` (MPL-2.0) pulled in by `dirs`; dropped `dirs` (home from HOME/USERPROFILE) rather than widening the license policy. Saves are atomic (write `config.toml.partial`, then rename).
 - **L22** T9 (delegated writer, cherry-picked onto main): `v` in commit details shows a file at that commit (`git show <oid>:<path>`) in the diff panel via a plain-text DiffView, titled `path @ abc1234`. Commit menu "Select for Compare" / "Compare with Selected" / "Compare with Working Tree" open a comparison in the details gap (`git diff --numstat -z --find-renames a [b]`, Enter → `git diff a [b] -- path`), reusing CommitDetailsView. Stale results are ignored. MenuContext gained `compare_base` (workspace-internal). README conflict on cherry-pick resolved by keeping both rows.
+- **L23** (2026-10-28) User: "add a smalal gap better staged and changes [Image #27] xsections. and work on t10 after that pdate readme whith was was done. ater do 1 to 4. thsi si really important on right clik on a branch i can do this [Image #28] rigth click out i cna do [Image #29] i ca also switch between bracnhcers with double click on vscode git graph"
+- **L24** T13: Item::Gap row between the sections (skipped by Up/Down, no hit region). Double-click: two left clicks on the same branch badge within `double_click` (400 ms) check the branch out via the toolbar checkout_action (local: checkout; remote: asks the local name; current branch: "Already on X."). T10 delegated to a writer (parent context backstop), branch feat/diff-pager from 44ed344.
