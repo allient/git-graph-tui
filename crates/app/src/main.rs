@@ -130,7 +130,11 @@ fn hand_over(terminal: &mut DefaultTerminal, program: &External) -> Result<Optio
         crossterm::terminal::EnterAlternateScreen,
         event::EnableMouseCapture
     )?;
-    terminal.clear()?;
+    // Redraw everything on the next frame. `resize` clears the screen and the
+    // back buffer without asking the terminal where its cursor is, which
+    // `clear` does (and which fails when the terminal is slow to answer).
+    let area = terminal.size()?.into();
+    terminal.resize(area)?;
     Ok(message)
 }
 
