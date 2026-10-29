@@ -20,7 +20,7 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 |----|-------|-------|--------|--------|
 | T1 | S1, S2, S5, S7 | inline | done (gate green, 421 tests) | feat/graph-spacing |
 | T5 | S8 | inline | done (429 tests) | feat/graph-spacing |
-| T2 | S3 | inline | in progress: per-file status and stage/unstage/commit actions done; pane widget and layout next | feat/source-control |
+| T2 | S3 | inline | done (454 tests, pty smoke committed a file) | feat/source-control: 88f9e46, fcac605, slice 4 |
 | T4 | S6 | inline | pending | |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
 
@@ -37,3 +37,4 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L9** (2026-10-28) User: "do thsi same That's why tools like lazygit and yazi make icons opt-in: they print plain text by default,  if icons use tehm in other case use what we have now"
 - **L10** (2026-10-28) User: "Do not forget to create 2 panes one is source controls and teho other is gitgraph [Image #20]" (T2, S3).
 - **L11** T2 plan, 4 slices on feat/source-control: (1) per-file status (`ChangedFile`, `Change`), (2) `WorkingTreeAction::{Stage, Unstage, Commit}` (`add --all`, `reset --quiet` (works unborn), `commit --message=`), (3) `SourceControlPane` widget in tgg-ui, (4) left pane plus graph pane layout, focus and wiring in the app. Slices 1 and 2 are done (434 tests).
+- **L12** T2 slice 4: the pane is on the left (a quarter of the width, 30-44 columns, hidden below 90 columns) with a divider; toolbar and graph are on the right. `c` or "Open Source Control" focuses the message; a click in the pane takes the keyboard and a click elsewhere gives it back. Commit is refused with "Type a commit message first." or "Nothing staged: stage files with + first.", and the message clears after a successful commit. At 110 columns the graph drops Date/Author (they need 100 graph columns).

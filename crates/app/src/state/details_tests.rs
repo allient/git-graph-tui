@@ -8,7 +8,8 @@ use tgg_testkit::FixtureRepo;
 use super::*;
 use crate::testing::Harness;
 
-const W: u16 = 110;
+/// Wide enough for full hashes beside the Source Control pane.
+const W: u16 = 150;
 const H: u16 = 30;
 
 fn open(repo: &FixtureRepo) -> Harness {

@@ -208,8 +208,8 @@ fn clicking_outside_closes_the_menu() {
 fn clicking_a_menu_item_chooses_it() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    let (_, y) = find(&h, "Update docs");
-    click(&mut h, MouseButton::Right, 10, y);
+    let (x, y) = find(&h, "Update docs");
+    click(&mut h, MouseButton::Right, x, y);
     let (x, item_y) = find(&h, "Copy Commit Hash to Clipboard");
     click(&mut h, MouseButton::Left, x, item_y);
     assert!(h.state.menu.is_none());

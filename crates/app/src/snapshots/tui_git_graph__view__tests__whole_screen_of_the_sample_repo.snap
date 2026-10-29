@@ -2,12 +2,12 @@
 source: crates/app/src/view.rs
 expression: "graph.join(\"\\n\")"
 ---
- Branches: [Show All ▾]  [x] Show Remote Branches                                               [↻] [⇣] [...]
-Graph Description                                                     Date             Author         Commit
-  ○   Uncommitted Changes (1)
-  ┆
-●      feature/login  Add login                                       2026-01-01 00:07 Fixture Author 82f432c
-│
-●      develop  Return a value                                        2026-01-01 00:06 Fixture Author 6681ca2
-│
-│ ●    main │ origin   v0.1.0  Merge branch 'develop'                 2026-01-01 00:05 Fixture Author 0b1f05f
+ SOURCE CONTROL               │ Branches: [Show All ▾]  [x] Show Remote Branches                [↻] [⇣] [...]
+ Message (Enter to commit on …│Graph Description                                                      Commit
+           ✓ Commit           │  ○   Uncommitted Changes (1)
+                              │  ┆
+▾ Changes                  1 +│●      feature/login  Add login                                        82f432c
+  notes.txt                U +││
+                              │●      develop  Return a value                                         6681ca2
+                              ││
+                              ││ ●    main │ origin   v0.1.0  Merge branch 'develop'                  0b1f05f

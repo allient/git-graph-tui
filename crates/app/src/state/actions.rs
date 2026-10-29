@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use tgg_actions::{Action, InputId, InputValue, Plan, UiEffect};
+use tgg_actions::{Action, InputId, InputValue, Plan, UiEffect, WorkingTreeAction};
 use tgg_git::{ExecError, Failure, GitCommand, Output};
 use tgg_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
@@ -127,8 +127,7 @@ impl AppState {
             Plan::Ui(UiEffect::ToggleBranchFilter { branch }) => self.toggle_branch_filter(branch),
             Plan::Ui(UiEffect::ShowTag { name }) => self.show_tag(name),
             Plan::Ui(UiEffect::OpenSourceControl) => {
-                self.message =
-                    Some("Use `git status` or your editor's source control view.".to_owned());
+                self.focus_source_control();
                 Vec::new()
             }
             Plan::Ui(UiEffect::PickRef { purpose }) => {
@@ -156,6 +155,12 @@ impl AppState {
                     return vec![Command::Run(next)];
                 }
                 self.message = Some(format!("✓ {}", running.label));
+                if matches!(
+                    running.action,
+                    Action::WorkingTree(WorkingTreeAction::Commit { .. })
+                ) {
+                    self.source_control.view.clear_message();
+                }
                 self.refresh()
             }
             Err(err) => {
