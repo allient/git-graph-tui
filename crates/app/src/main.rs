@@ -6,6 +6,7 @@ mod clipboard;
 mod config;
 mod external;
 mod git;
+mod herdr;
 mod panels;
 mod state;
 #[cfg(test)]
@@ -87,6 +88,9 @@ fn run(
     issues: config::Issues,
 ) -> Result<(config::Layout, config::Layout)> {
     let _mouse = MouseCapture::enable()?;
+    // Inside herdr, plain right-click opens the app's menus, not herdr's.
+    let env = |name: &str| std::env::var(name).ok();
+    let _right_click = herdr::RightClick::enable(&env, herdr::run_quietly);
     let (runner, results) = Runner::new(ProcessExecutor::new());
     let theme = Theme {
         icons,
