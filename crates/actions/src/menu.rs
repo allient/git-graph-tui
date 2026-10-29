@@ -3,7 +3,7 @@ use tgg_model::{Oid, Stash};
 
 use crate::{
     Action, CommitScope, CommitTarget, GraphColumn, MenuContext, Operation, OperationAction,
-    PickPurpose, PullMode, RepoAction, ResetMode, Rev, StashAction, TagAction, Target, UiEffect,
+    PickPurpose, RepoAction, ResetMode, Rev, StashAction, TagAction, Target, UiEffect,
     WorkingTreeAction, WorktreeAction,
 };
 
@@ -509,36 +509,23 @@ fn pick(purpose: PickPurpose) -> Action {
 /// Control "..." menu. Remote entries need a remote; current-branch entries
 /// need HEAD on a branch; create entries need a HEAD commit.
 fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
-    let current = ctx.current_branch();
     let remote = ctx.default_remote();
+    let on_branch_with_remote = ctx.current_branch().is_some() && remote.is_some();
     vec![
-        current.filter(|_| remote.is_some()).and_then(|branch| {
-            entry(
-                "Pull...",
-                Action::Repo(RepoAction::Pull {
-                    branch: branch.to_owned(),
-                    mode: PullMode::default(),
-                }),
-            )
+        entry_if(on_branch_with_remote, "Pull", || {
+            Action::Repo(RepoAction::PullUpstream { rebase: false })
         }),
-        current.zip(remote).and_then(|(branch, remote)| {
-            entry(
-                "Push...",
-                Action::PushBranch {
-                    branch: branch.to_owned(),
-                    remote: remote.to_owned(),
-                    set_upstream: true,
-                    force_with_lease: false,
-                },
-            )
+        entry_if(on_branch_with_remote, "Push", || {
+            Action::Repo(RepoAction::Push)
         }),
         entry("Checkout to...", pick(PickPurpose::Checkout)),
         entry_if(remote.is_some(), "Fetch", || {
-            Action::Repo(RepoAction::Fetch { prune: false })
+            Action::Repo(RepoAction::FetchDefault { prune: false })
         }),
         Some(MenuItem::Separator),
         Some(submenu("Commit", commit_submenu(ctx))),
         Some(submenu("Changes", changes_submenu())),
+        Some(submenu("Pull, Push", pull_push_submenu(ctx))),
         Some(submenu("Branch", branch_submenu(ctx))),
         Some(submenu("Remote", remote_submenu(ctx))),
         Some(submenu("Stash", stash_submenu())),
@@ -682,6 +669,61 @@ fn commit_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
     items.push(Some(MenuItem::Separator));
     items.extend(commits(false, true, " (Signed Off)"));
     items
+}
+
+/// VS Code's "Pull, Push" submenu. Pull, Push and Sync follow the git
+/// config (`pull.rebase`, `push.default`); "Pull from..." and "Push to..."
+/// ask where. Empty without a remote.
+fn pull_push_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let Some(remote) = ctx.default_remote() else {
+        return Vec::new();
+    };
+    let repo = |action| Action::Repo(action);
+    let branch_entries = ctx.current_branch().map(|branch| {
+        [
+            entry("Sync", repo(RepoAction::Sync)),
+            Some(MenuItem::Separator),
+            entry("Pull", repo(RepoAction::PullUpstream { rebase: false })),
+            entry(
+                "Pull (Rebase)",
+                repo(RepoAction::PullUpstream { rebase: true }),
+            ),
+            entry(
+                "Pull from...",
+                repo(RepoAction::PullFrom {
+                    remote: remote.to_owned(),
+                    branch: branch.to_owned(),
+                }),
+            ),
+            Some(MenuItem::Separator),
+            entry("Push", repo(RepoAction::Push)),
+            entry(
+                "Push to...",
+                Action::PushBranch {
+                    branch: branch.to_owned(),
+                    remote: remote.to_owned(),
+                    set_upstream: true,
+                    force_with_lease: false,
+                },
+            ),
+            Some(MenuItem::Separator),
+        ]
+    });
+    branch_entries
+        .into_iter()
+        .flatten()
+        .chain([
+            entry("Fetch", repo(RepoAction::FetchDefault { prune: false })),
+            entry(
+                "Fetch (Prune)",
+                repo(RepoAction::FetchDefault { prune: true }),
+            ),
+            entry(
+                "Fetch From All Remotes",
+                repo(RepoAction::Fetch { prune: false }),
+            ),
+        ])
+        .collect()
 }
 
 /// VS Code's Changes submenu, for every file at once.

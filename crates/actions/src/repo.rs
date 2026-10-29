@@ -5,39 +5,6 @@ use tgg_git::GitCommand;
 use crate::action::{Action, Confirmation, Plan, strings};
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 
-/// How `Pull` combines remote commits with local ones.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum PullMode {
-    /// Refuse when the branches diverged (`--ff-only`): never creates a
-    /// merge or rewrites anything behind the user's back.
-    #[default]
-    FastForwardOnly,
-    Rebase,
-    /// Merge commit when needed (`--no-rebase`).
-    Merge,
-}
-
-impl PullMode {
-    pub const CHOICES: &'static [&'static str] = &["ff-only", "rebase", "merge"];
-
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::FastForwardOnly => "ff-only",
-            Self::Rebase => "rebase",
-            Self::Merge => "merge",
-        }
-    }
-
-    fn flag(self) -> &'static str {
-        match self {
-            Self::FastForwardOnly => "--ff-only",
-            Self::Rebase => "--rebase",
-            Self::Merge => "--no-rebase",
-        }
-    }
-}
-
 /// What a ref picker opened from the repository menu is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PickPurpose {
@@ -71,13 +38,26 @@ impl PickPurpose {
 /// Repository-wide actions from the "..." menu (S11).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RepoAction {
-    /// Pulls the current branch (`branch`, for messages) from its upstream.
-    Pull {
-        branch: String,
-        mode: PullMode,
-    },
     /// Fetches every remote.
     Fetch {
+        prune: bool,
+    },
+    /// VS Code's Sync: `git pull`, then `git push`, as configured.
+    Sync,
+    /// `git pull` from the upstream as git is configured (`pull.rebase`,
+    /// `pull.ff`), or with `--rebase`; no dialog, as in VS Code.
+    PullUpstream {
+        rebase: bool,
+    },
+    /// Pulls `branch` from `remote` into the current branch.
+    PullFrom {
+        remote: String,
+        branch: String,
+    },
+    /// `git push` to the upstream, as configured.
+    Push,
+    /// `git fetch` from the default remote, optionally pruning.
+    FetchDefault {
         prune: bool,
     },
     /// Deletes remote-tracking branches whose remote branch is gone.
@@ -104,9 +84,27 @@ impl RepoAction {
         let network = |args: Vec<String>| GitCommand::network(repo, args);
         let write = |args: Vec<String>| GitCommand::write(repo, args);
         let commands = match self {
-            Self::Pull { mode, .. } => vec![network(strings(&["pull", mode.flag()]))],
             Self::Fetch { prune } => {
                 let mut args = strings(&["fetch", "--all"]);
+                if *prune {
+                    args.push("--prune".into());
+                }
+                vec![network(args)]
+            }
+            Self::Sync => vec![network(strings(&["pull"])), network(strings(&["push"]))],
+            Self::PullUpstream { rebase } => {
+                let mut args = strings(&["pull"]);
+                if *rebase {
+                    args.push("--rebase".into());
+                }
+                vec![network(args)]
+            }
+            Self::PullFrom { remote, branch } => {
+                vec![network(strings(&["pull", "--", remote, branch]))]
+            }
+            Self::Push => vec![network(strings(&["push"]))],
+            Self::FetchDefault { prune } => {
+                let mut args = strings(&["fetch"]);
                 if *prune {
                     args.push("--prune".into());
                 }
@@ -149,12 +147,10 @@ impl RepoAction {
     #[must_use]
     pub fn inputs(&self) -> Vec<InputSpec> {
         match self {
-            Self::Pull { mode, .. } => vec![InputSpec::text(
-                InputId::Mode,
-                "Mode",
-                InputKind::Choice(PullMode::CHOICES),
-                mode.name(),
-            )],
+            Self::PullFrom { remote, branch } => vec![
+                InputSpec::text(InputId::Remote, "Remote", InputKind::Remote, remote),
+                InputSpec::text(InputId::Name, "Branch", InputKind::RefName, branch),
+            ],
             Self::AddRemote { name, url } => vec![
                 InputSpec::text(InputId::Name, "Remote name", InputKind::Remote, name),
                 InputSpec::text(InputId::Url, "URL", InputKind::Path, url),
@@ -165,15 +161,10 @@ impl RepoAction {
 
     pub fn set_input(&mut self, id: InputId, value: InputValue) -> Result<(), InputError> {
         match (self, id) {
-            (Self::Pull { mode, .. }, InputId::Mode) => {
-                let name = input::text(id, value)?;
-                *mode = match name.as_str() {
-                    "ff-only" => PullMode::FastForwardOnly,
-                    "rebase" => PullMode::Rebase,
-                    "merge" => PullMode::Merge,
-                    _ => return Err(InputError::NotAChoice(name)),
-                };
+            (Self::PullFrom { remote, .. }, InputId::Remote) => {
+                *remote = input::ref_name(id, value)?;
             }
+            (Self::PullFrom { branch, .. }, InputId::Name) => *branch = input::ref_name(id, value)?,
             (Self::AddRemote { name, .. }, InputId::Name) => *name = input::ref_name(id, value)?,
             (Self::AddRemote { url, .. }, InputId::Url) => *url = input::required(id, value)?,
             _ => return Err(InputError::NotAnInput(id)),

@@ -73,7 +73,8 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Copy hash / subject to clipboard
 
 ### Repository menu ("..." in the Source Control header, or the toolbar when the pane is hidden)
-- [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag)
+- [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag). Pull, Push and Fetch run right away and follow your git config (`pull.rebase`, `pull.ff`, `push.default`); a diverged pull stops unless git is configured to merge or rebase
+- [x] Pull, Push submenu, as in VS Code: Sync (pull, then push); Pull, Pull (Rebase), Pull from... (a remote and branch); Push, Push to... (remote, set upstream, force with lease); Fetch, Fetch (Prune), Fetch From All Remotes
 - [x] Branch, remote, stash and tag submenus; show the git command log
 - [x] Commit submenu, as in VS Code's Source Control: Commit (what is staged, or everything when nothing is), Commit Staged, Commit All (untracked files too), each also as Amend (an empty message keeps the last one) and Signed Off; Undo Last Commit (its changes stay staged); Abort Rebase while a rebase is stopped. The message is the one typed in the Source Control pane
 - [x] Changes submenu: Stage All, Unstage All and Discard All Changes (asks first; untracked files are deleted, staged changes kept)

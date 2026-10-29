@@ -12,8 +12,8 @@ use std::process::Command;
 
 use pretty_assertions::assert_eq;
 use tgg_actions::{
-    Action, CommitTarget, InputId, InputValue, MenuContext, MenuItem, Plan, ResetMode, Rev, Target,
-    menu_for, validate_ref_name,
+    Action, CommitTarget, InputId, InputValue, MenuContext, MenuItem, Plan, RepoAction, ResetMode,
+    Rev, Target, menu_for, validate_ref_name,
 };
 use tgg_git::{Failure, GitCommand};
 use tgg_model::{HeadState, Oid};
@@ -578,4 +578,37 @@ fn local_name_check_agrees_with_git() {
     // Deliberately stricter than git: a branch named `@` is legal, but `@`
     // means HEAD in every revision argument.
     assert!(validate_ref_name("@").is_err());
+}
+
+// ---- Pull, Push submenu (scm-menu-parity S4) ----
+
+#[test]
+fn sync_pushes_local_commits_and_pull_from_merges_another_branch() {
+    let (repo, _) = diverged();
+    repo.add_origin();
+    repo.push("main");
+    repo.git(&["push", "--quiet", "origin", "topic"]);
+
+    // Sync: pull (nothing new), then push the new local commit.
+    let local = repo.commit_file("s.txt", "s\n", "Sync me");
+    ok(&repo, &Action::Repo(RepoAction::Sync));
+    assert_eq!(repo.git(&["rev-parse", "origin/main"]), local);
+    assert_eq!(
+        repo.git(&["ls-remote", "origin", "refs/heads/main"])
+            .split_whitespace()
+            .next(),
+        Some(local.as_str())
+    );
+
+    // Pull from origin/topic merges it into main.
+    repo.git(&["config", "pull.rebase", "false"]);
+    ok(
+        &repo,
+        &Action::Repo(RepoAction::PullFrom {
+            remote: "origin".into(),
+            branch: "topic".into(),
+        }),
+    );
+    assert!(repo.path().join("t.txt").exists());
+    assert_eq!(head_branch(&repo), "main");
 }

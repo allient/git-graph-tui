@@ -810,10 +810,14 @@ fn resets_wait_for_the_operation() {
 
 #[test]
 fn pulls_wait_for_the_operation() {
-    blocked(&[Action::Repo(RepoAction::Pull {
-        branch: "main".into(),
-        mode: crate::PullMode::default(),
-    })]);
+    blocked(&[
+        Action::Repo(RepoAction::Sync),
+        Action::Repo(RepoAction::PullUpstream { rebase: true }),
+        Action::Repo(RepoAction::PullFrom {
+            remote: "origin".into(),
+            branch: "main".into(),
+        }),
+    ]);
 }
 
 #[test]
