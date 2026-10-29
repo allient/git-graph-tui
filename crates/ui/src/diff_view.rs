@@ -2,7 +2,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Clear, Widget};
-use tgg_git::show::{Diff, FileChange, LineKind};
+use tgg_git::show::{Diff, DiffLine, FileChange, LineKind};
 
 use crate::details::file_label;
 use crate::{Key, Theme, fit};
@@ -99,6 +99,29 @@ impl DiffView {
         }
     }
 
+    /// A plain text file (a file at a revision): every line is a context
+    /// line numbered from 1 in the new-line column, with no `+`/`-` counts.
+    #[must_use]
+    pub fn text(title: String, content: &str) -> Self {
+        let lines = content
+            .lines()
+            .zip(1u32..)
+            .map(|(text, n)| DiffLine {
+                kind: LineKind::Context,
+                text: text.to_owned(),
+                old_line: None,
+                new_line: Some(n),
+            })
+            .collect();
+        Self {
+            title,
+            counts: String::new(),
+            diff: Diff { lines },
+            offset: 0,
+            style: DiffStyle::default(),
+        }
+    }
+
     #[must_use]
     pub fn with_style(mut self, style: DiffStyle) -> Self {
         self.style = style;
@@ -155,7 +178,11 @@ impl DiffView {
         }
         Clear.render(area, buf);
         let width = usize::from(area.width - 1);
-        let header = format!("{} {}", self.title, self.counts);
+        let header = if self.counts.is_empty() {
+            self.title.clone()
+        } else {
+            format!("{} {}", self.title, self.counts)
+        };
         let bold = Style::default().fg(theme.text).add_modifier(Modifier::BOLD);
         buf.set_string(area.x + 1, area.y, fit(&header, width), bold);
 

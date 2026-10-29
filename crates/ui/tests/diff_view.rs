@@ -14,6 +14,32 @@ fn run(repo: &FixtureRepo, args: Vec<String>) -> String {
     repo.git_raw(&full)
 }
 
+fn screen(view: &DiffView, area: Rect) -> String {
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf, &Theme::default());
+    (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| buf[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn plain_text_is_numbered_from_one_without_counts() {
+    let view = DiffView::text("src/a.rs @ abc1234".into(), "fn a() {}\n\tb\n");
+    assert_eq!(
+        screen(&view, Rect::new(0, 0, 30, 4)),
+        " src/a.rs @ abc1234\n         1 │ fn a() {}\n         2 │     b\n"
+    );
+    assert_eq!(view.diff().added(), 0);
+    assert_eq!(view.diff().deleted(), 0);
+}
+
 #[test]
 fn diff_of_a_modified_file() {
     let repo = FixtureRepo::new();

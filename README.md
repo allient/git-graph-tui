@@ -75,7 +75,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 ### Commit details
 - [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
 - [ ] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
-- [ ] View a file at that revision
+- [x] View a file at that revision
 - [ ] Compare any two commits, or a commit with the working tree
 
 ### Repository settings
@@ -167,7 +167,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | --- | --- |
 | `j` `k` / arrows, `PgUp` `PgDn`, `g` `G` | Move the selection (top, bottom) |
 | `H` | Jump to the HEAD commit |
-| `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file and `Enter` opens its diff |
+| `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |
 | `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |
