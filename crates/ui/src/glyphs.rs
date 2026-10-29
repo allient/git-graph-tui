@@ -1,6 +1,4 @@
-use std::cmp::Ordering;
-
-use tgg_graph::Row;
+use tgg_graph::{Edge, Row};
 
 /// One terminal cell of the graph column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,25 +26,25 @@ struct Joints {
 /// Draws a commit's line: the node and the lanes passing through it, `width`
 /// lanes wide.
 ///
-/// Lane `i` is cell `2 * i`; the odd cells between lanes carry the bends. A
-/// line changing lanes is an S-curve spread over this line and the connector
-/// lines next to it (see [`connector_glyphs`]): a line leaving towards another
-/// lane bends into the gap next to its own lane (`●╮`), and a line arriving
-/// from another lane comes down the gap next to the lane it joins (`●╯`).
-/// The result has `2 * width - 1` cells.
+/// Lane `i` is cell `2 * i`; the cells between lanes carry horizontal lines.
+/// As in VS Code's Git Graph, a line between a commit and another lane turns
+/// once, here on the commit's line: a fork leaves the node sideways and turns
+/// down its new lane (`●─╮`), and a branch runs straight down its own lane
+/// and turns into the node it joins (`●─╯`). The result has `2 * width - 1`
+/// cells.
 #[must_use]
 pub fn lane_glyphs(row: &Row, width: usize) -> Vec<GlyphCell> {
     let width = width.max(row.width()).max(1);
     let mut joints = vec![Joints::default(); 2 * width - 1];
-    // (cell the line runs vertically in, its lane's cell, goes up, color)
+    // (cell the line runs vertically in, the cell it turns to, goes up, color)
     let mut ends: Vec<(usize, usize, bool, usize)> = row
         .top
         .iter()
-        .map(|e| (bend(e.to, e.from), 2 * e.to, true, e.color))
+        .map(|e| (entry(row, e), 2 * e.to, true, e.color))
         .chain(
             row.bottom
                 .iter()
-                .map(|e| (bend(e.from, e.to), 2 * e.from, false, e.color)),
+                .map(|e| (exit(row, e), 2 * e.from, false, e.color)),
         )
         .collect();
     // Straight lanes first, so a bend leaving a lane doesn't recolor it.
@@ -72,10 +70,10 @@ pub fn lane_glyphs(row: &Row, width: usize) -> Vec<GlyphCell> {
 /// Draws the line between commit `above` and the commit `below` it (None when
 /// `above` is the last row loaded), `width` lanes wide.
 ///
-/// Each line leaving `above` runs down to where it enters `below`. A line
-/// that changes lanes crosses over here between the bends drawn on the commit
-/// lines, with rounded corners at both ends: `┃╰╮` below a commit that forks
-/// to the right, `┃╭╯` above one a branch joins from the right.
+/// Each line leaving `above` runs down to where it enters `below`. Lines to
+/// and from a commit already turned on the commit lines, so they run
+/// straight here; only a passing lane that moves to another lane crosses
+/// over, with rounded corners at both ends (`╭─╯`).
 #[must_use]
 pub fn connector_glyphs(above: &Row, below: Option<&Row>, width: usize) -> Vec<GlyphCell> {
     let width = width
@@ -100,16 +98,22 @@ pub fn connector_glyphs(above: &Row, below: Option<&Row>, width: usize) -> Vec<G
 }
 
 /// The lines crossing the boundary between two rows, as (cell above, cell
-/// below, color). A line that bent on the commit line above starts in the gap
-/// it bent into, and one that bends on the commit line below ends in the gap
-/// it bends down; see [`bend`]. The color is the one of the part that changes
-/// lanes.
+/// below, color). A line starts where it left the commit line above (see
+/// [`exit`]) and ends where it enters the commit line below (see [`entry`]).
+/// The color is the one of the part that changes lanes.
 fn segments(above: &Row, below: Option<&Row>) -> Vec<(usize, usize, usize)> {
-    let entering = below.map_or(&[][..], |b| b.top.as_slice());
+    let Some(below) = below else {
+        // The last row loaded: every line just continues down.
+        return above
+            .bottom
+            .iter()
+            .map(|out| (exit(above, out), 2 * out.to, out.color))
+            .collect();
+    };
     let mut segments = Vec::new();
     for out in &above.bottom {
-        let upper = bend(out.from, out.to);
-        let mut joined = entering.iter().filter(|e| e.from == out.to).peekable();
+        let upper = exit(above, out);
+        let mut joined = below.top.iter().filter(|e| e.from == out.to).peekable();
         if joined.peek().is_none() {
             segments.push((upper, 2 * out.to, out.color));
         }
@@ -119,26 +123,35 @@ fn segments(above: &Row, below: Option<&Row>) -> Vec<(usize, usize, usize)> {
             } else {
                 out.color
             };
-            segments.push((upper, bend(e.to, e.from), color));
+            segments.push((upper, entry(below, e), color));
         }
     }
     // Lines entering `below` that nothing above leads to.
-    for e in entering {
+    for e in &below.top {
         if !above.bottom.iter().any(|out| out.to == e.from) {
-            segments.push((2 * e.from, bend(e.to, e.from), e.color));
+            segments.push((2 * e.from, entry(below, e), e.color));
         }
     }
     segments
 }
 
-/// The cell a line on `lane` runs vertically in on a commit line: the lane's
-/// own cell, or the gap next to it on the side of `other` when the line turns
-/// towards `other`.
-fn bend(lane: usize, other: usize) -> usize {
-    match other.cmp(&lane) {
-        Ordering::Greater => 2 * lane + 1,
-        Ordering::Less => 2 * lane - 1,
-        Ordering::Equal => 2 * lane,
+/// The cell where edge `e` from above enters `row`'s commit line: the lane
+/// it comes down, so a branch joining the commit turns into it here.
+fn entry(row: &Row, e: &Edge) -> usize {
+    if e.to == row.lane {
+        2 * e.from
+    } else {
+        2 * e.to
+    }
+}
+
+/// The cell where edge `e` leaves `row`'s commit line downwards: the lane it
+/// goes to when it forks off the commit, so it turned here already.
+fn exit(row: &Row, e: &Edge) -> usize {
+    if e.from == row.lane {
+        2 * e.to
+    } else {
+        2 * e.from
     }
 }
 
@@ -255,9 +268,10 @@ mod tests {
     }
 
     #[test]
-    fn a_curve_joining_a_lane_from_the_left() {
+    fn a_line_joining_a_lane_from_the_left_turns_on_the_commit_line() {
         let above = row(0, 0, &[e(1, 1, 1)], &[e(1, 1, 1), e(0, 1, 0)]);
-        assert_eq!(text(&connector_glyphs(&above, None, 2)), " ╰┨");
+        assert_eq!(text(&lane_glyphs(&above, 2)), "●─┨");
+        assert_eq!(text(&connector_glyphs(&above, None, 2)), "  ┃");
     }
 
     #[test]
@@ -273,11 +287,11 @@ mod tests {
     }
 
     #[test]
-    fn commit_lines_start_and_end_the_curves() {
+    fn lines_turn_once_on_the_commit_line() {
         let merge = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
-        assert_eq!(text(&lane_glyphs(&merge, 2)), "●╮ ");
+        assert_eq!(text(&lane_glyphs(&merge, 2)), "●─╮");
         let joined = row(0, 0, &[e(0, 0, 0), e(1, 0, 1)], &[]);
-        assert_eq!(text(&lane_glyphs(&joined, 2)), "●╯ ");
+        assert_eq!(text(&lane_glyphs(&joined, 2)), "●─╯");
     }
 
     #[test]
@@ -294,37 +308,37 @@ mod tests {
     }
 
     #[test]
-    fn a_fork_to_the_right_is_an_s_curve() {
+    fn a_fork_to_the_right_turns_at_the_commit_then_runs_straight() {
         let merge = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
         let next = row(1, 1, &[e(0, 0, 0), e(1, 1, 1)], &[e(0, 0, 0), e(1, 1, 1)]);
-        assert_eq!(text(&lane_glyphs(&merge, 2)), "●╮ ");
-        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "┃╰╮");
+        assert_eq!(text(&lane_glyphs(&merge, 2)), "●─╮");
+        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "┃ ┃");
         assert_eq!(text(&lane_glyphs(&next, 2)), "┃ ●");
     }
 
     #[test]
-    fn a_merge_from_the_right_is_an_s_curve() {
+    fn a_branch_joining_from_the_right_runs_straight_then_turns_into_its_parent() {
         let tip = row(1, 1, &[e(0, 0, 0)], &[e(0, 0, 0), e(1, 1, 1)]);
         let parent = row(0, 0, &[e(0, 0, 0), e(1, 0, 1)], &[e(0, 0, 0)]);
         assert_eq!(text(&lane_glyphs(&tip, 2)), "┃ ●");
-        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "┃╭╯");
-        assert_eq!(text(&lane_glyphs(&parent, 2)), "●╯ ");
+        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "┃ ┃");
+        assert_eq!(text(&lane_glyphs(&parent, 2)), "●─╯");
     }
 
     #[test]
-    fn a_node_moving_left_bends_out_of_its_line() {
+    fn a_node_moving_left_turns_on_its_own_line() {
         let above = row(1, 1, &[e(1, 1, 1)], &[e(1, 0, 1)]);
         let below = row(0, 1, &[e(0, 0, 1)], &[]);
-        assert_eq!(text(&lane_glyphs(&above, 2)), " ╭●");
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 2)), "╭╯ ");
+        assert_eq!(text(&lane_glyphs(&above, 2)), "╭─●");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 2)), "┃  ");
     }
 
     #[test]
     fn a_passing_lane_moving_left_by_one() {
         let above = row(0, 0, &[e(0, 0, 0), e(2, 2, 2)], &[e(0, 0, 0), e(2, 1, 2)]);
         let below = row(0, 0, &[e(0, 0, 0), e(1, 1, 2)], &[e(0, 0, 0), e(1, 1, 2)]);
-        assert_eq!(text(&lane_glyphs(&above, 3)), "●  ╭╯");
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 3)), "┃ ╭╯ ");
+        assert_eq!(text(&lane_glyphs(&above, 3)), "●   ┃");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 3)), "┃ ╭─╯");
         assert_eq!(text(&lane_glyphs(&below, 3)), "● ┃  ");
     }
 
@@ -332,52 +346,49 @@ mod tests {
     fn a_passing_lane_arriving_from_the_right() {
         let above = row(1, 1, &[e(1, 1, 1), e(2, 2, 2)], &[e(1, 1, 1), e(2, 2, 2)]);
         let passing = row(1, 1, &[e(1, 1, 1), e(2, 0, 2)], &[e(0, 0, 2), e(1, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&above, Some(&passing), 3)), " ╭╂─╯");
-        assert_eq!(text(&lane_glyphs(&passing, 3)), "╭╯●  ");
+        assert_eq!(text(&connector_glyphs(&above, Some(&passing), 3)), "╭─╂─╯");
+        assert_eq!(text(&lane_glyphs(&passing, 3)), "┃ ●  ");
     }
 
     #[test]
-    fn a_long_span_bends_next_to_both_ends() {
+    fn a_long_fork_turns_at_the_commit() {
         let fork = row(0, 0, &[], &[e(0, 0, 0), e(0, 3, 3)]);
         let next = row(3, 3, &[e(0, 0, 0), e(3, 3, 3)], &[e(0, 0, 0), e(3, 3, 3)]);
-        assert_eq!(text(&lane_glyphs(&fork, 4)), "●╮     ");
-        assert_eq!(text(&connector_glyphs(&fork, Some(&next), 4)), "┃╰────╮");
+        assert_eq!(text(&lane_glyphs(&fork, 4)), "●─────╮");
+        assert_eq!(text(&connector_glyphs(&fork, Some(&next), 4)), "┃     ┃");
     }
 
     #[test]
     fn the_last_loaded_row_continues_down() {
         let r = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&r, None, 2)), "┃╰╮");
+        assert_eq!(text(&connector_glyphs(&r, None, 2)), "┃ ┃");
     }
 
     #[test]
-    fn a_curve_crossing_a_lane() {
+    fn a_line_crossing_a_lane_on_the_commit_line() {
         let above = row(0, 0, &[e(1, 1, 4)], &[e(0, 0, 0), e(1, 1, 4), e(0, 2, 9)]);
-        let cells = connector_glyphs(&above, None, 3);
-        assert_eq!(text(&cells), "┃╰╂─╮");
+        let cells = lane_glyphs(&above, 3);
+        assert_eq!(text(&cells), "●─╂─╮");
         assert_eq!(cells[2].color, Some(4), "the crossed lane keeps its color");
-        assert_eq!(
-            cells[4].color,
-            Some(9),
-            "the curve has the new lane's color"
-        );
+        assert_eq!(cells[4].color, Some(9), "the turn has the new lane's color");
+        assert_eq!(text(&connector_glyphs(&above, None, 3)), "┃ ┃ ┃");
     }
 
     #[test]
-    fn bends_meeting_in_one_gap_combine() {
+    fn lines_arriving_and_leaving_on_one_side_combine() {
         let r = row(0, 0, &[e(1, 0, 1)], &[e(0, 1, 2)]);
-        assert_eq!(text(&lane_glyphs(&r, 2)), "●┨ ");
+        assert_eq!(text(&lane_glyphs(&r, 2)), "●─┨");
     }
 
     #[test]
-    fn straight_lanes_keep_their_color_where_a_curve_leaves() {
+    fn straight_lanes_keep_their_color_where_a_line_turns_off() {
         let merge = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 7)]);
+        let line: Vec<Option<usize>> = lane_glyphs(&merge, 2).iter().map(|c| c.color).collect();
+        assert_eq!(line, [Some(0), Some(7), Some(7)], "node, the turn's color");
         let colors: Vec<Option<usize>> = connector_glyphs(&merge, None, 2)
             .iter()
             .map(|c| c.color)
             .collect();
-        assert_eq!(colors, [Some(0), Some(7), Some(7)], "lane, corner, corner");
-        let line: Vec<Option<usize>> = lane_glyphs(&merge, 2).iter().map(|c| c.color).collect();
-        assert_eq!(line, [Some(0), Some(7), None], "node, the bend's color");
+        assert_eq!(colors, [Some(0), None, Some(7)], "both lanes, straight");
     }
 }
