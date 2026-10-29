@@ -28,4 +28,4 @@ pub use working_tree::WorkingTreeAction;
 mod repo;
 pub use repo::{PickPurpose, PullMode, RepoAction};
 mod forge;
-pub use forge::pull_request_url;
+pub use forge::{IssueRef, issue_refs, issue_url, pull_request_url};

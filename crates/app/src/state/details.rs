@@ -185,7 +185,39 @@ impl AppState {
                 self.jump_target = Some(id);
                 self.continue_jump().unwrap_or_default()
             }
+            DetailsOutcome::OpenIssue(number) => match self.issues.url_for(&number) {
+                Some(url) => self.open_url(url),
+                // Read origin's URL to find its forge's issue page.
+                None => vec![Command::Git(Request::IssueUrl { number })],
+            },
         }
+    }
+
+    /// Opens issue `number` once origin's URL is read (None: no origin).
+    pub(super) fn on_issue_remote_url(
+        &mut self,
+        number: &str,
+        origin: Option<&str>,
+    ) -> Vec<Command> {
+        let origin = origin.map(str::trim);
+        if let Some(url) = origin.and_then(|url| tgg_actions::issue_url(url, number)) {
+            return self.open_url(url);
+        }
+        let reference = format!("{}{number}", self.issues.prefix());
+        let why = if origin.is_some() {
+            "origin isn't on GitHub, GitLab or Bitbucket"
+        } else {
+            "this repository has no origin remote"
+        };
+        self.message = Some(format!(
+            "Can't open {reference}: {why}. Set [issues] url in the config file, for example url = \"https://jira.example.com/browse/PROJ-$1\"."
+        ));
+        Vec::new()
+    }
+
+    fn open_url(&mut self, url: String) -> Vec<Command> {
+        self.message = Some(format!("Opening {url}"));
+        vec![Command::OpenUrl(url)]
     }
 
     /// Moves a pending jump forward: selects the target and opens its
@@ -253,7 +285,10 @@ impl AppState {
             && details.view.is_none()
             && let (Some(info), Some(files)) = (&details.info, &details.files)
         {
-            details.view = Some(CommitDetailsView::new(info.clone(), files.clone()));
+            details.view = Some(
+                CommitDetailsView::new(info.clone(), files.clone())
+                    .with_issue_prefix(self.issues.prefix()),
+            );
         }
     }
 

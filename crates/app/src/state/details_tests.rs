@@ -200,3 +200,91 @@ fn v_on_a_file_the_commit_deleted_shows_the_git_error() {
     // The details stay open.
     assert!(h.find_on_screen("Changed files (1)").is_some());
 }
+
+// ---- issue links (S20) ----
+
+/// The sample repo plus a commit whose body mentions `reference`, with its
+/// details open.
+fn details_mentioning(reference: &str, origin: Option<&str>) -> (FixtureRepo, Harness) {
+    let repo = FixtureRepo::sample();
+    if let Some(url) = origin {
+        repo.git(&["remote", "set-url", "origin", url]);
+    }
+    repo.commit_file(
+        "fix.txt",
+        "fixed\n",
+        &format!("Fix the login\n\nCloses {reference}."),
+    );
+    let mut h = open(&repo);
+    select(&mut h, "Fix the login");
+    press(&mut h, KeyCode::Enter);
+    (repo, h)
+}
+
+#[test]
+fn clicking_an_issue_reference_opens_it_on_the_github_origin() {
+    let (_repo, mut h) = details_mentioning("#12", Some("git@github.com:allient/demo.git"));
+    click_text(&mut h, "#12");
+    assert_eq!(h.opened, ["https://github.com/allient/demo/issues/12"]);
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some("Opening https://github.com/allient/demo/issues/12")
+    );
+    assert!(h.state.details.is_some(), "the details stay open");
+}
+
+#[test]
+fn a_configured_issue_url_wins_over_the_origin() {
+    let repo = FixtureRepo::sample();
+    repo.git(&[
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:allient/demo.git",
+    ]);
+    repo.commit_file(
+        "fix.txt",
+        "fixed\n",
+        "Fix the login\n\nPart of PROJ-7, not #3.",
+    );
+    let mut h = Harness::open(&repo);
+    h.state.issues = crate::config::Issues {
+        url: Some("https://jira.example.com/browse/PROJ-$1".into()),
+        prefix: Some("PROJ-".into()),
+    };
+    h.draw(W, H);
+    select(&mut h, "Fix the login");
+    press(&mut h, KeyCode::Enter);
+    click_text(&mut h, "PROJ-7");
+    assert_eq!(h.opened, ["https://jira.example.com/browse/PROJ-7"]);
+    click_text(&mut h, "#3");
+    assert_eq!(h.opened.len(), 1, "#3 isn't a reference with this prefix");
+}
+
+#[test]
+fn an_issue_without_a_page_explains_how_to_configure_one() {
+    // The sample's origin is a local folder: no forge to link to.
+    let (_repo, mut h) = details_mentioning("#12", None);
+    click_text(&mut h, "#12");
+    assert!(h.opened.is_empty());
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some(
+            "Can't open #12: origin isn't on GitHub, GitLab or Bitbucket. Set [issues] url in the config file, for example url = \"https://jira.example.com/browse/PROJ-$1\"."
+        )
+    );
+}
+
+#[test]
+fn an_issue_in_a_repository_without_origin_explains_too() {
+    let (repo, mut h) = details_mentioning("#12", None);
+    repo.git(&["remote", "remove", "origin"]);
+    click_text(&mut h, "#12");
+    assert!(h.opened.is_empty());
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(
+        message.starts_with("Can't open #12: this repository has no origin remote."),
+        "{message}"
+    );
+    assert!(message.contains("[issues] url"), "{message}");
+}
