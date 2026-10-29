@@ -36,7 +36,7 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 Target feature set, based on Git Graph for VS Code. The detailed specs for the first release are in [`odd/tasks/git-graph-mvp.md`](odd/tasks/git-graph-mvp.md).
 
 ### Graph view
-- [x] Commit graph with color-coded lanes per branch and merge lines
+- [x] Commit graph with color-coded lanes per branch and merge lines, drawn with thick lanes (`┃`, `┠─╮`) and rounded curves in Git Graph's own palette (blue, magenta, green, orange, purple, red, cyan, ...)
 - [x] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges
 - [x] Uncommitted changes shown as a virtual row at the top
 - [x] Columns: graph, description, date, author, commit hash (show/hide, adapt to width)
@@ -82,7 +82,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Stash, reset, clean
 
 ### Commit details
-- [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
+- [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files: bold labels, parent hashes and email addresses as links, and a folder tree whose file names are colored by change (added green, modified yellow, deleted red, renamed blue)
 - [x] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
 - [x] View a file at that revision
 - [x] Compare any two commits, or a commit with the working tree
@@ -199,7 +199,7 @@ Push, pull and fetch never prompt for a password: use SSH keys or a git credenti
 
 ### Icons
 
-The toolbar shows VS Code's own icons (Codicons) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu). The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
+The toolbar, the Source Control pane and the details panel's file tree show VS Code's own icons (Codicons, such as `cod-folder` and `cod-file` before folders and files) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu, `▾` folder, `·` file). The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
 
 1. Install a Nerd Font, for example JetBrains Mono:
 
