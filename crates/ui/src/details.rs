@@ -8,7 +8,7 @@ use tgg_git::show::{CommitDetails, FileChange, Numstat};
 use tgg_model::Oid;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{Key, Theme, fit, format_date};
+use crate::{Glyph, Key, Theme, fit, format_date};
 
 /// Characters of a parent hash shown (and clickable) in the details.
 const PARENT_HASH: usize = 8;
@@ -274,33 +274,24 @@ impl CommitDetailsView {
     ) -> u16 {
         let commit = &details.commit;
         let width = usize::from(area.width.saturating_sub(1));
-        let label = Style::default().fg(theme.muted);
         let text = Style::default().fg(theme.text);
+        let label = text.add_modifier(Modifier::BOLD);
+        let link = Style::default()
+            .fg(theme.link)
+            .add_modifier(Modifier::UNDERLINED);
         let x = area.x + 1;
+        let value_width = width.saturating_sub(LABEL);
         let field = |buf: &mut Buffer, y: u16, name: &str, value: &str, style: Style| {
             buf.set_string(x, y, fit(name, LABEL.min(width)), label);
-            buf.set_string(
-                x + to_u16(LABEL),
-                y,
-                fit(value, width.saturating_sub(LABEL)),
-                style,
-            );
+            buf.set_string(x + to_u16(LABEL), y, fit(value, value_width), style);
         };
         let signature = |s: &tgg_model::Signature| format!("{} <{}>", s.name, s.email);
         let mut lines: Vec<(&str, String, Style)> = vec![
-            (
-                "Commit:",
-                commit.id.to_string(),
-                Style::default().fg(theme.hash),
-            ),
+            ("Commit:", commit.id.to_string(), text),
             ("Parents:", String::new(), text),
             ("Author:", signature(&commit.author), text),
             ("Committer:", signature(&commit.committer), text),
-            (
-                "Date:",
-                format_date(commit.author.time),
-                Style::default().fg(theme.date),
-            ),
+            ("Date:", format_date(commit.author.time), text),
         ];
         if commit.parents.is_empty() {
             lines[1].1 = "(none)".into();
@@ -311,6 +302,26 @@ impl CommitDetailsView {
                 return y;
             }
             field(buf, y, name, value, *style);
+            let email = match *name {
+                "Author:" => Some(&commit.author),
+                "Committer:" => Some(&commit.committer),
+                _ => None,
+            };
+            if let Some(person) = email {
+                // The address between `<` and `>`, as far as it is visible
+                // (a cut value ends in an ellipsis).
+                let start = person.name.width() + 2;
+                let visible = if value.width() <= value_width {
+                    value_width
+                } else {
+                    value_width.saturating_sub(1)
+                };
+                let end = (start + person.email.width()).min(visible);
+                if end > start {
+                    let at = x + to_u16(LABEL + start);
+                    buf.set_style(Rect::new(at, y, to_u16(end - start), 1), link);
+                }
+            }
             if *name == "Parents:" {
                 // One clickable hash per parent, left to right.
                 let mut px = x + to_u16(LABEL);
@@ -320,9 +331,6 @@ impl CommitDetailsView {
                     if px + w > area.right() {
                         break;
                     }
-                    let link = Style::default()
-                        .fg(theme.hash)
-                        .add_modifier(Modifier::UNDERLINED);
                     buf.set_string(px, y, short, link);
                     hits.parents.push((Rect::new(px, y, w, 1), parent.clone()));
                     px += w + 1;
@@ -413,7 +421,8 @@ impl CommitDetailsView {
             let rect = Rect::new(area.x, y, area.width, 1);
             match row {
                 TreeRow::Dir { depth, name } => {
-                    let label = format!("{}{name}/", "  ".repeat(*depth));
+                    let folder = theme.icons.glyph(Glyph::Folder);
+                    let label = format!("{}{folder} {name}/", "  ".repeat(*depth));
                     buf.set_string(
                         area.x + 1,
                         y,
@@ -432,10 +441,21 @@ impl CommitDetailsView {
                         Style::default().fg(theme.text)
                     };
                     let (name, counts) = file_label(file);
-                    let indent = "  ".repeat(*depth);
+                    let prefix =
+                        format!("{}{} ", "  ".repeat(*depth), theme.icons.glyph(Glyph::File));
                     let room = width.saturating_sub(counts.width() + 1);
-                    let line = format!("{}{counts}", fit(&format!("{indent}{name}"), room + 1));
+                    let line = format!("{}{counts}", fit(&format!("{prefix}{name}"), room + 1));
                     buf.set_string(area.x + 1, y, fit(&line, width), style);
+                    // The name in the color of what happened to the file.
+                    let start = prefix.width();
+                    let end = (start + name.width()).min(room).min(width);
+                    if end > start {
+                        let at = area.x + 1 + to_u16(start);
+                        buf.set_style(
+                            Rect::new(at, y, to_u16(end - start), 1),
+                            Style::default().fg(theme.change(file.status)),
+                        );
+                    }
                     hits.files.push((rect, row_index));
                 }
             }
