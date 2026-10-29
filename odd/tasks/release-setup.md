@@ -17,7 +17,7 @@ Branch: build/release-setup, PR against main. Delivery: ask-on-risk. Tests: `car
 | ID | Specs | Route | Status | Commit |
 |---|---|---|---|---|
 | T1 | S1, S2, S3 | inline | done | build(release): cargo-dist |
-| T2 | S5 | inline | todo | |
+| T2 | S5 | inline | done | docs: install section |
 | T3 | S6 | delegated (verifier) | todo | |
 | T4 | S4 | user (tap repo + token), then first tag | todo | |
 
