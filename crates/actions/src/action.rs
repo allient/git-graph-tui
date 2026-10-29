@@ -5,8 +5,8 @@ use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{
-    OperationAction, PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction,
-    WorktreeAction,
+    InteractiveRebase, OperationAction, PickPurpose, RepoAction, StashAction, TagAction,
+    WorkingTreeAction, WorktreeAction,
 };
 
 /// Abbreviated hash length in confirmation text (git's default).
@@ -195,6 +195,9 @@ pub enum Action {
     Repo(RepoAction),
     /// Continue or abort the operation in progress (the conflict banner).
     Operation(OperationAction),
+    /// Rewrites the commits after a base on the current branch with an
+    /// edited todo list (the interactive rebase panel).
+    InteractiveRebase(InteractiveRebase),
     /// An app-only effect from a menu (pickers, the git output view).
     Ui(UiEffect),
 }
@@ -230,6 +233,10 @@ pub enum UiEffect {
     ShowReflog,
     /// Show the repository's worktrees, to add, remove or prune them.
     ShowWorktrees,
+    /// Open the interactive rebase panel for the commits after `base`.
+    OpenInteractiveRebase {
+        base: Oid,
+    },
     /// Open the hosting site's "new pull request" page for `branch` on `remote`.
     CreatePullRequest {
         remote: String,
@@ -359,6 +366,7 @@ impl Action {
             Self::Repo(action) => action.plan(repo),
             Self::Worktree(action) => action.plan(repo),
             Self::Operation(action) => action.plan(repo),
+            Self::InteractiveRebase(rebase) => rebase.plan(repo),
             Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
@@ -498,6 +506,7 @@ impl Action {
             | Self::Repo(_)
             | Self::Worktree(_)
             | Self::Operation(_)
+            | Self::InteractiveRebase(_)
             | Self::Ui(_) => Vec::new(),
         }
     }
@@ -518,6 +527,8 @@ impl Action {
                 | Self::CherryPick { .. }
                 | Self::Revert { .. }
                 | Self::Drop { .. }
+                | Self::InteractiveRebase(_)
+                | Self::Ui(UiEffect::OpenInteractiveRebase { .. })
                 | Self::ResetCurrentTo { .. }
                 | Self::CreateBranch { checkout: true, .. }
                 | Self::WorkingTree(WorkingTreeAction::Reset { .. })
@@ -538,7 +549,10 @@ impl Action {
     #[must_use]
     pub fn is_destructive(&self) -> bool {
         match self {
-            Self::DeleteBranch { .. } | Self::Drop { .. } | Self::RebaseCurrentOnto { .. } => true,
+            Self::DeleteBranch { .. }
+            | Self::Drop { .. }
+            | Self::RebaseCurrentOnto { .. }
+            | Self::InteractiveRebase(_) => true,
             Self::ResetCurrentTo { mode, .. } => *mode == ResetMode::Hard,
             Self::PushBranch {
                 force_with_lease, ..
@@ -642,6 +656,7 @@ impl Action {
             Self::Repo(action) => return action.confirmation(),
             Self::Worktree(action) => return action.confirmation(),
             Self::Operation(action) => return action.confirmation(),
+            Self::InteractiveRebase(rebase) => rebase.confirmation(),
             _ => return None,
         };
         Some(confirmation)

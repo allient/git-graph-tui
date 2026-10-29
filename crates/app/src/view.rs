@@ -20,6 +20,24 @@ const DETAILS_HEIGHT: u16 = 12;
 /// Graph lines kept visible above and below an open details panel.
 const MIN_GRAPH_LINES: u16 = 3;
 
+/// The full-area panels drawn over the graph: git output, worktrees, reflog
+/// and interactive rebase. Each records the area its rows took.
+fn draw_panels(frame: &mut Frame<'_>, graph_area: Rect, state: &mut AppState, theme: &Theme) {
+    if let Some(view) = &mut state.output_view {
+        view.page =
+            crate::panels::draw_output(frame, graph_area, &state.git_output, view.offset, theme);
+    }
+    if let Some(view) = &mut state.worktrees {
+        view.area = crate::panels::draw_worktrees(frame, graph_area, view, theme);
+    }
+    if let Some(view) = &mut state.reflog {
+        view.area = crate::panels::draw_reflog(frame, graph_area, view, theme);
+    }
+    if let Some(view) = &mut state.rebase {
+        view.area = crate::panels::draw_rebase(frame, graph_area, view, theme);
+    }
+}
+
 /// Narrowest the Source Control pane gets when dragged.
 const MIN_PANE_WIDTH: u16 = 20;
 /// Columns always left for the graph beside the pane.
@@ -102,16 +120,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         block.render(graph_area, frame.buffer_mut());
         diff.hits = Some(diff.view.render(inner, frame.buffer_mut(), theme));
     }
-    if let Some(view) = &mut state.output_view {
-        view.page =
-            crate::panels::draw_output(frame, graph_area, &state.git_output, view.offset, theme);
-    }
-    if let Some(view) = &mut state.worktrees {
-        view.area = crate::panels::draw_worktrees(frame, graph_area, view, theme);
-    }
-    if let Some(view) = &mut state.reflog {
-        view.area = crate::panels::draw_reflog(frame, graph_area, view, theme);
-    }
+    draw_panels(frame, graph_area, state, theme);
     if let Some(menu) = &state.menu {
         state.menu_hits = Some(menu.render(screen, frame.buffer_mut(), theme));
     }

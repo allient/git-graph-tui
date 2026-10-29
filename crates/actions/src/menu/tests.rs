@@ -20,6 +20,7 @@ fn ctx() -> MenuContext {
         remotes: vec!["origin".into()],
         branch_filter: Vec::new(),
         compare_base: None,
+        operation: None,
     }
 }
 
@@ -74,6 +75,7 @@ fn commit(id: char, parent_count: usize, is_head_ancestor: bool) -> Target {
         subject: "Add lib".into(),
         parent_count,
         is_head_ancestor,
+        linear_to_head: is_head_ancestor,
     })
 }
 
@@ -313,6 +315,7 @@ fn commit_menu_matches_the_vs_code_order() {
             "---",
             "Merge into current branch...",
             "Rebase current branch on this Commit...",
+            "Interactive Rebase from Here... (disabled: Only commits on the current branch can be rebased interactively.)",
             "Reset current branch to this Commit...",
             "---",
             "Select for Compare",
@@ -337,6 +340,7 @@ fn commit_on_the_current_branch_can_be_dropped_but_not_merged_or_picked() {
             "Drop...",
             "---",
             "Rebase current branch on this Commit...",
+            "Interactive Rebase from Here...",
             "Reset current branch to this Commit...",
             "---",
             "Select for Compare",
@@ -359,6 +363,8 @@ fn head_commit_menu() {
             "Checkout...",
             "Revert...",
             "Drop...",
+            "---",
+            "Interactive Rebase from Here... (disabled: This is HEAD: pick an older commit, the rebase edits the commits after it.)",
             "---",
             "Select for Compare",
             "Compare with Working Tree",
@@ -444,6 +450,64 @@ fn detached_head_at_the_commit_hides_checkout_and_reset() {
     assert!(
         !other.contains(&"Reset current branch to this Commit...".to_owned()),
         "{other:?}"
+    );
+}
+
+/// The "Interactive Rebase from Here..." entry of `target`'s menu.
+fn interactive_rebase(target: &Target, ctx: &MenuContext) -> String {
+    labels(&menu_for(target, ctx))
+        .into_iter()
+        .find(|l| l.starts_with("Interactive Rebase from Here..."))
+        .unwrap()
+}
+
+#[test]
+fn interactive_rebase_opens_the_panel_for_an_older_commit_on_the_branch() {
+    let menu = menu_for(&commit('c', 1, true), &ctx());
+    assert_eq!(
+        action(&menu, "Interactive Rebase from Here..."),
+        &Action::Ui(UiEffect::OpenInteractiveRebase { base: oid('c') })
+    );
+    // A merge commit as the base is fine: only the commits after it change.
+    assert_eq!(
+        interactive_rebase(&commit('c', 2, true), &ctx()),
+        "Interactive Rebase from Here..."
+    );
+}
+
+#[test]
+fn interactive_rebase_is_disabled_where_it_cannot_run() {
+    let disabled = |why: &str| format!("Interactive Rebase from Here... (disabled: {why})");
+    assert_eq!(
+        interactive_rebase(&commit('a', 1, true), &ctx()),
+        disabled("This is HEAD: pick an older commit, the rebase edits the commits after it.")
+    );
+    let detached = MenuContext {
+        head: HeadState::Detached,
+        ..ctx()
+    };
+    assert_eq!(
+        interactive_rebase(&commit('c', 1, true), &detached),
+        disabled("Interactive rebase needs HEAD on a branch.")
+    );
+    let merged = Target::Commit(CommitTarget {
+        id: oid('c'),
+        subject: "Add lib".into(),
+        parent_count: 1,
+        is_head_ancestor: true,
+        linear_to_head: false,
+    });
+    assert_eq!(
+        interactive_rebase(&merged, &ctx()),
+        disabled("There are merge commits between this commit and HEAD.")
+    );
+    let rebasing = MenuContext {
+        operation: Some(crate::Operation::Rebase),
+        ..ctx()
+    };
+    assert_eq!(
+        interactive_rebase(&commit('c', 1, true), &rebasing),
+        disabled("A rebase is in progress: continue or abort it first.")
     );
 }
 
@@ -775,6 +839,7 @@ fn empty_submenus_are_dropped() {
         remotes: Vec::new(),
         branch_filter: Vec::new(),
         compare_base: None,
+        operation: None,
     };
     let menu = menu_for(&Target::Repository, &ctx);
     assert!(

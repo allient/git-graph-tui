@@ -30,6 +30,7 @@ mod info;
 mod list;
 mod operation;
 mod output;
+mod rebase;
 mod reflog;
 mod resize;
 mod source_control;
@@ -44,6 +45,7 @@ pub use compare::Comparison;
 pub use details::{Details, DiffPanel};
 pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
+pub use rebase::RebaseView;
 pub use reflog::ReflogView;
 pub use toolbar::{OpenPicker, ToolbarState};
 pub use worktrees::{WorktreeEntry, WorktreesView};
@@ -224,6 +226,8 @@ pub struct AppState {
     pub reflog: Option<ReflogView>,
     /// The open worktrees view, drawn over the graph.
     pub worktrees: Option<WorktreesView>,
+    /// The open interactive rebase panel, drawn over the graph.
+    pub rebase: Option<RebaseView>,
     /// The toolbar's branch filter, remote toggle and keyboard focus.
     pub toolbar: ToolbarState,
     /// The open ref picker (branch filter, "Checkout to...", ...), above any menu.
@@ -289,6 +293,7 @@ impl AppState {
             output_view: None,
             reflog: None,
             worktrees: None,
+            rebase: None,
             toolbar: ToolbarState::default(),
             picker: None,
             source_control: SourceControlState::default(),
@@ -406,6 +411,9 @@ impl AppState {
                 None => Vec::new(),
             };
         }
+        if self.rebase.is_some() {
+            return self.on_rebase_key(key);
+        }
         if self.reflog.is_some() {
             return self.on_reflog_key(key);
         }
@@ -503,6 +511,9 @@ impl AppState {
                 _ => {}
             }
             return Vec::new();
+        }
+        if self.rebase.is_some() {
+            return self.on_rebase_mouse(mouse);
         }
         if self.reflog.is_some() {
             return self.on_reflog_mouse(mouse);
@@ -643,6 +654,7 @@ impl AppState {
                     subject: commit.subject.clone(),
                     parent_count: commit.parents.len(),
                     is_head_ancestor: in_head_ancestry,
+                    linear_to_head: in_head_ancestry && self.linear_range(&commit.id).is_some(),
                 }))
             }
             HitTarget::Ref { full_name, .. } => {
@@ -667,6 +679,7 @@ impl AppState {
             remotes,
             branch_filter: self.toolbar.branch_filter.clone(),
             compare_base: self.compare_base.clone(),
+            operation: self.operation,
         }
     }
 
@@ -929,6 +942,8 @@ mod operation_tests;
 mod output_tests;
 #[cfg(test)]
 mod pager_tests;
+#[cfg(test)]
+mod rebase_tests;
 #[cfg(test)]
 mod reflog_tests;
 #[cfg(test)]

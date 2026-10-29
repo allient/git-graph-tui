@@ -298,6 +298,7 @@ fn commit_menu(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Option<MenuItem>
                 current: current.clone(),
             },
         ),
+        Some(interactive_rebase_entry(commit, ctx)),
         current.as_ref().filter(|_| !is_head).and_then(|branch| {
             entry(
                 "Reset current branch to this Commit...",
@@ -701,6 +702,39 @@ fn tags_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
 
 /// Drop is `git rebase --onto <commit>^ <commit>`, which needs exactly one
 /// parent and the commit in HEAD's history.
+/// "Interactive Rebase from Here..." (S20 4): edits the commits after this
+/// one up to HEAD. Shown on every commit, disabled with the reason where it
+/// can't run.
+fn interactive_rebase_entry(commit: &CommitTarget, ctx: &MenuContext) -> MenuItem {
+    let why = if let Some(operation) = ctx.operation {
+        Some(format!(
+            "A {} is in progress: continue or abort it first.",
+            operation.label().to_lowercase()
+        ))
+    } else if ctx.current_branch().is_none() {
+        Some("Interactive rebase needs HEAD on a branch.".to_owned())
+    } else if ctx.is_head_commit(&commit.id) {
+        Some(
+            "This is HEAD: pick an older commit, the rebase edits the commits after it.".to_owned(),
+        )
+    } else if !commit.is_head_ancestor {
+        Some("Only commits on the current branch can be rebased interactively.".to_owned())
+    } else if !commit.linear_to_head {
+        Some("There are merge commits between this commit and HEAD.".to_owned())
+    } else {
+        None
+    };
+    MenuItem::Entry(
+        MenuEntry::new(
+            "Interactive Rebase from Here...",
+            Action::Ui(UiEffect::OpenInteractiveRebase {
+                base: commit.id.clone(),
+            }),
+        )
+        .disabled_because(why.as_deref()),
+    )
+}
+
 fn why_not_droppable(commit: &CommitTarget) -> Option<&'static str> {
     if commit.is_merge() {
         Some("Merge commits can't be dropped.")

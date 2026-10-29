@@ -110,6 +110,10 @@ impl AppState {
     }
 
     fn run_action(&mut self, action: Action, label: String) -> Vec<Command> {
+        // The panel's edits are in the action now; a conflict shows the banner.
+        if matches!(action, Action::InteractiveRebase(_)) {
+            self.rebase = None;
+        }
         match action.plan(&self.repo) {
             Plan::Git(commands) => {
                 let mut remaining: VecDeque<GitCommand> = commands.into();
@@ -141,6 +145,10 @@ impl AppState {
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
             Plan::Ui(UiEffect::ShowReflog) => self.show_reflog(),
             Plan::Ui(UiEffect::ShowWorktrees) => self.show_worktrees(),
+            Plan::Ui(UiEffect::OpenInteractiveRebase { base }) => {
+                self.open_interactive_rebase(base);
+                Vec::new()
+            }
             Plan::Ui(UiEffect::CreatePullRequest { remote, branch }) => {
                 vec![Command::Git(Request::RemoteUrl { remote, branch })]
             }

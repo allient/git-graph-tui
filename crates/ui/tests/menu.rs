@@ -19,6 +19,7 @@ fn ctx() -> MenuContext {
         remotes: vec!["origin".into()],
         branch_filter: Vec::new(),
         compare_base: None,
+        operation: None,
     }
 }
 
@@ -58,9 +59,10 @@ fn commit_menu_with_a_disabled_drop() {
         subject: "Add lib".into(),
         parent_count: 2,
         is_head_ancestor: false,
+        linear_to_head: false,
     });
     let menu = PopupMenu::new(menu_for(&target, &ctx()), Position::new(1, 0));
-    insta::assert_snapshot!(render(&menu, 48, 18));
+    insta::assert_snapshot!(render(&menu, 48, 19));
 }
 
 #[test]
