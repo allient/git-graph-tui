@@ -5,8 +5,8 @@ use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{
-    CommitScope, InteractiveRebase, OperationAction, PickPurpose, RepoAction, StashAction,
-    TagAction, WorkingTreeAction, WorktreeAction,
+    ChangesSort, ChangesView, CommitScope, InteractiveRebase, OperationAction, PickPurpose,
+    RepoAction, StashAction, TagAction, WorkingTreeAction, WorktreeAction,
 };
 
 /// Abbreviated hash length in confirmation text (git's default).
@@ -242,6 +242,10 @@ pub enum UiEffect {
         amend: bool,
         signoff: bool,
     },
+    /// List the Source Control pane's files flat or as a folder tree.
+    SetChangesView(ChangesView),
+    /// Order the Source Control pane's files.
+    SetChangesSort(ChangesSort),
     /// Show the log of git commands and their output.
     ShowGitOutput,
     /// Show where HEAD has been (the reflog), to recover lost commits.

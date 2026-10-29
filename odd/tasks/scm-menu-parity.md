@@ -25,7 +25,7 @@ Branch: feat/scm-menu-parity, based on fix/badge-white-text (PR #43); its PR ope
 | T2 | S4 | inline | done | feat(menu): Pull, Push submenu |
 | T3 | S5, S6 | inline | done | feat(menu): Branch and Remote submenus |
 | T4 | S7, S8 | inline | done | feat(menu): Stash and Tags submenus |
-| T5 | S9 | inline | todo | |
+| T5 | S9 | inline | done | feat(menu): View as Tree and View & Sort |
 | T6 | S10, S11 | inline | todo | |
 
 Route evidence: one feature, units depend on the shared menu.rs, so no parallel-writer reason; parent works inline.
@@ -41,3 +41,4 @@ Route evidence: one feature, units depend on the shared menu.rs, so no parallel-
 - **L7** (2026-10-29) T3 done: Branch submenu (Merge..., Rebase Branch..., Create Branch... now checks out, Create Branch From..., Rename Branch..., Delete Branch..., Delete Remote Branch..., Publish Branch...) via four new picker purposes; Remote: "Remove Remote". Correction to my PR #43 report: the remote branch context menu lacked "Delete Remote Branch..." and "Pull into current branch..." (VS Code has both, image 47); added here. Gate green, 775 tests.
 - **L8** (2026-10-29) T4 done: Stash submenu (Stash, Include Untracked, Stash Staged; Apply/Pop latest or picked; Drop picked or all; View Stash shows `git stash show --patch`) and Tags (Delete Tag..., Delete Remote Tag..., Push Tags). The app now loads the stash list on every refresh (`Request::Stashes`). Gate green, 781 tests.
 - **L9** (2026-10-29) w2 delivered the herdr plugin on feat/herdr-plugin (worktree ~/Documents/Github/Internal/tui-git-graph-herdr, commits b7b98ef, b14031c; not pushed): app routes plain right-click to itself inside herdr and restores it on exit (`TUI_GIT_GRAPH_HERDR_RIGHT_CLICK=off` disables), plugin opens tui-git-graph in a herdr tab. Plain right-click not yet tried with a real mouse.
+- **L10** (2026-10-29) T5 done: View as Tree / List and View & Sort (Name, Path, Status) for the Source Control pane; folder rows in tree view stage, unstage or discard everything under them. Sort by Path keeps git's order (git status already lists by path). Not persisted across runs. Gate green, 786 tests.

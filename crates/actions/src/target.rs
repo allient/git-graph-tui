@@ -83,6 +83,35 @@ impl Target {
     }
 }
 
+/// How the Source Control pane lists files (View & Sort).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ChangesView {
+    /// One row per file, with its folder after the name.
+    #[default]
+    List,
+    /// Files grouped under their folders.
+    Tree,
+}
+
+/// The order of the Source Control pane's files (View & Sort).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ChangesSort {
+    /// By file name, then path.
+    Name,
+    /// By full path.
+    #[default]
+    Path,
+    /// By status letter, then path.
+    Status,
+}
+
+/// The Source Control pane's current view and sort, for the menu's checks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChangesLayout {
+    pub view: ChangesView,
+    pub sort: ChangesSort,
+}
+
 /// Repository state that decides which menu entries apply.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MenuContext {
@@ -98,6 +127,8 @@ pub struct MenuContext {
     pub compare_base: Option<Oid>,
     /// The merge, rebase, cherry-pick or revert git stopped in the middle of.
     pub operation: Option<Operation>,
+    /// How the Source Control pane lists files.
+    pub changes: ChangesLayout,
 }
 
 impl MenuContext {

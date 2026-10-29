@@ -147,6 +147,14 @@ impl AppState {
                 amend,
                 signoff,
             }) => self.commit(scope, amend, signoff),
+            Plan::Ui(UiEffect::SetChangesView(view)) => {
+                self.source_control.view.set_view(view);
+                Vec::new()
+            }
+            Plan::Ui(UiEffect::SetChangesSort(sort)) => {
+                self.source_control.view.set_sort(sort);
+                Vec::new()
+            }
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
             Plan::Ui(UiEffect::ShowReflog) => self.show_reflog(),
             Plan::Ui(UiEffect::ShowWorktrees) => self.show_worktrees(),

@@ -497,6 +497,7 @@ fn every_git_entry_of_the_sample_menus_plans_valid_git() {
         branch_filter: Vec::new(),
         compare_base: None,
         operation: None,
+        changes: tgg_actions::ChangesLayout::default(),
     };
     let login = repo.git(&["rev-parse", "feature/login"]);
     let targets = [

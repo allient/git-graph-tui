@@ -5,6 +5,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Modifier, Style};
+use tgg_actions::{ChangesLayout, ChangesSort, ChangesView};
 use tgg_model::{Change, ChangedFile};
 use unicode_width::UnicodeWidthChar;
 
@@ -78,6 +79,13 @@ enum Item {
     Gap,
     ChangesHeader,
     Unstaged(usize),
+    /// A folder in tree view: `depth` levels down the path of `changes[file]`,
+    /// the first file under it.
+    Folder {
+        staged: bool,
+        file: usize,
+        depth: usize,
+    },
 }
 
 /// What is under a cell of the pane.
@@ -150,6 +158,8 @@ pub struct SourceControl {
     /// Sections whose files are hidden, by clicking their header.
     staged_collapsed: bool,
     changes_collapsed: bool,
+    /// List or tree, and the files' order (View & Sort).
+    layout: ChangesLayout,
 }
 
 impl SourceControl {
@@ -176,19 +186,82 @@ impl SourceControl {
         self.focus = Focus::Message;
     }
 
+    #[must_use]
+    pub fn layout(&self) -> ChangesLayout {
+        self.layout
+    }
+
+    pub fn set_view(&mut self, view: ChangesView) {
+        self.layout.view = view;
+        self.clamp_selection();
+    }
+
+    pub fn set_sort(&mut self, sort: ChangesSort) {
+        self.layout.sort = sort;
+    }
+
+    fn clamp_selection(&mut self) {
+        self.selected = self.selected.min(self.items().len().saturating_sub(1));
+    }
+
     /// Indexes into `changes` of the files in the staged or the changes
-    /// section, whether or not the section is collapsed.
+    /// section, whether or not the section is collapsed, in the chosen order.
+    /// `git status` already lists files by path, so that order is kept.
     fn section(&self, staged: bool) -> Vec<usize> {
-        (0..self.changes.len())
-            .filter(|&i| {
-                let file = &self.changes[i];
-                if staged {
-                    file.staged.is_some()
-                } else {
-                    file.unstaged.is_some()
-                }
-            })
-            .collect()
+        let change = |i: usize| {
+            let file = &self.changes[i];
+            if staged { file.staged } else { file.unstaged }
+        };
+        let mut files: Vec<usize> = (0..self.changes.len())
+            .filter(|&i| change(i).is_some())
+            .collect();
+        match self.layout.sort {
+            ChangesSort::Path => {}
+            ChangesSort::Name => files.sort_by_key(|&i| {
+                let path = &self.changes[i].path;
+                (
+                    path.rsplit('/').next().unwrap_or(path).to_owned(),
+                    path.clone(),
+                )
+            }),
+            ChangesSort::Status => files.sort_by_key(|&i| change(i).map(Change::letter)),
+        }
+        files
+    }
+
+    /// A section's rows below its header: its files, or in tree view its
+    /// folders (folders first, alphabetically) with their files below them.
+    fn section_items(&self, staged: bool) -> Vec<Item> {
+        let files = self.section(staged);
+        let file_item = |i| {
+            if staged {
+                Item::Staged(i)
+            } else {
+                Item::Unstaged(i)
+            }
+        };
+        if self.layout.view == ChangesView::List {
+            return files.into_iter().map(file_item).collect();
+        }
+        let mut root = Node::default();
+        for i in files {
+            let path = &self.changes[i].path;
+            let mut node = &mut root;
+            let dirs: Vec<&str> = path.split('/').collect();
+            for dir in &dirs[..dirs.len() - 1] {
+                node = node.dirs.entry((*dir).to_owned()).or_default();
+            }
+            node.files.push(i);
+        }
+        let mut items = Vec::new();
+        root.flatten(staged, 0, &file_item, &mut items);
+        items
+    }
+
+    /// A tree view folder's path, e.g. `b/c`.
+    fn folder_path(&self, file: usize, depth: usize) -> String {
+        let parts: Vec<&str> = self.changes[file].path.split('/').collect();
+        parts[..=depth.min(parts.len().saturating_sub(2))].join("/")
     }
 
     fn items(&self) -> Vec<Item> {
@@ -198,7 +271,7 @@ impl SourceControl {
         if !staged.is_empty() {
             items.push(Item::StagedHeader);
             if !self.staged_collapsed {
-                items.extend(staged.into_iter().map(Item::Staged));
+                items.extend(self.section_items(true));
             }
         }
         if !unstaged.is_empty() {
@@ -207,7 +280,7 @@ impl SourceControl {
             }
             items.push(Item::ChangesHeader);
             if !self.changes_collapsed {
-                items.extend(unstaged.into_iter().map(Item::Unstaged));
+                items.extend(self.section_items(false));
             }
         }
         items
@@ -311,8 +384,9 @@ impl SourceControl {
             }
             Some(Hit::Row(item)) => {
                 self.select(item);
-                // A file row opens its diff, a header collapses or expands.
-                if !self.collapse(item, None) {
+                // A file row opens its diff, a header collapses or expands;
+                // a folder only takes the selection.
+                if !self.collapse(item, None) && self.pane_file(item).is_some() {
                     return self.open(item);
                 }
             }
@@ -410,6 +484,7 @@ impl SourceControl {
         let staged = match items.get(item) {
             Some(Item::StagedHeader | Item::Staged(_)) => true,
             Some(Item::ChangesHeader | Item::Unstaged(_)) => false,
+            Some(Item::Folder { staged, .. }) => *staged,
             Some(Item::Gap) | None => return SourceControlOutcome::Stay,
         };
         let files = self
@@ -431,6 +506,7 @@ impl SourceControl {
         match self.items().get(item) {
             Some(Item::StagedHeader | Item::Staged(_)) => self.only(item, false),
             Some(Item::ChangesHeader | Item::Unstaged(_)) => self.only(item, true),
+            Some(Item::Folder { staged, .. }) => self.only(item, !staged),
             Some(Item::Gap) | None => SourceControlOutcome::Stay,
         }
     }
@@ -442,6 +518,22 @@ impl SourceControl {
             (Item::Unstaged(i), false) | (Item::Staged(i), true) => Some(vec![*i]),
             (Item::ChangesHeader, false) => Some(self.section(false)),
             (Item::StagedHeader, true) => Some(self.section(true)),
+            (
+                &Item::Folder {
+                    staged: s,
+                    file,
+                    depth,
+                },
+                _,
+            ) if s == staged => {
+                let prefix = format!("{}/", self.folder_path(file, depth));
+                Some(
+                    self.section(staged)
+                        .into_iter()
+                        .filter(|&i| self.changes[i].path.starts_with(&prefix))
+                        .collect(),
+                )
+            }
             _ => None,
         }
     }
@@ -682,6 +774,23 @@ impl SourceControl {
                 buttons.extend(stage_buttons(staged, index));
                 (None, (count.to_string(), muted), buttons)
             }
+            Item::Folder {
+                staged,
+                file,
+                depth,
+            } => {
+                let path = &self.changes[file].path;
+                let name = path.split('/').nth(depth).unwrap_or_default();
+                let folder = icons.glyph(Glyph::Folder);
+                buf.set_stringn(
+                    area.x + 2 + to_u16(2 * depth),
+                    area.y,
+                    format!("{folder} {name}"),
+                    usize::from(area.width),
+                    text,
+                );
+                (None, (String::new(), muted), stage_buttons(staged, index))
+            }
             Item::Staged(i) | Item::Unstaged(i) => {
                 let file = &self.changes[i];
                 let staged = matches!(item, Item::Staged(_));
@@ -690,13 +799,19 @@ impl SourceControl {
                     Some((dir, name)) => (name, dir),
                     None => (file.path.as_str(), ""),
                 };
+                // In tree view the folder rows above say where it is.
+                let (dir, indent) = if self.layout.view == ChangesView::Tree {
+                    ("", 2 * file.path.matches('/').count())
+                } else {
+                    (dir, 0)
+                };
                 let letter = change.map_or_else(
                     || (String::new(), muted),
                     |c| (c.letter().to_string(), Style::new().fg(theme.change(c))),
                 );
                 let mut buttons = vec![(Glyph::OpenFile, Hit::OpenFile(index))];
                 buttons.extend(stage_buttons(staged, index));
-                (Some((name, dir)), letter, buttons)
+                (Some((name, dir, indent)), letter, buttons)
             }
         };
 
@@ -716,13 +831,14 @@ impl SourceControl {
             hits.regions.push((Rect::new(x, area.y, 1, 1), *hit));
         }
 
-        if let Some((name, dir)) = left {
-            let room = usize::from(x.saturating_sub(area.x + 3));
-            let mut cx = area.x + 2;
+        if let Some((name, dir, indent)) = left {
+            let start = area.x + 2 + to_u16(indent);
+            let room = usize::from(x.saturating_sub(start + 1));
+            let mut cx = start;
             let name_width = unicode_width::UnicodeWidthStr::width(name);
             let name_fit = fit(name, room.min(name_width));
             cx = buf.set_stringn(cx, area.y, &name_fit, room, text).0;
-            let used = usize::from(cx - area.x - 2);
+            let used = usize::from(cx - start);
             if !dir.is_empty() && used + 1 < room {
                 buf.set_stringn(cx + 1, area.y, dir, room - used - 1, muted);
             }
@@ -742,10 +858,10 @@ fn stage_buttons(staged: bool, index: usize) -> Vec<(Glyph, Hit)> {
     }
 }
 
-/// A list row's file name and folder (none for headers), its status letter
-/// or count with its style, and its buttons.
+/// A list row's file name, folder and indent (none for headers and
+/// folders), its status letter or count with its style, and its buttons.
 type RowParts<'a> = (
-    Option<(&'a str, &'a str)>,
+    Option<(&'a str, &'a str, usize)>,
     (String, Style),
     Vec<(Glyph, Hit)>,
 );
@@ -786,3 +902,46 @@ fn width(chars: &[char]) -> usize {
 
 #[cfg(test)]
 mod tests;
+
+/// A folder of the tree view: its subfolders by name, and its files.
+#[derive(Default)]
+struct Node {
+    dirs: std::collections::BTreeMap<String, Node>,
+    files: Vec<usize>,
+}
+
+impl Node {
+    /// Folders first (alphabetically, each followed by what is in it), then
+    /// files, in section order.
+    fn flatten(
+        &self,
+        staged: bool,
+        depth: usize,
+        file_item: &impl Fn(usize) -> Item,
+        items: &mut Vec<Item>,
+    ) {
+        for child in self.dirs.values() {
+            if let Some(file) = child.first_file() {
+                items.push(Item::Folder {
+                    staged,
+                    file,
+                    depth,
+                });
+            }
+            child.flatten(staged, depth + 1, file_item, items);
+        }
+        items.extend(self.files.iter().copied().map(file_item));
+    }
+
+    fn first_file(&self) -> Option<usize> {
+        self.dirs
+            .values()
+            .find_map(Self::first_file)
+            .or_else(|| self.files.first().copied())
+    }
+}
+
+/// Terminal columns are u16; anything wider is clipped anyway.
+fn to_u16(n: usize) -> u16 {
+    u16::try_from(n).unwrap_or(u16::MAX)
+}
