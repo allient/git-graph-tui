@@ -177,8 +177,8 @@ impl Toolbar {
         }
         let y = area.y;
         let right: [(ToolbarButton, &str); 3] = [
-            (ToolbarButton::Refresh, "[Refresh]"),
-            (ToolbarButton::Fetch, "[Fetch]"),
+            (ToolbarButton::Refresh, "[↻]"),
+            (ToolbarButton::Fetch, "[⇣]"),
             (ToolbarButton::RepoMenu, "[...]"),
         ];
         let right_width: usize = right.iter().map(|(_, l)| l.width() + 1).sum::<usize>() - 1;

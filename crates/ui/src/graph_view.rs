@@ -5,13 +5,18 @@ use tgg_graph::Row;
 use tgg_model::{Commit, Oid, Ref};
 
 use crate::badges::{BadgeKind, badges_for};
-use crate::glyphs::lane_glyphs;
+use crate::glyphs::{GlyphCell, connector_glyphs, lane_glyphs};
 use crate::text::{fit, format_date};
 use crate::theme::Theme;
 
 const HASH_WIDTH: u16 = 8;
 const DATE_WIDTH: u16 = 16;
 const AUTHOR_WIDTH: u16 = 14;
+/// Room for the "Graph" header and a space after the lanes.
+const MIN_GRAPH_WIDTH: u16 = 6;
+
+/// Screen lines per display row: its line and the connector below it.
+pub const ROW_HEIGHT: u16 = 2;
 
 /// What is under a screen cell.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,15 +54,27 @@ impl HitMap {
         self.gap
     }
 
+    /// Where the first region showing `target` was drawn.
+    #[must_use]
+    pub fn area_of(&self, target: &HitTarget) -> Option<Rect> {
+        self.regions
+            .iter()
+            .find(|(_, t)| t == target)
+            .map(|(area, _)| *area)
+    }
+
     fn push(&mut self, area: Rect, target: HitTarget) {
         self.regions.push((area, target));
     }
 }
 
-/// The commit graph: lanes, ref badges, subject, date, author and hash.
+/// The commit graph: a header naming the columns, then lanes, ref badges,
+/// subject, date, author and hash.
 ///
 /// Display rows are the optional "Uncommitted Changes" row followed by the
-/// commits. `offset` and `selected` are display-row indices.
+/// commits. Each takes [`ROW_HEIGHT`] lines: its own, then a connector line
+/// carrying the lanes down to the next row. `offset` and `selected` are
+/// display-row indices.
 #[derive(Debug, Clone)]
 pub struct GraphView<'a> {
     pub commits: &'a [Commit],
@@ -93,27 +110,39 @@ impl GraphView<'_> {
         self.len() == 0
     }
 
-    /// Draws the visible rows into `area` and returns what each region shows.
+    /// Display rows that fit in `lines` screen lines, header included. The
+    /// last row's connector line may be cut off.
+    #[must_use]
+    pub fn rows_fitting(lines: u16) -> usize {
+        usize::from(lines.saturating_sub(1).div_ceil(ROW_HEIGHT)).max(1)
+    }
+
+    /// Draws the header and the visible rows into `area` and returns what each
+    /// region shows.
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) -> HitMap {
         let mut hits = HitMap::default();
+        if area.is_empty() {
+            return hits;
+        }
         let columns = Columns::for_width(area, self.lane_width(area));
+        draw_header(buf, &columns, area, theme);
 
-        let mut y = area.top();
+        let mut y = area.top() + 1;
         let mut display = self.offset;
         while y < area.bottom() && display < self.len() {
             let row_area = Rect::new(area.x, y, area.width, 1);
             if display == self.selected {
                 buf.set_style(row_area, Style::new().bg(theme.selected_bg));
             }
+            // The row's region goes first so its badges win a hit.
+            let target = match self.commit_index(display) {
+                None => HitTarget::Uncommitted,
+                Some(index) => HitTarget::Commit(index),
+            };
+            hits.push(row_area, target.clone());
             match self.commit_index(display) {
-                None => {
-                    self.draw_uncommitted(buf, &columns, y, theme);
-                    hits.push(row_area, HitTarget::Uncommitted);
-                }
-                Some(index) => {
-                    hits.push(row_area, HitTarget::Commit(index));
-                    self.draw_commit(buf, &columns, y, index, theme, &mut hits);
-                }
+                None => self.draw_uncommitted(buf, &columns, y, theme),
+                Some(index) => self.draw_commit(buf, &columns, y, index, theme, &mut hits),
             }
             y += 1;
             if let Some(gap) = self.gap.filter(|g| g.after == display) {
@@ -121,9 +150,38 @@ impl GraphView<'_> {
                 hits.gap = Some(Rect::new(area.x, y, area.width, height));
                 y += height;
             }
+            if y < area.bottom() && display + 1 < self.len() {
+                self.draw_connector(buf, &columns, y, display, theme);
+                hits.push(Rect::new(area.x, y, area.width, 1), target);
+                y += 1;
+            }
             display += 1;
         }
         hits
+    }
+
+    /// The line below display row `display`, joining it to the next row.
+    fn draw_connector(
+        &self,
+        buf: &mut Buffer,
+        cols: &Columns,
+        y: u16,
+        display: usize,
+        theme: &Theme,
+    ) {
+        let Some(index) = self.commit_index(display) else {
+            // A dotted line from the uncommitted row down to HEAD's lane.
+            let x = cols.graph.x + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
+            if x < cols.graph.right() {
+                buf[(x, y)].set_char('┆').set_fg(theme.muted);
+            }
+            return;
+        };
+        let Some(row) = self.rows.get(index) else {
+            return;
+        };
+        let cells = connector_glyphs(row, self.rows.get(index + 1), cols.lanes);
+        draw_glyphs(buf, cols, y, &cells, theme);
     }
 
     /// Commit index for a display row; None for the uncommitted row.
@@ -185,13 +243,7 @@ impl GraphView<'_> {
         let lane_color = row.map_or(0, |r| r.color);
 
         if let Some(row) = row {
-            for (x, cell) in (cols.graph.x..cols.graph.right()).zip(lane_glyphs(row, cols.lanes)) {
-                let target = &mut buf[(x, y)];
-                target.set_char(cell.ch);
-                if let Some(color) = cell.color {
-                    target.set_fg(theme.lane(color));
-                }
-            }
+            draw_glyphs(buf, cols, y, &lane_glyphs(row, cols.lanes), theme);
         }
 
         // Badges, then the subject, clipped to the description column.
@@ -247,6 +299,36 @@ impl GraphView<'_> {
     }
 }
 
+fn draw_glyphs(buf: &mut Buffer, cols: &Columns, y: u16, cells: &[GlyphCell], theme: &Theme) {
+    for (x, cell) in (cols.graph.x..cols.graph.right()).zip(cells) {
+        let target = &mut buf[(x, y)];
+        target.set_char(cell.ch);
+        if let Some(color) = cell.color {
+            target.set_fg(theme.lane(color));
+        }
+    }
+}
+
+/// The column names, on the first line of `area`.
+fn draw_header(buf: &mut Buffer, cols: &Columns, area: Rect, theme: &Theme) {
+    let y = area.y;
+    let style = Style::new()
+        .fg(theme.text)
+        .bg(theme.header_bg)
+        .add_modifier(Modifier::BOLD);
+    buf.set_style(Rect::new(area.x, y, area.width, 1), style);
+    let mut label = |column: Option<Rect>, text: &str| {
+        if let Some(c) = column {
+            put(buf, c.x, y, c.right(), text, style);
+        }
+    };
+    label(Some(cols.graph), "Graph");
+    label(Some(cols.description), "Description");
+    label(cols.date, "Date");
+    label(cols.author, "Author");
+    label(cols.hash, "Commit");
+}
+
 /// Writes `text` from `x` up to (not including) `right`; returns the next x.
 fn put(buf: &mut Buffer, x: u16, y: u16, right: u16, text: &str, style: Style) -> u16 {
     if x >= right {
@@ -270,7 +352,10 @@ struct Columns {
 impl Columns {
     fn for_width(area: Rect, lanes: usize) -> Self {
         let lanes = lanes.max(1);
-        let graph_width = u16::try_from(2 * lanes).unwrap_or(u16::MAX).min(area.width);
+        let graph_width = u16::try_from(2 * lanes)
+            .unwrap_or(u16::MAX)
+            .max(MIN_GRAPH_WIDTH)
+            .min(area.width);
         let col = |show: bool, width: u16| show.then_some(width);
         let hash = col(area.width >= 60, HASH_WIDTH);
         let date = col(area.width >= 80, DATE_WIDTH);

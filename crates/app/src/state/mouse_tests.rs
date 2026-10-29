@@ -221,6 +221,7 @@ fn clicking_a_menu_item_chooses_it() {
 fn graph_hits_come_from_the_last_frame() {
     let repo = FixtureRepo::sample();
     let h = open(&repo);
-    // Line 0 is the toolbar and line 1 the uncommitted row.
-    assert_eq!(h.state.graph_hits.hit(100, 2), Some(&HitTarget::Commit(0)));
+    // Line 0 is the toolbar, line 1 the column header, lines 2-3 the
+    // uncommitted row and its connector.
+    assert_eq!(h.state.graph_hits.hit(100, 4), Some(&HitTarget::Commit(0)));
 }

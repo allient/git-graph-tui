@@ -2,11 +2,13 @@
 source: crates/ui/tests/graph_view.rs
 expression: text(&buf)
 ---
-  ○ Uncommitted Changes (1)
-●    feature/login  Add login                       82f432c
-●    develop  Return a value                        6681ca2
-├─●  main │ origin   v0.1.0  Merge branch 'develop' 0b1f05f
-● │ Add lib                                         4351aec
-│ ● Update docs                                     8119c01
-●─╯ Add main                                        ded9b2d
-●   Initial commit                                  8d04db8
+Graph Description                                   Commit
+  ○   Uncommitted Changes (1)
+  ┆
+●      feature/login  Add login                     82f432c
+│
+●      develop  Return a value                      6681ca2
+│
+│ ●    main │ origin   v0.1.0  Merge branch 'develo 0b1f05f
+├─┤
+● │   Add lib                                       4351aec

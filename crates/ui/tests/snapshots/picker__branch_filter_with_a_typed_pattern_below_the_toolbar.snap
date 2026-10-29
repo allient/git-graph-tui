@@ -2,7 +2,7 @@
 source: crates/ui/tests/picker.rs
 expression: text(&buf)
 ---
- Branches: [develop ▾]  [x] Show Remote Branches        [Refresh] [Fetch] [...]
+ Branches: [develop ▾]  [x] Show Remote Branches                  [↻] [⇣] [...]
            ┌ Branches ────────────────────────────────────────────────┐
            │ > feat*                                                  │
            ├──────────────────────────────────────────────────────────┤

@@ -169,7 +169,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file and `Enter` opens its diff |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
-| `Tab` | Move to the toolbar (branch filter, Show Remote Branches, Refresh, Fetch, `...` repository menu); arrows move, `Enter` presses |
+| `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch, `...` repository menu); arrows move, `Enter` presses |
 | `r` | Refresh |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
 | `q` | Quit (closes the diff first when one is open) |

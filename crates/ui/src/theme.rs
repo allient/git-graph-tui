@@ -8,6 +8,8 @@ pub struct Theme {
     /// Commits that aren't ancestors of HEAD.
     pub muted: Color,
     pub selected_bg: Color,
+    /// Background of the graph's column header.
+    pub header_bg: Color,
     /// Text on colored badges.
     pub badge_fg: Color,
     pub tag: Color,
@@ -42,6 +44,7 @@ impl Default for Theme {
             text: Color::Reset,
             muted: Color::DarkGray,
             selected_bg: Color::Indexed(237),
+            header_bg: Color::Indexed(235),
             badge_fg: Color::Black,
             tag: Color::Yellow,
             stash: Color::Gray,

@@ -37,7 +37,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         height: DETAILS_HEIGHT.min(graph_area.height.saturating_sub(MIN_GRAPH_LINES)),
     });
     let gap_height = gap.map_or(0, |g| g.height);
-    state.viewport_height = usize::from(graph_area.height - gap_height).max(1);
+    state.viewport_height = GraphView::rows_fitting(graph_area.height - gap_height);
 
     let refs = state.visible_refs();
     let view = GraphView {
@@ -192,8 +192,8 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            h.state.viewport_height, 4,
-            "the toolbar and status bar take a line each"
+            h.state.viewport_height, 2,
+            "the toolbar, status bar and column header take a line each; rows take two"
         );
     }
 
