@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 use tgg_model::HeadState;
-use tgg_ui::{Gap, GraphView, SourceControlHitMap, Theme};
+use tgg_ui::{BannerHitMap, Gap, GraphView, SourceControlHitMap, Theme};
 
 use crate::state::{AppState, Dialog, DialogHits, Find, MIN_WIDTH_FOR_PANE};
 
@@ -42,12 +42,21 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
     let right_area = draw_source_control(frame, main_area, state, theme);
     state.toolbar.more = !state.source_control.visible;
-    let [toolbar_area, graph_area] =
-        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(right_area);
+    let banner = state.banner();
+    let banner_height = u16::from(banner.is_some());
+    let [toolbar_area, banner_area, graph_area] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(banner_height),
+        Constraint::Fill(1),
+    ])
+    .areas(right_area);
     state.toolbar.hits = state
         .toolbar
         .widget()
         .render(toolbar_area, frame.buffer_mut(), theme);
+    state.banner_hits = banner.map_or_else(BannerHitMap::default, |b| {
+        b.render(banner_area, frame.buffer_mut(), theme)
+    });
     let gap = state.details_display_index().map(|after| Gap {
         after,
         height: DETAILS_HEIGHT.min(graph_area.height.saturating_sub(MIN_GRAPH_LINES)),

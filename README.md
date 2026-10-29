@@ -93,7 +93,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ### Stretch goals (inspired by Git Graph+)
 - [ ] Interactive rebase UI (reorder, squash, fixup, drop)
-- [ ] Conflict detection banner with continue / abort
+- [x] Conflict detection banner with continue / abort
 - [ ] Worktree management
 - [x] Reflog view with recovery of lost commits
 
@@ -189,6 +189,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |
 | `c` | Move to the Source Control pane on the left (shown from 90 columns). Type the commit message (`Alt+Enter`, `Shift+Enter` or `Ctrl+J` starts a new line) and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files: `Space`/`Enter` stages or unstages a file or a whole section, as do `+` and `-`; `d` discards a file's changes (or the whole Changes section) after asking; `m` opens the repository menu; `Esc` goes back to the graph. The header's `✓` `↻` `…` commit, refresh and open the repository menu; each row's `↶` `+` `−` discard, stage and unstage |
 | `r` | Refresh |
+| `C` / `A`, or the banner's `[Continue]` `[Abort]` | While a merge, rebase, cherry-pick or revert is stopped on a conflict, a banner under the toolbar says so and counts the conflicted files. `C` continues it (`git <operation> --continue`, keeping git's message) once every conflict is resolved and staged; `A` aborts it (`git <operation> --abort`) after asking. Until then, checkouts, merges, rebases, cherry-picks, reverts, resets, pulls and stash apply/pop are refused; staging, committing and discarding still work |
 | Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |
 | Right click the column header | Show or hide the Date, Author and Commit columns (`✓` marks the shown ones), like VS Code Git Graph; the description takes the room. Narrow terminals still drop columns that don't fit (Commit under 60 columns, Date under 80, Author under 100) |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
