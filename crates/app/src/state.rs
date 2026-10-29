@@ -16,7 +16,8 @@ use tgg_git::{CancelToken, ExecError, GitCommand, in_progress, log, refs, status
 use tgg_graph::Graph;
 use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
 use tgg_ui::{
-    BannerHitMap, ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, PopupMenu,
+    BadgeKind, BannerHitMap, ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome,
+    PopupMenu, badges_for,
 };
 
 use crate::external::External;
@@ -576,14 +577,19 @@ impl AppState {
                     return Vec::new();
                 };
                 self.select(self.display_index(&target));
-                match button {
-                    MouseButton::Right => self.open_menu(&target, Position { x, y }),
-                    // Double-clicking a branch checks it out, like VS Code.
-                    _ if self.is_double_click(&target) => return self.checkout_ref(&target),
-                    _ if target != HitTarget::Uncommitted => return self.toggle_details(),
-                    _ => {}
+                if button == MouseButton::Right {
+                    self.open_menu(&target, Position { x, y });
+                    return Vec::new();
                 }
-                Vec::new()
+                // Double-clicking a branch, or a commit a branch points at,
+                // checks it out, like VS Code.
+                if let Some(branch) = self.double_clicked_branch(&target) {
+                    return self.checkout_ref(&branch);
+                }
+                if target == HitTarget::Uncommitted {
+                    return Vec::new();
+                }
+                self.toggle_details()
             }
             MouseEventKind::ScrollDown => {
                 let max = self.display_len().saturating_sub(self.viewport_height);
@@ -598,15 +604,37 @@ impl AppState {
         }
     }
 
-    /// Whether this left click on `target` completes a double-click on a branch.
-    fn is_double_click(&mut self, target: &HitTarget) -> bool {
+    /// The branch badge to check out when this left click on `target`
+    /// completes a double-click: the badge itself, or the first branch on a
+    /// commit row (the current branch first, then local, then remote ones).
+    fn double_clicked_branch(&mut self, target: &HitTarget) -> Option<HitTarget> {
         let now = Instant::now();
-        let double = matches!(target, HitTarget::Ref { .. })
-            && self.last_click.as_ref().is_some_and(|(at, last)| {
-                last == target && now.duration_since(*at) < self.double_click
-            });
+        let double = self.last_click.as_ref().is_some_and(|(at, last)| {
+            last == target && now.duration_since(*at) < self.double_click
+        });
         self.last_click = (!double).then(|| (now, target.clone()));
-        double
+        if !double {
+            return None;
+        }
+        match target {
+            HitTarget::Ref { .. } => Some(target.clone()),
+            HitTarget::Commit(index) => {
+                let commit = self.commits.get(*index)?;
+                badges_for(&commit.id, &self.refs)
+                    .into_iter()
+                    .find(|b| {
+                        matches!(
+                            b.kind,
+                            BadgeKind::Head | BadgeKind::Branch | BadgeKind::Remote
+                        )
+                    })
+                    .map(|b| HitTarget::Ref {
+                        commit: *index,
+                        full_name: b.full_name,
+                    })
+            }
+            HitTarget::Uncommitted => None,
+        }
     }
 
     /// Checks out the branch a badge shows (a remote one asks for the local name).

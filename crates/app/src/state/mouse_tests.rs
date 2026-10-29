@@ -271,3 +271,28 @@ fn double_clicking_a_remote_branch_asks_for_the_local_name() {
         h.state.message
     );
 }
+
+#[test]
+fn double_clicking_a_commit_row_checks_out_its_branch() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.double_click = Duration::from_secs(60);
+    // The subject of develop's tip, not its badge.
+    let (x, y) = find(&h, "Return a value");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
+}
+
+#[test]
+fn double_clicking_a_commit_without_a_branch_checks_nothing_out() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.double_click = Duration::from_secs(60);
+    let (x, y) = find(&h, "Add lib");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "main");
+    assert!(
+        h.state.details.is_none(),
+        "the second click closes the details"
+    );
+}
