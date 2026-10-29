@@ -10,4 +10,4 @@ expression: "graph.join(\"\\n\")"
                               │  ┃
 ▾ Changes               ↶ + 1 │  ●     develop  Return a value                                        6681ca2
   notes.txt             ↶ + U │  ┃
-                              │  ┃ ●   main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f
+                              │  ┃╭●   main │ origin   v0.1.0  Merge branch 'develop'                 0b1f05f
