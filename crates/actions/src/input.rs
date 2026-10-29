@@ -7,6 +7,10 @@ pub enum InputId {
     Name,
     /// Annotated tag message.
     Message,
+    /// Tag type: `Annotated` or `Lightweight`.
+    TagType,
+    /// Push a new tag to the remote.
+    PushToRemote,
     /// Archive output path.
     Output,
     Remote,

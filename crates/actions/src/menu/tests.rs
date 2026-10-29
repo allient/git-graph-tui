@@ -328,7 +328,7 @@ fn commit_menu_matches_the_vs_code_order() {
 }
 
 #[test]
-fn commit_on_the_current_branch_can_be_dropped_but_not_merged_or_picked() {
+fn commit_on_the_current_branch_can_be_dropped_and_explains_merge_and_pick() {
     assert_eq!(
         labels(&menu_for(&commit('c', 1, true), &ctx())),
         [
@@ -336,9 +336,11 @@ fn commit_on_the_current_branch_can_be_dropped_but_not_merged_or_picked() {
             "Create Branch...",
             "---",
             "Checkout...",
+            "Cherry Pick... (disabled: This commit is already on the current branch.)",
             "Revert...",
             "Drop...",
             "---",
+            "Merge into current branch... (disabled: This commit is already on the current branch.)",
             "Rebase current branch on this Commit...",
             "Interactive Rebase from Here...",
             "Reset current branch to this Commit...",
@@ -361,10 +363,14 @@ fn head_commit_menu() {
             "Create Branch...",
             "---",
             "Checkout...",
+            "Cherry Pick... (disabled: This commit is already on the current branch.)",
             "Revert...",
             "Drop...",
             "---",
+            "Merge into current branch... (disabled: This commit is already on the current branch.)",
+            "Rebase current branch on this Commit... (disabled: The current branch is already at this commit.)",
             "Interactive Rebase from Here... (disabled: This is HEAD: pick an older commit, the rebase edits the commits after it.)",
+            "Reset current branch to this Commit... (disabled: The current branch is already at this commit.)",
             "---",
             "Select for Compare",
             "Compare with Working Tree",
@@ -438,7 +444,7 @@ fn merges_and_root_commits_cannot_be_dropped() {
 }
 
 #[test]
-fn detached_head_at_the_commit_hides_checkout_and_reset() {
+fn detached_head_hides_checkout_here_and_disables_branch_actions() {
     let ctx = MenuContext {
         head: HeadState::Detached,
         ..ctx()
@@ -447,10 +453,14 @@ fn detached_head_at_the_commit_hides_checkout_and_reset() {
     assert!(!menu.contains(&"Checkout...".to_owned()), "{menu:?}");
     let other = labels(&menu_for(&commit('c', 1, false), &ctx));
     assert!(other.contains(&"Checkout...".to_owned()), "{other:?}");
-    assert!(
-        !other.contains(&"Reset current branch to this Commit...".to_owned()),
-        "{other:?}"
-    );
+    for label in [
+        "Merge into current branch...",
+        "Rebase current branch on this Commit...",
+        "Reset current branch to this Commit...",
+    ] {
+        let disabled = format!("{label} (disabled: HEAD isn't on a branch.)");
+        assert!(other.contains(&disabled), "{other:?}");
+    }
 }
 
 /// The "Interactive Rebase from Here..." entry of `target`'s menu.

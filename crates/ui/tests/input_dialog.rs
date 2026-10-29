@@ -48,10 +48,13 @@ fn annotated_tag() {
     let action = Action::AddTag {
         at: commit(),
         name: "v1.0.0".into(),
+        annotated: true,
         message: "First release".into(),
+        remote: Some("origin".into()),
+        push: false,
     };
     let dialog = InputDialog::for_action("Add Tag", &action).unwrap();
-    insta::assert_snapshot!(render(&dialog, 64, 13));
+    insta::assert_snapshot!(render(&dialog, 64, 17));
 }
 
 #[test]
