@@ -9,7 +9,7 @@ use crate::{Button, DialogStyle, Key, Theme, fit};
 
 /// A single-line text input. The cursor is a char index, so editing never
 /// splits a UTF-8 sequence.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TextField {
     text: String,
     cursor: usize,
@@ -542,7 +542,7 @@ fn choice(options: impl Iterator<Item = String>, current: &str) -> Value {
 /// The part of `field` that fits in `columns` with the cursor visible,
 /// and the cursor's column within it. Scrolls so the cursor sits at most on
 /// the last column.
-fn window(field: &TextField, columns: usize) -> (String, u16) {
+pub(crate) fn window(field: &TextField, columns: usize) -> (String, u16) {
     let chars: Vec<char> = field.text().chars().collect();
     let cursor = field.cursor();
     let room = columns.saturating_sub(1);
