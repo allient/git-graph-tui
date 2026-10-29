@@ -1,6 +1,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
+use tgg_actions::GraphColumn;
 use tgg_graph::Row;
 use tgg_model::{Commit, Oid, Ref};
 
@@ -74,29 +75,45 @@ impl ColumnWidths {
                     MAX_COLUMN,
                 ));
             }
-            ColumnDivider::AfterDescription => w.date = shift(self.date, -delta, MAX_COLUMN),
-            ColumnDivider::AfterDate => {
-                let total = self.date + self.author;
-                w.date = shift(self.date, delta, total - MIN_COLUMN);
-                w.author = total - w.date;
+            ColumnDivider::BeforeColumn(column) => {
+                *w.width_mut(column) = shift(self.width(column), -delta, MAX_COLUMN);
             }
-            ColumnDivider::AfterAuthor => {
-                let total = self.author + self.hash;
-                w.author = shift(self.author, delta, total - MIN_COLUMN);
-                w.hash = total - w.author;
+            ColumnDivider::Between(left, right) => {
+                let total = self.width(left) + self.width(right);
+                let moved = shift(self.width(left), delta, total - MIN_COLUMN);
+                *w.width_mut(left) = moved;
+                *w.width_mut(right) = total - moved;
             }
         }
         w
     }
+
+    fn width(self, column: GraphColumn) -> u16 {
+        match column {
+            GraphColumn::Date => self.date,
+            GraphColumn::Author => self.author,
+            GraphColumn::Commit => self.hash,
+        }
+    }
+
+    fn width_mut(&mut self, column: GraphColumn) -> &mut u16 {
+        match column {
+            GraphColumn::Date => &mut self.date,
+            GraphColumn::Author => &mut self.author,
+            GraphColumn::Commit => &mut self.hash,
+        }
+    }
 }
 
-/// A divider in the column header, named by the column on its left.
+/// A divider in the column header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnDivider {
+    /// Between the graph and the description: resizes the graph.
     AfterGraph,
-    AfterDescription,
-    AfterDate,
-    AfterAuthor,
+    /// Between the description and the first shown column: resizes it.
+    BeforeColumn(GraphColumn),
+    /// Between two shown columns: trades width between them.
+    Between(GraphColumn, GraphColumn),
 }
 
 /// Screen regions and what they show, recorded while rendering.
@@ -105,6 +122,7 @@ pub struct HitMap {
     regions: Vec<(Rect, HitTarget)>,
     gap: Option<Rect>,
     dividers: Vec<(u16, u16, ColumnDivider)>,
+    header: Option<Rect>,
     graph_width: u16,
 }
 
@@ -127,6 +145,14 @@ impl HitMap {
             .iter()
             .find(|&&(dx, dy, _)| (dx, dy) == (x, y))
             .map(|&(_, _, divider)| divider)
+    }
+
+    /// Whether a cell is on the column header line (right-click shows or
+    /// hides columns).
+    #[must_use]
+    pub fn is_header(&self, x: u16, y: u16) -> bool {
+        self.header
+            .is_some_and(|area| area.contains(ratatui::layout::Position { x, y }))
     }
 
     /// Width of the graph column as last drawn.
@@ -179,6 +205,8 @@ pub struct GraphView<'a> {
     pub widths: ColumnWidths,
     /// Commits matching the find bar, ascending; their subjects are highlighted.
     pub matches: &'a [usize],
+    /// Columns hidden from the header's menu.
+    pub hidden: &'a [GraphColumn],
 }
 
 /// Blank lines opened below display row `after`; rows below it move down.
@@ -214,8 +242,9 @@ impl GraphView<'_> {
         if area.is_empty() {
             return hits;
         }
-        let columns = Columns::for_width(area, self.lane_width(area), self.widths);
+        let columns = Columns::for_width(area, self.lane_width(area), self.widths, self.hidden);
         hits.graph_width = columns.graph.width;
+        hits.header = Some(Rect::new(area.x, area.y, area.width, 1));
         hits.dividers = draw_header(buf, &columns, area, theme);
 
         let mut y = area.top() + 1;
@@ -441,9 +470,17 @@ fn draw_header(
     };
     let description = Some(cols.description).filter(|d| d.width > 0);
     divider(description, ColumnDivider::AfterGraph);
-    divider(cols.date, ColumnDivider::AfterDescription);
-    divider(cols.date.and(cols.author), ColumnDivider::AfterDate);
-    divider(cols.author.and(cols.hash), ColumnDivider::AfterAuthor);
+    // Hidden columns have no divider: each shown one gets one on its left.
+    let mut left = None;
+    for (column, area) in cols.optional() {
+        if area.is_some() {
+            let which = left.map_or(ColumnDivider::BeforeColumn(column), |left| {
+                ColumnDivider::Between(left, column)
+            });
+            divider(area, which);
+            left = Some(column);
+        }
+    }
     dividers
 }
 
@@ -455,8 +492,8 @@ fn put(buf: &mut Buffer, x: u16, y: u16, right: u16, text: &str, style: Style) -
     buf.set_stringn(x, y, text, usize::from(right - x), style).0
 }
 
-/// Horizontal layout of one line. Optional columns appear as the width allows:
-/// hash from 60 columns, date from 80, author from 100.
+/// Horizontal layout of one line. Optional columns appear as the width allows
+/// (hash from 60 columns, date from 80, author from 100) and unless hidden.
 #[derive(Debug)]
 struct Columns {
     lanes: usize,
@@ -468,12 +505,21 @@ struct Columns {
 }
 
 impl Columns {
+    /// The optional columns, left to right, and where each is (if shown).
+    fn optional(&self) -> [(GraphColumn, Option<Rect>); 3] {
+        [
+            (GraphColumn::Date, self.date),
+            (GraphColumn::Author, self.author),
+            (GraphColumn::Commit, self.hash),
+        ]
+    }
+
     /// Where lane 0 is drawn, after the padding.
     fn lanes_x(&self) -> u16 {
         self.graph.x + GRAPH_PADDING.min(self.graph.width)
     }
 
-    fn for_width(area: Rect, lanes: usize, widths: ColumnWidths) -> Self {
+    fn for_width(area: Rect, lanes: usize, widths: ColumnWidths, hidden: &[GraphColumn]) -> Self {
         let lanes = lanes.max(1);
         let graph_width = widths
             .graph
@@ -484,10 +530,12 @@ impl Columns {
                     .max(MIN_GRAPH_WIDTH)
             })
             .min(area.width);
-        let col = |show: bool, width: u16| show.then_some(width);
-        let hash = col(area.width >= 60, widths.hash);
-        let date = col(area.width >= 80, widths.date);
-        let author = col(area.width >= 100, widths.author);
+        let col = |column: GraphColumn, min_width: u16, width: u16| {
+            (area.width >= min_width && !hidden.contains(&column)).then_some(width)
+        };
+        let hash = col(GraphColumn::Commit, 60, widths.hash);
+        let date = col(GraphColumn::Date, 80, widths.date);
+        let author = col(GraphColumn::Author, 100, widths.author);
         // Each optional column is preceded by one space.
         let fixed: u16 = [date, author, hash].iter().flatten().map(|w| w + 1).sum();
         let description_width = area.width.saturating_sub(graph_width + fixed);
@@ -534,16 +582,36 @@ mod tests {
 
     #[test]
     fn dragging_after_the_description_resizes_the_date_column() {
-        let w = start().dragged(ColumnDivider::AfterDescription, -4);
+        let w = start().dragged(ColumnDivider::BeforeColumn(GraphColumn::Date), -4);
         assert_eq!(w.date, DATE_WIDTH + 4, "moving left widens the date");
         assert_eq!((w.author, w.hash), (AUTHOR_WIDTH, HASH_WIDTH));
     }
 
     #[test]
+    fn dividers_next_to_a_hidden_column_resize_the_shown_ones() {
+        let w = start().dragged(ColumnDivider::BeforeColumn(GraphColumn::Author), -2);
+        assert_eq!((w.date, w.author), (DATE_WIDTH, AUTHOR_WIDTH + 2));
+        let w = start().dragged(
+            ColumnDivider::Between(GraphColumn::Date, GraphColumn::Commit),
+            -3,
+        );
+        assert_eq!(
+            (w.date, w.author, w.hash),
+            (DATE_WIDTH - 3, AUTHOR_WIDTH, HASH_WIDTH + 3)
+        );
+    }
+
+    #[test]
     fn dragging_between_two_columns_trades_width_between_them() {
-        let w = start().dragged(ColumnDivider::AfterDate, 3);
+        let w = start().dragged(
+            ColumnDivider::Between(GraphColumn::Date, GraphColumn::Author),
+            3,
+        );
         assert_eq!((w.date, w.author), (DATE_WIDTH + 3, AUTHOR_WIDTH - 3));
-        let w = start().dragged(ColumnDivider::AfterAuthor, 100);
+        let w = start().dragged(
+            ColumnDivider::Between(GraphColumn::Author, GraphColumn::Commit),
+            100,
+        );
         assert_eq!(
             (w.author, w.hash),
             (AUTHOR_WIDTH + HASH_WIDTH - MIN_COLUMN, MIN_COLUMN)

@@ -10,6 +10,8 @@
 //! date_column = 16
 //! author_column = 14
 //! hash_column = 8
+//! hidden_columns = ["author"]  # hidden from the header's right-click menu:
+//!                              # "date", "author" or "commit"
 //!
 //! [diff]
 //! pager = "delta"         # pipe file diffs into this command; "" or unset:
@@ -22,6 +24,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use tgg_actions::GraphColumn;
 
 use crate::cli::IconStyle;
 
@@ -45,8 +48,8 @@ pub struct Diff {
     pub pager: Option<String>,
 }
 
-/// Pane and column widths; None keeps the built-in default.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// Pane and column widths and hidden columns; None keeps the built-in default.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Layout {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,6 +62,37 @@ pub struct Layout {
     pub author_column: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash_column: Option<u16>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub hidden_columns: Vec<ColumnName>,
+}
+
+/// A graph column the header's menu can hide, as the config file names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColumnName {
+    Date,
+    Author,
+    Commit,
+}
+
+impl From<ColumnName> for GraphColumn {
+    fn from(name: ColumnName) -> Self {
+        match name {
+            ColumnName::Date => Self::Date,
+            ColumnName::Author => Self::Author,
+            ColumnName::Commit => Self::Commit,
+        }
+    }
+}
+
+impl From<GraphColumn> for ColumnName {
+    fn from(column: GraphColumn) -> Self {
+        match column {
+            GraphColumn::Date => Self::Date,
+            GraphColumn::Author => Self::Author,
+            GraphColumn::Commit => Self::Commit,
+        }
+    }
 }
 
 /// Where the config file lives; `env` looks up an environment variable.
@@ -202,6 +236,31 @@ mod tests {
         fs::write(&file, "[diff]\npager = \"delta\"\n").unwrap();
         save_layout(&file, Layout::default()).unwrap();
         assert_eq!(load(&file).unwrap().diff.pager.as_deref(), Some("delta"));
+    }
+
+    #[test]
+    fn hidden_columns_are_saved_by_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        save_layout(
+            &file,
+            Layout {
+                hidden_columns: vec![ColumnName::Author, ColumnName::Commit],
+                ..Layout::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            "[layout]\nhidden_columns = [\"author\", \"commit\"]\n"
+        );
+        assert_eq!(
+            load(&file).unwrap().layout.hidden_columns,
+            [ColumnName::Author, ColumnName::Commit]
+        );
+        fs::write(&file, "[layout]\nhidden_columns = [\"graph\"]\n").unwrap();
+        let err = format!("{:#}", load(&file).unwrap_err());
+        assert!(err.contains("unknown variant `graph`"), "{err}");
     }
 
     #[test]

@@ -146,6 +146,10 @@ impl AppState {
                 let other = Some(commit.clone());
                 self.open_comparison(commit, Comparison { base, other })
             }
+            Plan::Ui(UiEffect::ToggleColumn { column }) => {
+                self.toggle_column(column);
+                Vec::new()
+            }
             Plan::Ui(UiEffect::CompareWithWorkingTree { commit }) => {
                 let base = commit.clone();
                 self.open_comparison(commit, Comparison { base, other: None })

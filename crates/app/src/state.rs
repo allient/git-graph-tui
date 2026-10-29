@@ -10,7 +10,7 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{CommitTarget, MenuContext, MenuItem, Target, menu_for};
+use tgg_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Target, menu_for};
 use tgg_git::show::{self, FileChange};
 use tgg_git::{CancelToken, ExecError, GitCommand, log, refs, status};
 use tgg_graph::Graph;
@@ -209,6 +209,8 @@ pub struct AppState {
     last_click: Option<(Instant, HitTarget)>,
     /// The graph's column widths, set by dragging the header dividers.
     pub columns: ColumnWidths,
+    /// Columns hidden from the header's right-click menu, in column order.
+    pub hidden_columns: Vec<GraphColumn>,
     /// The commit marked with "Select for Compare".
     pub compare_base: Option<Oid>,
     /// Shell command the diffs are piped into (S12); None uses the built-in view.
@@ -257,6 +259,7 @@ impl AppState {
             double_click: DOUBLE_CLICK,
             last_click: None,
             columns: ColumnWidths::default(),
+            hidden_columns: Vec::new(),
             compare_base: None,
             pager: None,
             drag: None,
@@ -460,6 +463,10 @@ impl AppState {
             return commands;
         }
         match mouse.kind {
+            MouseEventKind::Down(MouseButton::Right) if self.graph_hits.is_header(x, y) => {
+                self.open_column_menu(Position { x, y: y + 1 });
+                Vec::new()
+            }
             MouseEventKind::Down(button @ (MouseButton::Left | MouseButton::Right)) => {
                 let Some(target) = self.graph_hits.hit(x, y).cloned() else {
                     return Vec::new();

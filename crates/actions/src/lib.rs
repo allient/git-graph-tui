@@ -13,9 +13,9 @@ mod menu;
 mod refname;
 mod target;
 
-pub use action::{Action, Confirmation, Plan, ResetMode, Rev, UiEffect};
+pub use action::{Action, Confirmation, GraphColumn, Plan, ResetMode, Rev, UiEffect};
 pub use input::{InputError, InputId, InputKind, InputSpec, InputValue};
-pub use menu::{MenuEntry, MenuItem, menu_for};
+pub use menu::{MenuEntry, MenuItem, column_menu, menu_for};
 pub use refname::{RefNameError, validate_ref_name};
 pub use target::{CommitTarget, MenuContext, Target};
 mod stash;

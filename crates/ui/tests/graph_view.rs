@@ -6,6 +6,7 @@
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use tgg_actions::GraphColumn;
 use tgg_git::{log, refs, status};
 use tgg_graph::{Graph, Row};
 use tgg_model::{Commit, Oid, Ref, WorkingTreeStatus};
@@ -57,6 +58,7 @@ fn view(l: &Loaded) -> GraphView<'_> {
         gap: None,
         widths: ColumnWidths::default(),
         matches: &[],
+        hidden: &[],
     }
 }
 
@@ -292,9 +294,15 @@ fn header_dividers_separate_the_columns_and_can_be_grabbed() {
     // Graph 0..7, description 7..69, then date, author and hash, each after a divider.
     for (x, divider) in [
         (6, ColumnDivider::AfterGraph),
-        (69, ColumnDivider::AfterDescription),
-        (86, ColumnDivider::AfterDate),
-        (101, ColumnDivider::AfterAuthor),
+        (69, ColumnDivider::BeforeColumn(GraphColumn::Date)),
+        (
+            86,
+            ColumnDivider::Between(GraphColumn::Date, GraphColumn::Author),
+        ),
+        (
+            101,
+            ColumnDivider::Between(GraphColumn::Author, GraphColumn::Commit),
+        ),
     ] {
         assert_eq!(buf[(x, 0)].symbol(), "│", "x={x}");
         assert_eq!(hits.divider_at(x, 0), Some(divider), "x={x}");
@@ -325,8 +333,87 @@ fn column_widths_move_the_columns() {
     // The date column is 20 wide, so it starts 4 columns further left.
     assert_eq!(
         hits.divider_at(65, 0),
-        Some(ColumnDivider::AfterDescription)
+        Some(ColumnDivider::BeforeColumn(GraphColumn::Date))
     );
     let line: String = (66..86).map(|x| buf[(x, 3)].symbol()).collect();
     assert!(line.starts_with("2026-01-01 00:07"), "{line:?}");
+}
+
+#[test]
+fn hidden_columns_drop_their_header_and_divider_and_the_description_takes_the_room() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let hidden = [GraphColumn::Author];
+    let without_author = GraphView {
+        hidden: &hidden,
+        ..view(&loaded)
+    };
+    let (buf, hits) = render(&without_author, 110, 10);
+    let header = text(&buf).lines().next().unwrap().to_owned();
+    assert!(!header.contains("Author"), "{header:?}");
+    assert!(header.contains("│Date"), "{header:?}");
+    assert!(header.contains("Commit"), "{header:?}");
+    // 15 columns (author and its space) go to the description.
+    assert_eq!(
+        hits.divider_at(84, 0),
+        Some(ColumnDivider::BeforeColumn(GraphColumn::Date))
+    );
+    assert_eq!(
+        (0..110)
+            .filter_map(|x| hits.divider_at(x, 0))
+            .collect::<Vec<_>>(),
+        [
+            ColumnDivider::AfterGraph,
+            ColumnDivider::BeforeColumn(GraphColumn::Date),
+            ColumnDivider::Between(GraphColumn::Date, GraphColumn::Commit),
+        ],
+        "the author's divider is gone; date and commit trade width"
+    );
+    assert_eq!(buf[(101, 0)].symbol(), "│");
+    let row = text(&buf).lines().nth(3).unwrap().to_owned();
+    assert!(!row.contains("Fixture Author"), "no author names: {row:?}");
+
+    let all = [GraphColumn::Date, GraphColumn::Author, GraphColumn::Commit];
+    let bare = GraphView {
+        hidden: &all,
+        ..view(&loaded)
+    };
+    let (buf, hits) = render(&bare, 110, 10);
+    let header = text(&buf).lines().next().unwrap().to_owned();
+    assert!(header.ends_with("Description"), "{header:?}");
+    assert_eq!(
+        (0..110)
+            .filter_map(|x| hits.divider_at(x, 0))
+            .collect::<Vec<_>>(),
+        [ColumnDivider::AfterGraph]
+    );
+
+    // Without the date, the author's left divider resizes the author.
+    let no_date = [GraphColumn::Date];
+    let (buf, hits) = render(
+        &GraphView {
+            hidden: &no_date,
+            ..view(&loaded)
+        },
+        110,
+        10,
+    );
+    let header = text(&buf).lines().next().unwrap().to_owned();
+    let x = header.find("│Author").expect("a divider before Author");
+    let x = u16::try_from(header[..x].chars().count()).unwrap();
+    assert_eq!(
+        hits.divider_at(x, 0),
+        Some(ColumnDivider::BeforeColumn(GraphColumn::Author))
+    );
+}
+
+#[test]
+fn the_header_line_is_known_to_the_hit_map() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (_, hits) = render(&view(&loaded), 110, 10);
+    assert!(hits.is_header(30, 0));
+    assert!(hits.is_header(109, 0));
+    assert!(!hits.is_header(30, 1));
+    assert!(!hits.is_header(110, 0));
 }

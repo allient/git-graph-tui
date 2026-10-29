@@ -109,7 +109,7 @@ fn a_saved_layout_is_applied_and_read_back() {
         date_column: Some(20),
         ..Layout::default()
     };
-    h.state.apply_layout(saved);
+    h.state.apply_layout(saved.clone());
     h.draw(150, H);
     assert_eq!(cell(&h, 40, 5), "│", "the saved pane width");
     assert_eq!(
@@ -141,6 +141,7 @@ fn default_widths_written_in_the_config_are_not_a_change() {
         date_column: Some(16),
         author_column: Some(14),
         hash_column: Some(8),
+        hidden_columns: Vec::new(),
     };
     let baseline = h.state.apply_layout(example);
     h.draw(150, H);
@@ -149,4 +150,87 @@ fn default_widths_written_in_the_config_are_not_a_change() {
         baseline,
         "quitting without resizing leaves the file alone"
     );
+}
+
+fn header_menu_labels(h: &Harness) -> Vec<String> {
+    h.state
+        .menu
+        .as_ref()
+        .map(|m| {
+            m.items()
+                .iter()
+                .filter_map(|item| match item {
+                    MenuItem::Entry(e) => Some(e.label.clone()),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn right_click_header(h: &mut Harness, width: u16) {
+    let (x, y) = find(h, "Description");
+    mouse(h, MouseEventKind::Down(MouseButton::Right), x + 3, y, width);
+}
+
+/// Clicks the open menu's entry `label`.
+fn choose(h: &mut Harness, label: &str, width: u16) {
+    let (x, y) = find(h, label);
+    mouse(h, MouseEventKind::Down(MouseButton::Left), x + 3, y, width);
+}
+
+#[test]
+fn right_clicking_the_header_shows_or_hides_columns() {
+    use crate::config::ColumnName;
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo, 150);
+    right_click_header(&mut h, 150);
+    assert_eq!(header_menu_labels(&h), ["✓ Date", "✓ Author", "✓ Commit"]);
+    choose(&mut h, "✓ Author", 150);
+
+    assert!(h.state.menu.is_none());
+    assert!(
+        h.find_on_screen("Author").is_none(),
+        "the header lost Author"
+    );
+    assert!(
+        h.find_on_screen("Fixture Author").is_none(),
+        "the rows lost it too"
+    );
+    assert!(h.find_on_screen("│Date").is_some());
+    assert!(h.find_on_screen("│Author").is_none(), "and its divider");
+    assert!(
+        h.find_on_screen("│Commit").is_some(),
+        "commit now follows date"
+    );
+    assert_eq!(h.state.layout().hidden_columns, [ColumnName::Author]);
+
+    // The menu now shows it unchecked; choosing it again brings it back.
+    right_click_header(&mut h, 150);
+    assert_eq!(header_menu_labels(&h), ["✓ Date", "  Author", "✓ Commit"]);
+    choose(&mut h, "  Author", 150);
+    assert!(h.find_on_screen("│Author").is_some());
+    assert!(h.state.layout().hidden_columns.is_empty());
+}
+
+#[test]
+fn hidden_columns_are_saved_and_applied() {
+    use crate::config::{ColumnName, Layout};
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    let saved = Layout {
+        hidden_columns: vec![ColumnName::Date, ColumnName::Commit],
+        ..Layout::default()
+    };
+    let baseline = h.state.apply_layout(saved.clone());
+    assert_eq!(baseline, saved);
+    h.draw(150, H);
+    assert!(h.find_on_screen("│Date").is_none());
+    assert!(h.find_on_screen("│Commit").is_none());
+    assert!(h.find_on_screen("│Author").is_some());
+
+    right_click_header(&mut h, 150);
+    choose(&mut h, "  Date", 150);
+    assert!(h.find_on_screen("│Date").is_some());
+    assert_eq!(h.state.layout().hidden_columns, [ColumnName::Commit]);
 }

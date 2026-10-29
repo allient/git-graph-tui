@@ -39,7 +39,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Commit graph with color-coded lanes per branch and merge lines
 - [x] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges
 - [x] Uncommitted changes shown as a virtual row at the top
-- [ ] Columns: graph, description, date, author, commit hash (show/hide, adapt to width)
+- [x] Columns: graph, description, date, author, commit hash (show/hide, adapt to width)
 - [x] Highlight HEAD and mute commits that aren't ancestors of HEAD
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
@@ -186,6 +186,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `c` | Move to the Source Control pane on the left (shown from 90 columns). Type the commit message (`Alt+Enter`, `Shift+Enter` or `Ctrl+J` starts a new line) and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files: `Space`/`Enter` stages or unstages a file or a whole section, as do `+` and `-`; `d` discards a file's changes (or the whole Changes section) after asking; `m` opens the repository menu; `Esc` goes back to the graph. The header's `✓` `↻` `…` commit, refresh and open the repository menu; each row's `↶` `+` `−` discard, stage and unstage |
 | `r` | Refresh |
 | Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |
+| Right click the column header | Show or hide the Date, Author and Commit columns (`✓` marks the shown ones), like VS Code Git Graph; the description takes the room. Narrow terminals still drop columns that don't fit (Commit under 60 columns, Date under 80, Author under 100) |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
 | `q` | Quit (closes the diff first when one is open) |
 
@@ -225,6 +226,7 @@ graph_column = 12
 date_column = 16
 author_column = 14
 hash_column = 8
+hidden_columns = ["author"] # hidden from the header's right-click menu: "date", "author", "commit"
 
 [diff]
 pager = "delta"           # pipe file diffs into this command; unset or "" uses the built-in view
@@ -232,7 +234,7 @@ pager = "delta"           # pipe file diffs into this command; unset or "" uses 
 
 `pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `TUI_GIT_GRAPH_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 
-Drag the pane or column dividers and quit: the new widths are written to `[layout]` and used next time. Other settings in the file are kept, but comments are not. A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
+Drag the pane or column dividers, or show and hide columns, and quit: the new layout is written to `[layout]` and used next time. Other settings in the file are kept, but comments are not. A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
 
 ## Development
 

@@ -3,8 +3,8 @@ use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
 use crate::{
-    Action, CommitTarget, PickPurpose, PullMode, RepoAction, ResetMode, Rev, StashAction,
-    TagAction, UiEffect, WorkingTreeAction,
+    Action, CommitTarget, GraphColumn, PickPurpose, PullMode, RepoAction, ResetMode, Rev,
+    StashAction, TagAction, UiEffect, WorkingTreeAction,
 };
 
 fn oid(c: char) -> Oid {
@@ -756,4 +756,33 @@ fn create_pull_request_targets_the_branch_on_its_remote() {
             branch: "feature/x".into()
         })
     );
+}
+
+// ---- column header menu (S20 1) ----
+
+#[test]
+fn the_column_menu_checks_the_shown_columns() {
+    let menu = column_menu(&[GraphColumn::Author]);
+    assert_eq!(labels(&menu), ["✓ Date", "  Author", "✓ Commit"]);
+    assert_eq!(
+        action(&menu, "  Author"),
+        &Action::Ui(UiEffect::ToggleColumn {
+            column: GraphColumn::Author
+        })
+    );
+    assert_eq!(
+        action(&menu, "✓ Commit"),
+        &Action::Ui(UiEffect::ToggleColumn {
+            column: GraphColumn::Commit
+        })
+    );
+}
+
+#[test]
+fn column_names_round_trip() {
+    for column in GraphColumn::ALL {
+        assert_eq!(GraphColumn::from_name(column.name()), Some(column));
+    }
+    assert_eq!(GraphColumn::Commit.name(), "commit");
+    assert_eq!(GraphColumn::from_name("graph"), None, "always shown");
 }

@@ -67,6 +67,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
         gap,
         widths: state.columns,
         matches: state.find.as_ref().map_or(&[], |f| f.matches.as_slice()),
+        hidden: &state.hidden_columns,
     };
     state.graph_hits = view.render(graph_area, frame.buffer_mut(), theme);
     if let (Some(area), Some(details)) = (state.graph_hits.gap(), &mut state.details) {
