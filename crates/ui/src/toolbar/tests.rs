@@ -41,14 +41,14 @@ fn full_layout_on_a_wide_terminal() {
     let (line, _) = render(&toolbar(), 100);
     assert_eq!(
         line,
-        " Branches: [main, develop ▾]  [x] Show Remote Branches                      [Refresh] [Fetch] [...]"
+        " Branches: [main, develop ▾]  [x] Show Remote Branches                                [↻] [⇣] [...]"
     );
 }
 
 #[test]
 fn compact_layout_on_a_narrow_terminal() {
     let (line, _) = render(&Toolbar::new(&[], false), 53);
-    assert_eq!(line, " [Show All ▾]  [ ] Remotes   [Refresh] [Fetch] [...]");
+    assert_eq!(line, " [Show All ▾]  [ ] Remotes             [↻] [⇣] [...]");
 }
 
 #[test]

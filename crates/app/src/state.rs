@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-use ratatui::layout::Position;
+use ratatui::layout::{Position, Rect};
 use tgg_actions::{CommitTarget, MenuContext, MenuItem, Target, menu_for};
 use tgg_git::show::{self, FileChange};
 use tgg_git::{CancelToken, ExecError, GitCommand, log, refs, status};
@@ -430,12 +430,9 @@ impl AppState {
             Some(index) => HitTarget::Commit(index),
             None => HitTarget::Uncommitted,
         };
-        // Anchor just below the selected row, in from the left edge.
-        let row = self.selected.saturating_sub(self.offset) + 1;
-        let anchor = Position {
-            x: 4,
-            y: u16::try_from(row).unwrap_or(u16::MAX),
-        };
+        // Anchor just below the selected row as last drawn, in from the left edge.
+        let y = self.graph_hits.area_of(&target).map_or(0, Rect::bottom);
+        let anchor = Position { x: 4, y };
         self.open_menu(&target, anchor);
     }
 

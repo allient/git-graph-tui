@@ -77,7 +77,7 @@ fn the_toolbar_is_the_first_line() {
     let h = open(&repo);
     let (_, y) = find(&h, "Branches: [Show All");
     assert_eq!(y, 0);
-    assert!(h.find_on_screen("[Fetch]").is_some());
+    assert!(h.find_on_screen("[⇣]").is_some());
 }
 
 #[test]

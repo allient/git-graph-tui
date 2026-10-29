@@ -83,8 +83,35 @@ fn render(v: &GraphView<'_>, width: u16, height: u16) -> (Buffer, tgg_ui::HitMap
 fn sample_repo_wide() {
     let repo = FixtureRepo::sample();
     let loaded = load(&repo);
-    let (buf, _) = render(&view(&loaded), 110, 10);
+    let (buf, _) = render(&view(&loaded), 110, 16);
     insta::assert_snapshot!(text(&buf));
+}
+
+#[test]
+fn the_first_line_names_the_columns() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, _) = render(&view(&loaded), 110, 10);
+    let header = text(&buf).lines().next().unwrap().to_owned();
+    let names: Vec<&str> = header.split_whitespace().collect();
+    assert_eq!(names, ["Graph", "Description", "Date", "Author", "Commit"]);
+    assert_eq!(buf[(0, 0)].bg, Theme::default().header_bg);
+}
+
+#[test]
+fn a_line_joins_consecutive_commits() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, hits) = render(&view(&loaded), 110, 10);
+    let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
+    // "Add login" (line 3) and its parent "Return a value" (line 5), both on lane 0.
+    assert!(
+        lines[3].starts_with('●') && lines[5].starts_with('●'),
+        "{lines:#?}"
+    );
+    assert_eq!(lines[4], "│");
+    // The connector line belongs to the row above it.
+    assert_eq!(hits.hit(100, 4), Some(&HitTarget::Commit(0)));
 }
 
 #[test]
@@ -103,11 +130,11 @@ fn uncommitted_row_comes_first_when_the_tree_is_dirty() {
     assert!(
         text(&buf)
             .lines()
-            .next()
+            .nth(1)
             .unwrap()
             .contains("Uncommitted Changes (1)")
     );
-    assert_eq!(hits.hit(40, 0), Some(&HitTarget::Uncommitted));
+    assert_eq!(hits.hit(40, 1), Some(&HitTarget::Uncommitted));
 }
 
 #[test]
@@ -116,8 +143,8 @@ fn clean_tree_has_no_uncommitted_row() {
     repo.commit_file("a.txt", "1\n", "Only commit");
     let loaded = load(&repo);
     let (buf, hits) = render(&view(&loaded), 80, 3);
-    assert!(text(&buf).lines().next().unwrap().contains("Only commit"));
-    assert_eq!(hits.hit(40, 0), Some(&HitTarget::Commit(0)));
+    assert!(text(&buf).lines().nth(1).unwrap().contains("Only commit"));
+    assert_eq!(hits.hit(40, 1), Some(&HitTarget::Commit(0)));
 }
 
 #[test]
@@ -127,8 +154,9 @@ fn hit_map_finds_commits_and_badges() {
     let (buf, hits) = render(&view(&loaded), 110, 10);
     let screen = text(&buf);
 
-    // Row 1 is the first commit ("Add login" on feature/login).
-    assert_eq!(hits.hit(100, 1), Some(&HitTarget::Commit(0)));
+    // Line 3 is the first commit ("Add login" on feature/login), below the
+    // header, the uncommitted row and its connector.
+    assert_eq!(hits.hit(100, 3), Some(&HitTarget::Commit(0)));
 
     // Clicking inside a badge targets that ref.
     let (y, line) = screen
@@ -157,11 +185,11 @@ fn scrolling_starts_at_the_offset() {
     assert!(
         text(&buf)
             .lines()
-            .next()
+            .nth(1)
             .unwrap()
             .contains("Merge branch 'develop'")
     );
-    assert_eq!(hits.hit(100, 0), Some(&HitTarget::Commit(2)));
+    assert_eq!(hits.hit(100, 1), Some(&HitTarget::Commit(2)));
 }
 
 #[test]
@@ -172,8 +200,9 @@ fn selected_row_is_highlighted() {
     v.selected = 2;
     let (buf, _) = render(&v, 110, 10);
     let theme = Theme::default();
-    assert_eq!(buf[(105, 2)].bg, theme.selected_bg);
-    assert_ne!(buf[(105, 3)].bg, theme.selected_bg);
+    // Display row 2 is on line 5 (header, then two lines per row).
+    assert_eq!(buf[(105, 5)].bg, theme.selected_bg);
+    assert_ne!(buf[(105, 6)].bg, theme.selected_bg);
 }
 
 #[test]
@@ -213,14 +242,14 @@ fn a_gap_opens_blank_lines_below_its_row() {
     let plain_lines: Vec<String> = text(&plain_buf).lines().map(str::to_owned).collect();
     let lines: Vec<String> = text(&buf).lines().map(str::to_owned).collect();
 
-    // Rows 0 and 1, three blank lines, then row 2 onwards.
-    assert_eq!(lines[..2], plain_lines[..2]);
-    assert!(lines[2..5].iter().all(String::is_empty), "{lines:#?}");
-    assert_eq!(lines[5..], plain_lines[2..7]);
-    assert_eq!(hits.gap(), Some(Rect::new(0, 2, 100, 3)));
+    // Header to row 1, three blank lines, then row 1's connector onwards.
+    assert_eq!(lines[..4], plain_lines[..4]);
+    assert!(lines[4..7].iter().all(String::is_empty), "{lines:#?}");
+    assert_eq!(lines[7..], plain_lines[4..7]);
+    assert_eq!(hits.gap(), Some(Rect::new(0, 4, 100, 3)));
     // Clicks below the gap resolve to the shifted row (display 2 is commit 1).
-    assert_eq!(hits.hit(40, 5), Some(&HitTarget::Commit(1)));
-    assert_eq!(hits.hit(40, 3), None);
+    assert_eq!(hits.hit(40, 8), Some(&HitTarget::Commit(1)));
+    assert_eq!(hits.hit(40, 5), None);
 }
 
 #[test]
@@ -229,13 +258,13 @@ fn a_gap_is_clipped_at_the_bottom_and_skipped_when_its_row_is_off_screen() {
     let loaded = load(&repo);
     let clipped = GraphView {
         gap: Some(Gap {
-            after: 2,
+            after: 1,
             height: 10,
         }),
         ..view(&loaded)
     };
     let (_, hits) = render(&clipped, 100, 6);
-    assert_eq!(hits.gap(), Some(Rect::new(0, 3, 100, 3)));
+    assert_eq!(hits.gap(), Some(Rect::new(0, 4, 100, 2)));
 
     let hidden = GraphView {
         offset: 3,
