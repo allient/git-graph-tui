@@ -14,8 +14,9 @@ use crate::testing::Harness;
 fn refresh_loads_commits_refs_status_and_layout() {
     let repo = FixtureRepo::sample();
     let h = Harness::open(&repo);
-    assert_eq!(h.state.commits.len(), 7);
-    assert_eq!(h.state.graph.rows().len(), 7);
+    // Seven commits and the fixture's stash, a row above the commit it was made on.
+    assert_eq!(h.state.commits.len(), 8);
+    assert_eq!(h.state.graph.rows().len(), 8);
     assert_eq!(h.state.refs.len(), 6);
     assert_eq!(h.state.status.changed_files(), 1);
     assert_eq!(
@@ -57,9 +58,10 @@ fn page_keys_move_by_the_viewport_height() {
     h.key(KeyCode::PageDown);
     assert_eq!(h.state.selected, 5);
     h.key(KeyCode::PageDown);
-    assert_eq!(h.state.selected, 7, "clamped to the last row");
+    // Eight rows with the stash: the last is 8 (row 0 is the uncommitted row).
+    assert_eq!(h.state.selected, 8, "clamped to the last row");
     h.key(KeyCode::PageUp);
-    assert_eq!(h.state.selected, 2);
+    assert_eq!(h.state.selected, 3);
 }
 
 #[test]
@@ -68,8 +70,8 @@ fn the_viewport_scrolls_to_keep_the_selection_visible() {
     let mut h = Harness::open(&repo);
     h.key(KeyCode::Char('G'));
     assert_eq!(
-        h.state.offset, 3,
-        "last row (7) is at the bottom of a 5-row viewport"
+        h.state.offset, 4,
+        "last row (8, with the stash row) is at the bottom of a 5-row viewport"
     );
     h.key(KeyCode::Char('g'));
     assert_eq!(h.state.offset, 0);
@@ -91,7 +93,8 @@ fn refresh_keeps_the_selection_on_the_same_commit() {
     repo.git(&["switch", "--quiet", "--discard-changes", "develop"]);
     repo.commit_file("new.txt", "1\n", "New on develop");
     h.key(KeyCode::Char('r'));
-    assert_eq!(h.state.commits.len(), 8);
+    // Eight commits and the fixture's stash row.
+    assert_eq!(h.state.commits.len(), 9);
     assert_eq!(h.selected_subject(), Some("Merge branch 'develop'"));
 }
 
@@ -129,19 +132,20 @@ fn results_from_a_superseded_refresh_are_ignored() {
 fn more_commits_load_when_the_selection_nears_the_end() {
     let repo = FixtureRepo::sample();
     let mut h = Harness::with_page_size(&repo, 3);
-    // A 5-row viewport with 3-commit pages loads two pages to fill the screen.
+    // A 5-row viewport with 3-commit pages loads two pages to fill the
+    // screen; the fixture's stash adds a row above the commit it was made on.
     assert_eq!(
         h.state.commits.len(),
-        6,
+        7,
         "pages load until the viewport is filled"
     );
     h.key(KeyCode::Char('G'));
     h.key(KeyCode::Char('G'));
     h.key(KeyCode::Char('G'));
-    assert_eq!(h.state.commits.len(), 7, "pages load until history ends");
+    assert_eq!(h.state.commits.len(), 8, "pages load until history ends");
     assert!(h.state.history_complete);
     assert_eq!(h.selected_subject(), Some("Initial commit"));
-    assert_eq!(h.state.graph.rows().len(), 7);
+    assert_eq!(h.state.graph.rows().len(), 8);
 }
 
 #[test]

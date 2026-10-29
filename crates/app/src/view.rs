@@ -331,8 +331,9 @@ mod tests {
         terminal
             .draw(|f| draw(f, &mut h.state, &Theme::default()))
             .unwrap();
-        // Toolbar, 2 graph lines, status bar; the last commit (index 6) is on the bottom graph line.
-        assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(6)));
+        // Toolbar, 2 graph lines, status bar; the last row (index 7, after
+        // the fixture's stash row) is on the bottom graph line.
+        assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(7)));
     }
 
     #[test]

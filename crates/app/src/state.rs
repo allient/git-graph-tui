@@ -223,6 +223,12 @@ pub struct AppState {
     pub refs: Vec<Ref>,
     /// The stash list, newest first.
     pub stashes: Vec<Stash>,
+    /// The stashes as commits (first parent only), shown as rows above
+    /// the commit each was made on.
+    stash_commits: Vec<Commit>,
+    /// How many commits the history pages have loaded: `commits` without
+    /// the stash rows, for paging.
+    log_loaded: usize,
     pub status: WorkingTreeStatus,
     pub head: Option<Oid>,
     /// Selected display row (0 is the uncommitted row when the tree is dirty).
@@ -313,6 +319,8 @@ impl AppState {
             graph: Graph::new(None),
             refs: Vec::new(),
             stashes: Vec::new(),
+            stash_commits: Vec::new(),
+            log_loaded: 0,
             status: WorkingTreeStatus::default(),
             head: None,
             selected: 0,
@@ -719,6 +727,9 @@ impl AppState {
             HitTarget::Uncommitted => Some(Target::Uncommitted),
             HitTarget::Commit(index) => {
                 let commit = self.commits.get(*index)?;
+                if let Some(stash) = self.stashes.iter().find(|s| s.id == commit.id) {
+                    return Some(Target::Stash(stash.clone()));
+                }
                 let in_head_ancestry = self
                     .graph
                     .rows()
@@ -733,6 +744,9 @@ impl AppState {
                 }))
             }
             HitTarget::Ref { full_name, .. } => {
+                if let Some(stash) = self.stash_named(full_name) {
+                    return Some(Target::Stash(stash.clone()));
+                }
                 let r = self.refs.iter().find(|r| &r.full_name == full_name)?;
                 Target::from_ref(r)
             }
@@ -815,9 +829,10 @@ impl AppState {
                 Vec::new()
             }
             (Request::Stashes, Ok(out)) => {
-                self.parsed(tgg_git::stash::parse(&out.stdout), |s, stashes| {
-                    s.stashes = stashes;
-                });
+                self.parsed(
+                    tgg_git::stash::parse_commits(&out.stdout),
+                    Self::apply_stashes,
+                );
                 Vec::new()
             }
             (Request::Status, Ok(out)) => {
@@ -935,12 +950,15 @@ impl AppState {
             let head = self.refreshing_head.take();
             self.graph = Graph::new(head.clone());
             self.head = head;
-            self.commits = page;
+            self.log_loaded = page.len();
+            self.commits = self.with_stash_rows(page);
             self.graph.extend(&self.commits);
             let keep = self.keep_selected.take();
             self.restore_selection(keep.as_ref());
             self.drop_details_if_gone();
-        } else if skip == self.commits.len() {
+        } else if skip == self.log_loaded {
+            self.log_loaded += page.len();
+            let page = self.with_stash_rows(page);
             self.graph.extend(&page);
             self.commits.extend(page);
         } else {
@@ -948,6 +966,50 @@ impl AppState {
         }
         self.history_complete = complete;
         self.refind(skip > 0);
+    }
+
+    /// `page` with each stash inserted just above the commit it was made on,
+    /// newest stash first.
+    fn with_stash_rows(&self, page: Vec<Commit>) -> Vec<Commit> {
+        let mut rows = Vec::with_capacity(page.len() + self.stash_commits.len());
+        for commit in page {
+            rows.extend(
+                self.stash_commits
+                    .iter()
+                    .filter(|stash| stash.parents.first() == Some(&commit.id))
+                    .cloned(),
+            );
+            rows.push(commit);
+        }
+        rows
+    }
+
+    /// A new stash list: the stash rows are laid out again when history is
+    /// already loaded (the list usually arrives first).
+    fn apply_stashes(&mut self, commits: Vec<Commit>) {
+        self.stashes = commits
+            .iter()
+            .enumerate()
+            .map(|(index, commit)| Stash {
+                id: commit.id.clone(),
+                index,
+                subject: commit.subject.clone(),
+            })
+            .collect();
+        let old: Vec<Oid> = self.stash_commits.iter().map(|c| c.id.clone()).collect();
+        self.stash_commits = commits;
+        if self.commits.is_empty() {
+            return;
+        }
+        let keep = self.selected_commit().map(|c| c.id.clone());
+        let history: Vec<Commit> = std::mem::take(&mut self.commits)
+            .into_iter()
+            .filter(|c| !old.contains(&c.id))
+            .collect();
+        self.graph = Graph::new(self.head.clone());
+        self.commits = self.with_stash_rows(history);
+        self.graph.extend(&self.commits);
+        self.restore_selection(keep.as_ref());
     }
 
     fn parsed<T>(
@@ -981,7 +1043,7 @@ impl AppState {
         if self.loading_log() {
             return Vec::new();
         }
-        self.log_request(self.commits.len()).into_iter().collect()
+        self.log_request(self.log_loaded).into_iter().collect()
     }
 
     /// Asks for the next page when the selection is within half a page of the end.
@@ -995,7 +1057,7 @@ impl AppState {
         if self.history_complete || loading_log || self.commits.is_empty() || !near_end {
             return Vec::new();
         }
-        self.log_request(self.commits.len()).into_iter().collect()
+        self.log_request(self.log_loaded).into_iter().collect()
     }
 
     fn head_display_index(&self) -> Option<usize> {
@@ -1062,6 +1124,8 @@ mod reflog_tests;
 mod resize_tests;
 #[cfg(test)]
 mod source_control_tests;
+#[cfg(test)]
+mod stash_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

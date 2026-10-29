@@ -41,10 +41,11 @@ fn status_line(h: &Harness) -> String {
 fn typing_jumps_to_the_first_matching_commit() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    find(&mut h, "docs");
+    // "docs" alone also finds the fixture's stash, "On main: WIP on docs".
+    find(&mut h, "update docs");
     assert_eq!(h.selected_subject(), Some("Update docs"));
     let status = status_line(&h);
-    assert!(status.contains("Find: docs"), "{status:?}");
+    assert!(status.contains("Find: update docs"), "{status:?}");
     assert!(status.contains("1 of 1"), "{status:?}");
 }
 
@@ -103,8 +104,9 @@ fn finds_by_hash_author_date_and_ref_name() {
     assert_eq!(h.selected_subject(), Some("Update docs"), "the date column");
     press(&mut h, KeyCode::Esc);
 
+    // Seven commits and the fixture's stash row.
     find(&mut h, "FIXTURE AUTHOR");
-    assert!(status_line(&h).contains("1 of 7"), "{:?}", status_line(&h));
+    assert!(status_line(&h).contains("1 of 8"), "{:?}", status_line(&h));
 }
 
 #[test]
@@ -140,7 +142,7 @@ fn escape_closes_find_and_keys_go_back_to_the_graph() {
 fn backspace_edits_the_query() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
-    find(&mut h, "docsx");
+    find(&mut h, "update docsx");
     assert!(status_line(&h).contains("No matches"));
     press(&mut h, KeyCode::Backspace);
     assert_eq!(h.selected_subject(), Some("Update docs"));
