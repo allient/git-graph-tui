@@ -8,8 +8,9 @@ use tgg_testkit::FixtureRepo;
 use super::*;
 use crate::testing::Harness;
 
-/// Wide enough for full hashes beside the Source Control pane.
-const W: u16 = 150;
+/// Wide enough for full hashes beside the Source Control pane (the panel
+/// starts at the Description column and its left half holds the fields).
+const W: u16 = 160;
 const H: u16 = 30;
 
 fn open(repo: &FixtureRepo) -> Harness {
@@ -162,11 +163,14 @@ fn v_shows_the_selected_file_as_it_was_in_that_commit() {
     let mut h = open(&repo);
     select(&mut h, "Add lib");
     press(&mut h, KeyCode::Enter);
+    // The hints need a wide panel beside the Source Control pane.
+    h.draw(200, H);
     assert!(
         h.find_on_screen("enter diff  v view file  t difftool")
             .is_some(),
         "key hint"
     );
+    h.draw(W, H);
     press(&mut h, KeyCode::Char('v'));
 
     let short = &hash(&repo, "Add lib")[..7];
