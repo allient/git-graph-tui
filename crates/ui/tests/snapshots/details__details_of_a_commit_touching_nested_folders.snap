@@ -2,13 +2,13 @@
 source: crates/ui/tests/details.rs
 expression: "render(&view, 100, 10)"
 ---
- Commit:    bc3be056146c6c6db1a050227bcbecaef632b…│ Changed files (4)
- Parents:   d9a1ef26                              │ ▾ apps/
- Author:    Fixture Author <fixture@example.com>  │   ▾ full-app/
- Committer: Fixture Author <fixture@example.com>  │     ▾ src/
- Date:      2026-01-01 00:01                      │       · main.rs                          (+1 -0)
-                                                  │     · Cargo.toml                         (+1 -0)
- Add the apps                                     │   ▾ web/
-                                                  │     · index.html                         (+1 -0)
- Full app and a web page.                         │ · README.md                              (+2 -0)
-                                                  │
+ Commit:    bc3be056146c6c6db1a050227bcbecaef63…│ Changed files (4)                               ✕
+ Parents:   d9a1ef26                            │ ▾ apps/                                         ⌕
+ Author:    Fixture Author <fixture@example.com>│   ▾ full-app/                                   ├
+ Committer: Fixture Author <fixture@example.com>│     ▾ src/                                      ≡
+ Date:      2026-01-01 00:01                    │       · main.rs
+                                                │     · Cargo.toml
+ Add the apps                                   │   ▾ web/
+                                                │     · index.html
+ Full app and a web page.                       │ · README.md (+2 | -0)
+                                                │

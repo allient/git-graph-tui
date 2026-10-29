@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Clear, Widget};
 use tgg_git::show::{CommitDetails, FileChange, Numstat};
-use tgg_model::Oid;
+use tgg_model::{Change, Oid};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{Glyph, Key, Theme, fit, format_date};
@@ -14,10 +14,50 @@ use crate::{Glyph, Key, Theme, fit, format_date};
 const PARENT_HASH: usize = 8;
 /// Width of the `Committer: ` label column.
 const LABEL: usize = 11;
+/// Lines of commit fields above the message (Commit to Date).
+const FIELDS: usize = 5;
 /// Keys for the selected file, beside the changed-files title.
 const KEY_HINTS: &str = "enter diff  v view file  t difftool";
 /// The same for a comparison, which has no single commit to view a file at.
 const COMPARISON_HINTS: &str = "enter diff  t difftool  esc close";
+/// Columns the side buttons take at the right edge: a blank, the icon and
+/// the blank after it (a Codicon can draw wider than its cell).
+const BUTTONS_WIDTH: u16 = 3;
+/// Narrowest panel that still gets the side buttons.
+const MIN_WIDTH_FOR_BUTTONS: u16 = 20;
+
+/// How the changed files are listed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FileLayout {
+    /// Grouped into folders.
+    #[default]
+    Tree,
+    /// One row per file, with its full path.
+    List,
+}
+
+/// A button in the column at the panel's right edge, top to bottom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetailsButton {
+    Close,
+    /// Filters the files by name (`f`).
+    Find,
+    Tree,
+    List,
+}
+
+impl DetailsButton {
+    const ALL: [Self; 4] = [Self::Close, Self::Find, Self::Tree, Self::List];
+
+    fn glyph(self) -> Glyph {
+        match self {
+            Self::Close => Glyph::Close,
+            Self::Find => Glyph::Find,
+            Self::Tree => Glyph::TreeView,
+            Self::List => Glyph::ListView,
+        }
+    }
+}
 
 /// A row of the changed-files tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,24 +93,49 @@ pub enum DetailsHit {
     Parent(Oid),
     /// An issue reference in the message: its number.
     Issue(String),
+    /// One of the side buttons.
+    Button(DetailsButton),
     Frame,
     Outside,
 }
 
-/// Where the panel, its parent hashes and file rows were drawn.
+/// Where the panel, its parent hashes, file rows and buttons were drawn, and
+/// how far its two sides were scrolled.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DetailsHitMap {
     area: Rect,
     files: Vec<(Rect, usize)>,
     parents: Vec<(Rect, Oid)>,
     issues: Vec<(Rect, String)>,
+    buttons: Vec<(Rect, DetailsButton)>,
+    /// The commit's fields and message, which scroll together.
+    message: Scrolled,
+    /// The file rows below the title.
+    file_list: Scrolled,
+}
+
+/// A part of the panel that scrolls on its own.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Scrolled {
+    area: Rect,
+    offset: usize,
+    max: usize,
+}
+
+impl Scrolled {
+    /// The offset after scrolling by `lines` (negative is up), within bounds.
+    fn moved(self, lines: isize) -> usize {
+        self.offset.saturating_add_signed(lines).min(self.max)
+    }
 }
 
 impl DetailsHitMap {
     #[must_use]
     pub fn hit(&self, x: u16, y: u16) -> DetailsHit {
         let point = Position { x, y };
-        if let Some((_, row)) = self.files.iter().find(|(r, _)| r.contains(point)) {
+        if let Some((_, button)) = self.buttons.iter().find(|(r, _)| r.contains(point)) {
+            DetailsHit::Button(*button)
+        } else if let Some((_, row)) = self.files.iter().find(|(r, _)| r.contains(point)) {
             DetailsHit::File(*row)
         } else if let Some((_, id)) = self.parents.iter().find(|(r, _)| r.contains(point)) {
             DetailsHit::Parent(id.clone())
@@ -94,6 +159,15 @@ impl DetailsHitMap {
     pub fn parent(&self, id: &Oid) -> Option<Rect> {
         self.parents.iter().find(|(_, p)| p == id).map(|(r, _)| *r)
     }
+
+    /// Where `button` was drawn.
+    #[must_use]
+    pub fn button(&self, button: DetailsButton) -> Option<Rect> {
+        self.buttons
+            .iter()
+            .find(|(_, b)| *b == button)
+            .map(|(r, _)| *r)
+    }
 }
 
 /// What the panel shows above or beside its file tree.
@@ -106,7 +180,9 @@ enum Header {
 }
 
 /// The inline commit details panel (S10): metadata and message on the left,
-/// the changed files as a folder tree with `(+a -d)` counts on the right.
+/// the changed files as a folder tree (or a flat list) with `(+a | -d)`
+/// counts on the right, and a column of buttons at the right edge (close,
+/// find, tree, list). Both sides scroll on their own (S24).
 /// A comparison (S12) shows only the files, under its title.
 ///
 /// The app draws it in the rows under the selected commit.
@@ -119,6 +195,15 @@ pub struct CommitDetailsView {
     selected: Option<usize>,
     /// What starts an issue reference in the message (`#` in `#123`).
     issue_prefix: String,
+    layout: FileLayout,
+    /// Only files whose path contains this (ignoring case) are listed.
+    filter: String,
+    /// Keys type into the filter.
+    filtering: bool,
+    /// First file row shown; None keeps the selection in view.
+    files_scroll: Option<usize>,
+    /// First line of the fields and message shown.
+    message_scroll: usize,
 }
 
 impl CommitDetailsView {
@@ -136,15 +221,20 @@ impl CommitDetailsView {
     }
 
     fn with_header(header: Header, files: Vec<FileChange>) -> Self {
-        let rows = file_tree(&files);
-        let selected = rows.iter().position(|r| matches!(r, TreeRow::File { .. }));
-        Self {
+        let mut view = Self {
             header,
             files,
-            rows,
-            selected,
+            rows: Vec::new(),
+            selected: None,
             issue_prefix: "#".into(),
-        }
+            layout: FileLayout::Tree,
+            filter: String::new(),
+            filtering: false,
+            files_scroll: None,
+            message_scroll: 0,
+        };
+        view.rebuild_rows();
+        view
     }
 
     /// Links issue references that start with `prefix` (such as `PROJ-`)
@@ -169,9 +259,28 @@ impl CommitDetailsView {
         &self.files
     }
 
+    /// The rows listed: folders and files in the tree layout, files in the
+    /// list layout; only those matching the filter.
     #[must_use]
     pub fn rows(&self) -> &[TreeRow] {
         &self.rows
+    }
+
+    #[must_use]
+    pub fn layout(&self) -> FileLayout {
+        self.layout
+    }
+
+    /// The text the files are filtered by ("" lists them all).
+    #[must_use]
+    pub fn filter(&self) -> &str {
+        &self.filter
+    }
+
+    /// Whether keys type into the filter (after `f` or the find button).
+    #[must_use]
+    pub fn is_filtering(&self) -> bool {
+        self.filtering
     }
 
     #[must_use]
@@ -183,18 +292,24 @@ impl CommitDetailsView {
     }
 
     /// Up/Down/Home/End/PageUp/PageDown move between files, Enter opens the
-    /// selected one's diff, `v` shows its content, Esc closes the panel.
+    /// selected one's diff, `v` shows its content, `f` filters the files by
+    /// name, `l` switches between the tree and the list, Esc clears the
+    /// filter or closes the panel. While filtering, keys type into the
+    /// filter; Enter keeps it and Esc clears it.
     pub fn handle_key(&mut self, key: Key) -> DetailsOutcome {
+        if self.filtering {
+            return self.filter_key(key);
+        }
         match key {
             Key::Down => self.step(true),
             Key::Up => self.step(false),
             Key::Home | Key::PageUp => {
                 let first = self.file_rows().next();
-                self.selected = first;
+                self.select_row(first);
             }
             Key::End | Key::PageDown => {
                 let last = self.file_rows().next_back();
-                self.selected = last;
+                self.select_row(last);
             }
             Key::Enter => {
                 if let Some(file) = self.selected_file() {
@@ -206,14 +321,55 @@ impl CommitDetailsView {
                     return DetailsOutcome::ViewFile(file.clone());
                 }
             }
+            Key::Char('f') => self.filtering = true,
+            Key::Char('l') => {
+                let other = match self.layout {
+                    FileLayout::Tree => FileLayout::List,
+                    FileLayout::List => FileLayout::Tree,
+                };
+                self.set_layout(other);
+            }
+            Key::Esc if !self.filter.is_empty() => self.clear_filter(),
             Key::Esc => return DetailsOutcome::Close,
             _ => {}
         }
         DetailsOutcome::Stay
     }
 
+    fn filter_key(&mut self, key: Key) -> DetailsOutcome {
+        match key {
+            Key::Char(c) => {
+                self.filter.push(c);
+                self.rebuild_rows();
+            }
+            Key::Backspace if self.filter.pop().is_some() => self.rebuild_rows(),
+            Key::Enter => self.filtering = false,
+            Key::Esc => self.clear_filter(),
+            Key::Down => self.step(true),
+            Key::Up => self.step(false),
+            _ => {}
+        }
+        DetailsOutcome::Stay
+    }
+
+    fn clear_filter(&mut self) {
+        self.filtering = false;
+        if !self.filter.is_empty() {
+            self.filter.clear();
+            self.rebuild_rows();
+        }
+    }
+
+    fn set_layout(&mut self, layout: FileLayout) {
+        if self.layout != layout {
+            self.layout = layout;
+            self.rebuild_rows();
+        }
+    }
+
     /// A click on a file selects and opens it; a click on a parent hash
-    /// jumps to that commit; a click on an issue reference opens it.
+    /// jumps to that commit; a click on an issue reference opens it; the
+    /// side buttons close the panel, start the filter, or switch the layout.
     pub fn handle_click(&mut self, hits: &DetailsHitMap, x: u16, y: u16) -> DetailsOutcome {
         match hits.hit(x, y) {
             DetailsHit::File(row) => {
@@ -224,8 +380,39 @@ impl CommitDetailsView {
             }
             DetailsHit::Parent(id) => DetailsOutcome::JumpTo(id),
             DetailsHit::Issue(number) => DetailsOutcome::OpenIssue(number),
+            DetailsHit::Button(DetailsButton::Close) => DetailsOutcome::Close,
+            DetailsHit::Button(DetailsButton::Find) => {
+                self.filtering = true;
+                DetailsOutcome::Stay
+            }
+            DetailsHit::Button(DetailsButton::Tree) => {
+                self.set_layout(FileLayout::Tree);
+                DetailsOutcome::Stay
+            }
+            DetailsHit::Button(DetailsButton::List) => {
+                self.set_layout(FileLayout::List);
+                DetailsOutcome::Stay
+            }
             DetailsHit::Frame | DetailsHit::Outside => DetailsOutcome::Stay,
         }
+    }
+
+    /// The mouse wheel at a cell: scrolls the side under it by `lines`
+    /// (negative is up), the graph stays put. False when the cell is outside
+    /// the panel.
+    pub fn scroll(&mut self, hits: &DetailsHitMap, x: u16, y: u16, lines: isize) -> bool {
+        let point = Position { x, y };
+        if hits.message.area.contains(point) {
+            self.scroll_message(hits, lines);
+        } else if hits.file_list.area.contains(point) {
+            self.files_scroll = Some(hits.file_list.moved(lines));
+        }
+        hits.area.contains(point)
+    }
+
+    /// Scrolls the commit's fields and message by `lines` (negative is up).
+    pub fn scroll_message(&mut self, hits: &DetailsHitMap, lines: isize) {
+        self.message_scroll = hits.message.moved(lines);
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) -> DetailsHitMap {
@@ -237,33 +424,114 @@ impl CommitDetailsView {
             return hits;
         }
         Clear.render(area, buf);
+        let content = if area.width >= MIN_WIDTH_FOR_BUTTONS {
+            self.render_buttons(area, buf, theme, &mut hits);
+            Rect {
+                width: area.width - BUTTONS_WIDTH,
+                ..area
+            }
+        } else {
+            area
+        };
         let Header::Commit(details) = &self.header else {
-            self.render_files(area, buf, theme, &mut hits);
+            self.render_files(content, buf, theme, &mut hits);
             return hits;
         };
         let left = Rect {
-            width: area.width / 2,
-            ..area
+            width: content.width / 2,
+            ..content
         };
         let right = Rect {
             x: left.right() + 1,
-            width: area.width - left.width - 1,
-            ..area
+            width: content.width - left.width - 1,
+            ..content
         };
         for y in area.top()..area.bottom() {
             buf.set_string(left.right(), y, "│", Style::default().fg(theme.muted));
         }
-        let message_y = Self::render_metadata(details, left, buf, theme, &mut hits);
-        let message = Rect {
-            y: message_y,
-            height: left.bottom().saturating_sub(message_y),
-            ..left
-        };
-        self.render_message(&details.message, message, buf, theme, &mut hits);
+        self.render_left(details, left, buf, theme, &mut hits);
         self.render_files(right, buf, theme, &mut hits);
         hits
     }
 
+    /// The side buttons, one per line from the top, at the right edge. The
+    /// layout shown and an active filter are highlighted.
+    fn render_buttons(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        hits: &mut DetailsHitMap,
+    ) {
+        let x = area.right() - 2;
+        let normal = Style::default().fg(theme.text);
+        let active = normal.bg(theme.selected_bg);
+        for (y, button) in (area.top()..area.bottom()).zip(DetailsButton::ALL) {
+            let on = match button {
+                DetailsButton::Close => false,
+                DetailsButton::Find => self.filtering || !self.filter.is_empty(),
+                DetailsButton::Tree => self.layout == FileLayout::Tree,
+                DetailsButton::List => self.layout == FileLayout::List,
+            };
+            let style = if on { active } else { normal };
+            let icon = theme.icons.glyph(button.glyph());
+            // The blank cell after the icon, so a wide Codicon doesn't
+            // overlap what follows.
+            buf.set_string(x, y, format!("{icon} "), style);
+            hits.buttons.push((Rect::new(x, y, 2, 1), button));
+        }
+    }
+
+    /// The commit's fields and message in `area`, scrolled as one text.
+    fn render_left(
+        &self,
+        details: &CommitDetails,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        hits: &mut DetailsHitMap,
+    ) {
+        // Fields, a blank line, then the message: drawn whole off screen,
+        // then the visible lines are copied, so drawing needn't know about
+        // scrolling.
+        let total = to_u16(FIELDS + 1 + details.message.lines().count());
+        let full = Rect::new(area.x, 0, area.width, total);
+        let mut scratch = Buffer::empty(full);
+        let mut drawn = DetailsHitMap::default();
+        let message_y = Self::render_metadata(details, full, &mut scratch, theme, &mut drawn);
+        let message = Rect {
+            y: message_y,
+            height: full.bottom().saturating_sub(message_y),
+            ..full
+        };
+        self.render_message(&details.message, message, &mut scratch, theme, &mut drawn);
+
+        let max = usize::from(total.saturating_sub(area.height));
+        let offset = self.message_scroll.min(max);
+        hits.message = Scrolled { area, offset, max };
+        let first = to_u16(offset);
+        for (y, from) in (area.top()..area.bottom()).zip(first..total) {
+            for x in area.left()..area.right() {
+                buf[(x, y)] = scratch[(x, from)].clone();
+            }
+        }
+        let shown = |r: Rect| -> Option<Rect> {
+            let y = r.y.checked_sub(first).filter(|&dy| dy < area.height)?;
+            Some(Rect { y: area.y + y, ..r })
+        };
+        hits.parents.extend(
+            drawn
+                .parents
+                .into_iter()
+                .filter_map(|(r, id)| Some((shown(r)?, id))),
+        );
+        hits.issues.extend(
+            drawn
+                .issues
+                .into_iter()
+                .filter_map(|(r, number)| Some((shown(r)?, number))),
+        );
+    }
     /// Draws the commit's fields; returns the line its message starts on.
     fn render_metadata(
         details: &CommitDetails,
@@ -389,26 +657,51 @@ impl CommitDetailsView {
     fn render_files(&self, area: Rect, buf: &mut Buffer, theme: &Theme, hits: &mut DetailsHitMap) {
         let width = usize::from(area.width.saturating_sub(1));
         let count = self.files.len();
-        let (title, keys) = match &self.header {
-            Header::Commit(_) => (format!("Changed files ({count})"), KEY_HINTS),
+        let filtered = self.filtering || !self.filter.is_empty();
+        let shown = self.file_rows().count();
+        let counted = if filtered {
+            format!("{shown} of {count}")
+        } else {
+            count.to_string()
+        };
+        let (mut title, keys) = match &self.header {
+            Header::Commit(_) => (format!("Changed files ({counted})"), KEY_HINTS),
             Header::Comparison(title) => {
                 let plural = if count == 1 { "" } else { "s" };
-                let title = format!("{title} ({count} changed file{plural})");
+                let title = format!("{title} ({counted} changed file{plural})");
                 (title, COMPARISON_HINTS)
             }
         };
+        if filtered {
+            let cursor = if self.filtering { "▏" } else { "" };
+            title = format!("{title}  find: {}{cursor}", self.filter);
+        }
         let muted = Style::default().fg(theme.muted);
         buf.set_string(area.x + 1, area.y, fit(&title, width), muted);
         // Key hints at the right of the title row, when they fit.
-        if count > 0 && title.width() + 2 + keys.width() <= width {
+        if count > 0 && !filtered && title.width() + 2 + keys.width() <= width {
             let x = area.right().saturating_sub(to_u16(keys.width()) + 1);
             buf.set_string(x, area.y, keys, muted);
         }
         let visible = usize::from(area.height.saturating_sub(1));
-        // Scroll so the selected file stays visible.
+        let max = self.rows.len().saturating_sub(visible);
+        // Scrolled by the wheel, or so the selected file stays visible.
         let offset = self
-            .selected
-            .map_or(0, |s| s.saturating_sub(visible.saturating_sub(1)));
+            .files_scroll
+            .unwrap_or_else(|| {
+                self.selected
+                    .map_or(0, |s| s.saturating_sub(visible.saturating_sub(1)))
+            })
+            .min(max);
+        hits.file_list = Scrolled {
+            area: Rect {
+                y: area.y + 1,
+                height: area.height.saturating_sub(1),
+                ..area
+            },
+            offset,
+            max,
+        };
         for (n, (row_index, row)) in self
             .rows
             .iter()
@@ -418,52 +711,86 @@ impl CommitDetailsView {
             .enumerate()
         {
             let y = area.y + 1 + to_u16(n);
-            let rect = Rect::new(area.x, y, area.width, 1);
             match row {
                 TreeRow::Dir { depth, name } => {
                     let folder = theme.icons.glyph(Glyph::Folder);
                     let label = format!("{}{folder} {name}/", "  ".repeat(*depth));
-                    buf.set_string(
-                        area.x + 1,
-                        y,
-                        fit(&label, width),
-                        Style::default().fg(theme.muted),
-                    );
+                    buf.set_string(area.x + 1, y, fit(&label, width), muted);
                 }
                 TreeRow::File { depth, index } => {
                     let Some(file) = self.files.get(*index) else {
                         continue;
                     };
                     let selected = self.selected == Some(row_index);
-                    let style = if selected {
-                        Style::default().fg(theme.text).bg(theme.selected_bg)
-                    } else {
-                        Style::default().fg(theme.text)
-                    };
-                    let (name, counts) = file_label(file);
-                    let prefix =
-                        format!("{}{} ", "  ".repeat(*depth), theme.icons.glyph(Glyph::File));
-                    let room = width.saturating_sub(counts.width() + 1);
-                    let line = format!("{}{counts}", fit(&format!("{prefix}{name}"), room + 1));
-                    buf.set_string(area.x + 1, y, fit(&line, width), style);
-                    // The name in the color of what happened to the file.
-                    let start = prefix.width();
-                    let end = (start + name.width()).min(room).min(width);
-                    if end > start {
-                        let at = area.x + 1 + to_u16(start);
-                        buf.set_style(
-                            Rect::new(at, y, to_u16(end - start), 1),
-                            Style::default().fg(theme.change(file.status)),
-                        );
-                    }
-                    hits.files.push((rect, row_index));
+                    self.render_file(file, *depth, selected, area, y, buf, theme);
+                    hits.files
+                        .push((Rect::new(area.x, y, area.width, 1), row_index));
                 }
+            }
+        }
+    }
+
+    /// One file row: its icon, its name in the color of what happened to it
+    /// (S21), then its counts, added lines green and deleted ones red (S25).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one row of render_files, which owns the layout"
+    )]
+    fn render_file(
+        &self,
+        file: &FileChange,
+        depth: usize,
+        selected: bool,
+        area: Rect,
+        y: u16,
+        buf: &mut Buffer,
+        theme: &Theme,
+    ) {
+        let width = usize::from(area.width.saturating_sub(1));
+        let x = area.x + 1;
+        let right = x + to_u16(width);
+        let mut base = Style::default().fg(theme.text);
+        if selected {
+            base = base.bg(theme.selected_bg);
+        }
+        buf.set_string(x, y, " ".repeat(width), base);
+        let name = match self.layout {
+            FileLayout::Tree => file_label(file).0,
+            FileLayout::List => list_label(file),
+        };
+        let prefix = format!("{}{} ", "  ".repeat(depth), theme.icons.glyph(Glyph::File));
+        let counts = count_parts(file, theme);
+        let counts_width: usize = counts.iter().map(|(text, _)| text.width()).sum();
+        let room = width
+            .saturating_sub(prefix.width())
+            .saturating_sub(if counts_width > 0 {
+                counts_width + 1
+            } else {
+                0
+            });
+        let name = if name.width() > room {
+            fit(&name, room)
+        } else {
+            name
+        };
+        let mut at = put(buf, x, y, right, &prefix, base);
+        at = put(buf, at, y, right, &name, base.fg(theme.change(file.status)));
+        if !counts.is_empty() {
+            at = put(buf, at, y, right, " ", base);
+            for (text, color) in counts {
+                at = put(buf, at, y, right, &text, base.fg(color));
             }
         }
     }
 
     fn file_rows(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
         (0..self.rows.len()).filter(|&i| matches!(self.rows[i], TreeRow::File { .. }))
+    }
+
+    /// Selects tree row `row` and scrolls the file list back to it.
+    fn select_row(&mut self, row: Option<usize>) {
+        self.selected = row;
+        self.files_scroll = None;
     }
 
     fn step(&mut self, down: bool) {
@@ -475,13 +802,53 @@ impl CommitDetailsView {
         } else {
             self.file_rows().rev().find(|&i| i < current)
         };
-        if let Some(next) = next {
-            self.selected = Some(next);
+        if next.is_some() {
+            self.select_row(next);
+        }
+    }
+
+    /// Lists the files matching the filter in the current layout, keeping
+    /// the selected file selected when it is still listed.
+    fn rebuild_rows(&mut self) {
+        let kept = self.selected_index();
+        let needle = self.filter.to_lowercase();
+        let shown = self
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.path.to_lowercase().contains(&needle));
+        self.rows = match self.layout {
+            FileLayout::Tree => file_tree(shown),
+            FileLayout::List => {
+                let mut files: Vec<_> = shown.collect();
+                files.sort_by(|a, b| a.1.path.cmp(&b.1.path));
+                files
+                    .into_iter()
+                    .map(|(index, _)| TreeRow::File { depth: 0, index })
+                    .collect()
+            }
+        };
+        let row_of = |index: usize| {
+            self.rows
+                .iter()
+                .position(|r| matches!(r, TreeRow::File { index: i, .. } if *i == index))
+        };
+        let row = kept.and_then(row_of).or_else(|| self.file_rows().next());
+        self.select_row(row);
+    }
+
+    /// Index into `files` of the selected file.
+    fn selected_index(&self) -> Option<usize> {
+        match self.rows.get(self.selected?)? {
+            TreeRow::File { index, .. } => Some(*index),
+            TreeRow::Dir { .. } => None,
         }
     }
 }
 
-/// A file's tree label and its counts: `name` (with rename info) and `(+a -d)`.
+/// A file's tree label and its counts: `name` (with rename info) and
+/// `(+a -d)`, as the diff header shows them. The details panel draws its
+/// counts in color instead (see `count_parts`).
 #[must_use]
 pub fn file_label(file: &FileChange) -> (String, String) {
     let (dir, name) = split_path(&file.path);
@@ -503,6 +870,40 @@ pub fn file_label(file: &FileChange) -> (String, String) {
     (label, counts)
 }
 
+/// A file's label in the list layout: its full path.
+fn list_label(file: &FileChange) -> String {
+    match file.old_path.as_deref() {
+        None => file.path.clone(),
+        Some(old) => format!("{old} → {}", file.path),
+    }
+}
+
+/// The parts of a file's counts and their colors: `(`, `+a` green, ` | `,
+/// `-d` red, `)`. None for a new file.
+fn count_parts(file: &FileChange, theme: &Theme) -> Vec<(String, Color)> {
+    if file.status == Change::Added {
+        return Vec::new();
+    }
+    match file.stat {
+        Numstat::Lines { added, deleted } => vec![
+            ("(".to_owned(), theme.text),
+            (format!("+{added}"), theme.added),
+            (" | ".to_owned(), theme.text),
+            (format!("-{deleted}"), theme.deleted),
+            (")".to_owned(), theme.text),
+        ],
+        Numstat::Binary => vec![("(binary)".to_owned(), theme.text)],
+    }
+}
+
+/// Writes `text` from `x` up to (not including) `right`; returns the next x.
+fn put(buf: &mut Buffer, x: u16, y: u16, right: u16, text: &str, style: Style) -> u16 {
+    if x >= right {
+        return x;
+    }
+    buf.set_stringn(x, y, text, usize::from(right - x), style).0
+}
+
 /// Terminal columns are u16; anything wider is clipped by the buffer anyway.
 fn to_u16(n: usize) -> u16 {
     u16::try_from(n).unwrap_or(u16::MAX)
@@ -519,10 +920,11 @@ struct Node {
     files: Vec<(String, usize)>,
 }
 
-/// Groups `files` by folder: folders first (alphabetical), then files.
-fn file_tree(files: &[FileChange]) -> Vec<TreeRow> {
+/// Groups `files` (with their indices) by folder: folders first
+/// (alphabetical), then files.
+fn file_tree<'a>(files: impl Iterator<Item = (usize, &'a FileChange)>) -> Vec<TreeRow> {
     let mut root = Node::default();
-    for (index, file) in files.iter().enumerate() {
+    for (index, file) in files {
         let mut node = &mut root;
         let mut parts: Vec<&str> = file.path.split('/').collect();
         let name = parts.pop().unwrap_or_default();

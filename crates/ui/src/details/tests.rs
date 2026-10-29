@@ -234,17 +234,22 @@ fn v_views_the_selected_file() {
 fn a_comparison_lists_its_files_across_the_whole_panel() {
     let mut view = CommitDetailsView::comparison("Comparing aaaaaaa..bbbbbbb".into(), files());
     assert!(view.details().is_none());
-    let (buf, hits) = render(&view, Rect::new(0, 0, 80, 6));
+    let (buf, hits) = render(&view, Rect::new(0, 0, 90, 6));
     let title = line(&buf, 0);
     assert!(
         title.starts_with(" Comparing aaaaaaa..bbbbbbb (5 changed files) "),
         "{title:?}"
     );
+    // The hints end where the side buttons start.
     assert!(
-        title.ends_with(" enter diff  t difftool  esc close"),
+        title.ends_with(" enter diff  t difftool  esc close  ✕"),
         "{title:?}"
     );
-    assert_eq!(line(&buf, 1), " ▾ apps/");
+    assert!(
+        line(&buf, 1).starts_with(" ▾ apps/ "),
+        "{:?}",
+        line(&buf, 1)
+    );
     assert!(
         line(&buf, 3).starts_with("     · a.rs"),
         "{:?}",
@@ -323,10 +328,10 @@ fn a_configured_prefix_links_its_own_references() {
 #[test]
 fn a_link_cut_off_by_the_panel_edge_is_not_clickable() {
     let mut view = with_message("A long subject that ends with #12345");
-    // The metadata half is 20 columns: the reference doesn't fit.
+    // The metadata half is 18 columns: the reference doesn't fit.
     let (buf, hits) = render(&view, Rect::new(0, 0, 40, 12));
     let y = position(&buf, "A long").1;
-    for x in 0..20 {
+    for x in 0..18 {
         assert_eq!(
             view.handle_click(&hits, x, y),
             DetailsOutcome::Stay,
@@ -343,9 +348,9 @@ fn render_with(view: &CommitDetailsView, area: Rect, theme: &Theme) -> Buffer {
     buf
 }
 
-/// The right half of a 100-column panel (the file tree), from `x = 51`.
+/// The right half of a 100-column panel (the file tree), from `x = 49`.
 fn tree(buf: &Buffer, y: u16) -> String {
-    line(buf, y).chars().skip(51).collect()
+    line(buf, y).chars().skip(49).collect()
 }
 
 #[test]
@@ -442,7 +447,6 @@ fn file_names_are_colored_by_what_the_commit_did() {
     ];
     let view = CommitDetailsView::comparison("Comparing a..b".into(), files);
     let (buf, _) = render(&view, Rect::new(0, 0, 80, 6));
-    let counts = position(&buf, "(+1 -0)").0;
     for (name, color) in [
         ("added.rs", theme.added),
         ("deleted.rs", theme.deleted),
@@ -452,6 +456,288 @@ fn file_names_are_colored_by_what_the_commit_did() {
         let (x, y) = position(&buf, name);
         assert_eq!(buf[(x, y)].fg, color, "{name}");
         assert_eq!(buf[(x + 3, y)].fg, color, "{name}");
-        assert_eq!(buf[(counts, y)].fg, theme.text, "counts stay plain: {name}");
     }
+}
+
+// ---- counts in color (S25) ----
+
+#[test]
+fn counts_follow_the_name_split_by_a_pipe_and_new_files_have_none() {
+    let files = vec![
+        file("b.txt", 3, 2),
+        FileChange {
+            status: Change::Added,
+            ..file("new.txt", 4, 0)
+        },
+        FileChange {
+            stat: Numstat::Binary,
+            ..file("logo.png", 0, 0)
+        },
+    ];
+    let view = CommitDetailsView::comparison("Comparing a..b".into(), files);
+    let (buf, _) = render(&view, Rect::new(0, 0, 80, 6));
+    // Left of the side buttons.
+    let files = |y: u16| -> String {
+        let text: String = line(&buf, y).chars().take(77).collect();
+        text.trim_end().to_owned()
+    };
+    assert_eq!(files(1), " · b.txt (+3 | -2)");
+    assert_eq!(files(2), " · logo.png (binary)");
+    assert_eq!(files(3), " · new.txt");
+    // The diff header keeps its own format.
+    assert_eq!(file_label(&file("b.txt", 3, 2)).1, "(+3 -2)");
+}
+
+#[test]
+fn added_lines_are_green_and_deleted_lines_red() {
+    let theme = Theme::default();
+    let files = vec![
+        file("changed.rs", 12, 3),
+        FileChange {
+            status: Change::Added,
+            ..file("fresh.rs", 9, 0)
+        },
+    ];
+    let view = CommitDetailsView::comparison("Comparing a..b".into(), files);
+    let (buf, _) = render(&view, Rect::new(0, 0, 80, 6));
+    let (x, y) = position(&buf, "(+12 | -3)");
+    let fg = |dx: u16| buf[(x + dx, y)].fg;
+    assert_eq!(fg(0), theme.text, "(");
+    assert_eq!(
+        (fg(1), fg(2), fg(3)),
+        (theme.added, theme.added, theme.added)
+    );
+    assert_eq!((fg(4), fg(5), fg(6)), (theme.text, theme.text, theme.text));
+    assert_eq!((fg(7), fg(8)), (theme.deleted, theme.deleted));
+    assert_eq!(fg(9), theme.text, ")");
+    let (x, y) = position(&buf, "fresh.rs");
+    assert_eq!(buf[(x, y)].fg, theme.added);
+    assert!(!line(&buf, y).contains("(+"), "{:?}", line(&buf, y));
+}
+
+// ---- side buttons (S26) ----
+
+/// The button column of a panel drawn in `area`: x of the icons.
+fn buttons_x(area: Rect) -> u16 {
+    area.right() - 2
+}
+
+#[test]
+fn close_find_tree_and_list_buttons_sit_at_the_right_edge() {
+    let area = Rect::new(10, 3, 100, 12);
+    let (buf, hits) = render(&view(), area);
+    let x = buttons_x(area);
+    let icons: Vec<&str> = (0..4).map(|dy| buf[(x, area.y + dy)].symbol()).collect();
+    assert_eq!(icons, ["✕", "⌕", "├", "≡"]);
+    for dy in 0..4 {
+        assert_eq!(buf[(x + 1, area.y + dy)].symbol(), " ", "blank after icon");
+    }
+    let theme = Theme::default();
+    assert_eq!(buf[(x, area.y + 2)].bg, theme.selected_bg, "tree is active");
+    assert_ne!(buf[(x, area.y + 3)].bg, theme.selected_bg);
+    assert_eq!(
+        hits.hit(x, area.y),
+        DetailsHit::Button(DetailsButton::Close)
+    );
+    assert_eq!(
+        hits.hit(x + 1, area.y + 3),
+        DetailsHit::Button(DetailsButton::List)
+    );
+
+    let nerd = Theme {
+        icons: crate::Icons::Nerd,
+        ..Theme::default()
+    };
+    let buf = render_with(&view(), area, &nerd);
+    let icons: Vec<&str> = (0..4).map(|dy| buf[(x, area.y + dy)].symbol()).collect();
+    assert_eq!(icons, ["\u{ea76}", "\u{ea6d}", "\u{eb86}", "\u{eb84}"]);
+}
+
+#[test]
+fn the_close_button_closes_and_the_list_button_shows_full_paths() {
+    let area = Rect::new(0, 0, 100, 12);
+    let mut view = view();
+    let (_, hits) = render(&view, area);
+    let x = buttons_x(area);
+    assert_eq!(view.handle_click(&hits, x, 0), DetailsOutcome::Close);
+    assert_eq!(view.handle_click(&hits, x, 3), DetailsOutcome::Stay);
+    assert_eq!(view.layout(), FileLayout::List);
+    assert_eq!(
+        labels(&view),
+        [
+            "README.md",
+            "apps/full-app/a.rs",
+            "apps/full-app/b.rs",
+            "apps/z.rs",
+            "docs/guide.md",
+        ]
+    );
+    let (buf, hits) = render(&view, area);
+    assert!(
+        tree(&buf, 1).starts_with(" · README.md"),
+        "{:?}",
+        tree(&buf, 1)
+    );
+    assert!(
+        tree(&buf, 2).starts_with(" · apps/full-app/a.rs"),
+        "{:?}",
+        tree(&buf, 2)
+    );
+    assert_eq!(
+        buf[(x, 3)].bg,
+        Theme::default().selected_bg,
+        "list is active"
+    );
+    assert_eq!(view.handle_click(&hits, x, 2), DetailsOutcome::Stay);
+    assert_eq!(view.layout(), FileLayout::Tree);
+    assert_eq!(labels(&view)[0], "apps/");
+}
+
+#[test]
+fn l_switches_between_the_tree_and_the_list_keeping_the_selection() {
+    let mut view = view();
+    view.handle_key(Key::Down);
+    assert_eq!(selected_path(&view), "apps/full-app/b.rs");
+    view.handle_key(Key::Char('l'));
+    assert_eq!(view.layout(), FileLayout::List);
+    assert_eq!(selected_path(&view), "apps/full-app/b.rs");
+    view.handle_key(Key::Char('l'));
+    assert_eq!(view.layout(), FileLayout::Tree);
+    assert_eq!(selected_path(&view), "apps/full-app/b.rs");
+}
+
+#[test]
+fn find_filters_the_files_by_name_and_escape_clears_it() {
+    let area = Rect::new(0, 0, 100, 12);
+    let mut view = view();
+    let (_, hits) = render(&view, area);
+    assert_eq!(
+        view.handle_click(&hits, buttons_x(area), 1),
+        DetailsOutcome::Stay
+    );
+    assert!(view.is_filtering());
+    for c in "GUI".chars() {
+        assert_eq!(view.handle_key(Key::Char(c)), DetailsOutcome::Stay);
+    }
+    assert_eq!(view.filter(), "GUI");
+    assert_eq!(labels(&view), ["docs/", "  docs/guide.md"], "ignores case");
+    assert_eq!(selected_path(&view), "docs/guide.md");
+    let (buf, _) = render(&view, area);
+    assert!(
+        tree(&buf, 0).starts_with(" Changed files (1 of 5)  find: GUI"),
+        "{:?}",
+        tree(&buf, 0)
+    );
+    view.handle_key(Key::Backspace);
+    view.handle_key(Key::Backspace);
+    assert_eq!(view.filter(), "G");
+    // `l` is typed into the filter while it is edited.
+    view.handle_key(Key::Char('l'));
+    assert_eq!(view.filter(), "Gl");
+    assert_eq!(view.layout(), FileLayout::Tree);
+    // Enter keeps the filter and stops editing it.
+    assert_eq!(view.handle_key(Key::Enter), DetailsOutcome::Stay);
+    assert!(!view.is_filtering());
+    assert_eq!(view.filter(), "Gl");
+    // `f` edits it again; Esc clears it, a second Esc closes the panel.
+    view.handle_key(Key::Char('f'));
+    assert!(view.is_filtering());
+    assert_eq!(view.handle_key(Key::Esc), DetailsOutcome::Stay);
+    assert_eq!(view.filter(), "");
+    assert_eq!(labels(&view).len(), 8);
+    assert_eq!(view.handle_key(Key::Esc), DetailsOutcome::Close);
+}
+
+#[test]
+fn a_filter_matching_nothing_leaves_no_selection() {
+    let mut view = view();
+    view.handle_key(Key::Char('f'));
+    view.handle_key(Key::Char('q'));
+    assert!(view.rows().is_empty());
+    assert!(view.selected_file().is_none());
+    assert_eq!(view.handle_key(Key::Enter), DetailsOutcome::Stay);
+    assert_eq!(view.handle_key(Key::Enter), DetailsOutcome::Stay, "no file");
+    view.handle_key(Key::Char('f'));
+    view.handle_key(Key::Backspace);
+    assert_eq!(selected_path(&view), "apps/full-app/a.rs");
+}
+
+// ---- internal scroll (S24) ----
+
+fn long_message() -> CommitDetailsView {
+    let body = (1..=30)
+        .map(|i| format!("Line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let many: Vec<FileChange> = (0..30)
+        .map(|i| file(&format!("f{i:02}.txt"), 1, 0))
+        .collect();
+    let mut info = details(vec![oid('b')]);
+    info.message = format!("Subject\n\n{body}");
+    CommitDetailsView::new(info, many)
+}
+
+#[test]
+fn the_message_and_the_files_scroll_on_their_own() {
+    let area = Rect::new(0, 0, 100, 8);
+    let mut view = long_message();
+    let (buf, hits) = render(&view, area);
+    assert!(line(&buf, 0).starts_with(" Commit:"), "{:?}", line(&buf, 0));
+    // Wheel over the message: only the left side moves.
+    assert!(view.scroll(&hits, 5, 3, 4));
+    let (buf, hits) = render(&view, area);
+    assert!(line(&buf, 0).starts_with(" Date:"), "{:?}", line(&buf, 0));
+    assert!(
+        tree(&buf, 1).starts_with(" · f00.txt"),
+        "{:?}",
+        tree(&buf, 1)
+    );
+    // Wheel over the files: only the file list moves.
+    assert!(view.scroll(&hits, 60, 3, 3));
+    let (buf, hits) = render(&view, area);
+    assert!(line(&buf, 0).starts_with(" Date:"), "{:?}", line(&buf, 0));
+    assert!(
+        tree(&buf, 1).starts_with(" · f03.txt"),
+        "{:?}",
+        tree(&buf, 1)
+    );
+    assert!(hits.file_row(0).is_none());
+    // Both stop at their ends.
+    assert!(view.scroll(&hits, 5, 3, 1000));
+    let (buf, hits) = render(&view, area);
+    assert!(line(&buf, 7).starts_with(" Line 30"), "{:?}", line(&buf, 7));
+    assert!(view.scroll(&hits, 60, 3, 1000));
+    let (_, hits) = render(&view, area);
+    assert!(hits.file_row(29).is_some());
+    assert!(view.scroll(&hits, 60, 3, -1000));
+    let (_, hits) = render(&view, area);
+    assert!(hits.file_row(0).is_some());
+    // Outside the panel nothing scrolls.
+    assert!(!view.scroll(&hits, 5, 20, 3));
+}
+
+#[test]
+fn moving_the_selection_brings_it_back_into_view() {
+    let area = Rect::new(0, 0, 100, 8);
+    let mut view = long_message();
+    let (_, hits) = render(&view, area);
+    view.scroll(&hits, 60, 3, 20);
+    let (_, hits) = render(&view, area);
+    assert!(hits.file_row(0).is_none());
+    view.handle_key(Key::Home);
+    let (_, hits) = render(&view, area);
+    assert!(hits.file_row(0).is_some());
+}
+
+#[test]
+fn the_message_scrolls_by_lines_from_the_keyboard() {
+    let area = Rect::new(0, 0, 100, 8);
+    let mut view = long_message();
+    let (_, hits) = render(&view, area);
+    view.scroll_message(&hits, 2);
+    let (buf, hits) = render(&view, area);
+    assert!(line(&buf, 0).starts_with(" Author:"), "{:?}", line(&buf, 0));
+    view.scroll_message(&hits, -5);
+    let (buf, _) = render(&view, area);
+    assert!(line(&buf, 0).starts_with(" Commit:"), "{:?}", line(&buf, 0));
 }

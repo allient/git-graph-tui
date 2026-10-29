@@ -100,8 +100,10 @@ fn select_for_compare_then_compare_with_selected_lists_the_changed_files() {
     let (_, row) = h.find_on_screen("Add lib").unwrap();
     let (_, panel) = h.find_on_screen(&title).unwrap();
     assert_eq!(panel, row + 1);
-    assert!(has_row(&h, "lib.rs", "(+1 -0)"));
-    assert!(has_row(&h, "main.rs", "(+1 -0)"));
+    // Both files are new since the initial commit: no counts, like Git Graph.
+    assert!(has_row(&h, "lib.rs", ""));
+    assert!(!has_row(&h, "lib.rs", "(+"));
+    assert!(!has_row(&h, "main.rs", "(+"));
 
     // Enter opens the selected file's diff between the two commits.
     press(&mut h, KeyCode::Down);
@@ -130,8 +132,8 @@ fn compare_with_working_tree_includes_uncommitted_changes() {
     let title = format!("Comparing {base}..working tree");
     assert!(h.find_on_screen(&title).is_some(), "{title}");
     // README.md changed on main since; src/main.rs only in the working tree.
-    assert!(has_row(&h, "README.md", "(+2 -0)"));
-    assert!(has_row(&h, "main.rs", "(+1 -1)"));
+    assert!(has_row(&h, "README.md", "(+2 | -0)"));
+    assert!(has_row(&h, "main.rs", "(+1 | -1)"));
 
     // The first file row is src/main.rs (folders come first).
     press(&mut h, KeyCode::Enter);
