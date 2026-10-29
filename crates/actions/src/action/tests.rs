@@ -648,3 +648,153 @@ fn archive_output_is_required() {
         Err(InputError::Required(InputId::Output))
     );
 }
+
+// ---- while a merge, rebase, cherry-pick or revert is in progress ----
+
+fn blocked(actions: &[Action]) {
+    for action in actions {
+        assert!(action.conflicts_with_operation(), "{action:?} should wait");
+    }
+}
+
+#[test]
+fn checkouts_wait_for_the_operation() {
+    blocked(&[
+        Action::CheckoutBranch {
+            name: "develop".into(),
+        },
+        Action::CheckoutRemoteBranch {
+            remote: "origin".into(),
+            branch: "develop".into(),
+            local_name: "develop".into(),
+        },
+        Action::CreateBranch {
+            at: oid(),
+            name: "x".into(),
+            checkout: true,
+        },
+        Action::CheckoutCommit {
+            commit: oid(),
+            subject: "s".into(),
+        },
+        Action::Stash(StashAction::CreateBranch {
+            stash: tgg_model::Stash {
+                id: oid(),
+                index: 0,
+                subject: "WIP".into(),
+            },
+            name: "x".into(),
+        }),
+    ]);
+}
+
+#[test]
+fn merges_wait_for_the_operation() {
+    let stash = tgg_model::Stash {
+        id: oid(),
+        index: 0,
+        subject: "WIP".into(),
+    };
+    blocked(&[
+        Action::MergeIntoCurrent {
+            source: local("develop"),
+            current: Some("main".into()),
+            no_ff: false,
+        },
+        Action::Stash(StashAction::Apply {
+            stash: stash.clone(),
+            reinstate_index: false,
+        }),
+        Action::Stash(StashAction::Pop {
+            stash,
+            reinstate_index: false,
+        }),
+        Action::Repo(RepoAction::ApplyLatestStash),
+        Action::Repo(RepoAction::PopLatestStash),
+    ]);
+}
+
+#[test]
+fn rebases_wait_for_the_operation() {
+    blocked(&[
+        Action::RebaseCurrentOnto {
+            onto: local("develop"),
+            current: Some("main".into()),
+        },
+        Action::Drop {
+            commit: oid(),
+            subject: "s".into(),
+            current: Some("main".into()),
+        },
+    ]);
+}
+
+#[test]
+fn cherry_picks_and_reverts_wait_for_the_operation() {
+    blocked(&[
+        Action::CherryPick {
+            commit: oid(),
+            subject: "s".into(),
+            is_merge: false,
+        },
+        Action::Revert {
+            commit: oid(),
+            subject: "s".into(),
+            is_merge: false,
+        },
+    ]);
+}
+
+#[test]
+fn resets_wait_for_the_operation() {
+    blocked(&[
+        reset(ResetMode::Soft),
+        reset(ResetMode::Hard),
+        Action::WorkingTree(WorkingTreeAction::Reset {
+            mode: ResetMode::Mixed,
+        }),
+    ]);
+}
+
+#[test]
+fn pulls_wait_for_the_operation() {
+    blocked(&[Action::Repo(RepoAction::Pull {
+        branch: "main".into(),
+        mode: crate::PullMode::default(),
+    })]);
+}
+
+#[test]
+fn resolving_conflicts_stays_allowed() {
+    let paths = vec!["file.txt".to_owned()];
+    for action in [
+        WorkingTreeAction::Stage {
+            paths: paths.clone(),
+        },
+        WorkingTreeAction::Unstage {
+            paths: paths.clone(),
+        },
+        WorkingTreeAction::Commit {
+            message: "Merge".into(),
+        },
+        WorkingTreeAction::Discard {
+            paths,
+            untracked: Vec::new(),
+        },
+    ] {
+        let action = Action::WorkingTree(action);
+        assert!(!action.conflicts_with_operation(), "{action:?}");
+    }
+    let others = [
+        Action::CreateBranch {
+            at: oid(),
+            name: "x".into(),
+            checkout: false,
+        },
+        Action::Repo(RepoAction::Fetch { prune: false }),
+        Action::CopyCommitHash { commit: oid() },
+    ];
+    for action in others {
+        assert!(!action.conflicts_with_operation(), "{action:?}");
+    }
+}

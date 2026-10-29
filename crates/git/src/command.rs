@@ -25,6 +25,8 @@ pub struct GitCommand {
     args: Vec<String>,
     kind: CommandKind,
     timeout: Duration,
+    /// Where git would ask for a message in an editor, keep its own.
+    no_editor: bool,
 }
 
 impl GitCommand {
@@ -69,6 +71,7 @@ impl GitCommand {
             args: args.into_iter().map(Into::into).collect(),
             kind,
             timeout,
+            no_editor: false,
         }
     }
 
@@ -76,6 +79,15 @@ impl GitCommand {
     #[must_use]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+    /// Never opens an editor: where git would ask for a message (`merge
+    /// --continue`), it keeps the one it prepared. The app runs git without
+    /// a terminal, so an editor could never be used anyway.
+    #[must_use]
+    pub fn without_editor(mut self) -> Self {
+        self.no_editor = true;
         self
     }
 
@@ -100,6 +112,9 @@ impl GitCommand {
         let mut env = vec![("GIT_TERMINAL_PROMPT", "0")];
         if self.kind == CommandKind::Read {
             env.push(("GIT_OPTIONAL_LOCKS", "0"));
+        }
+        if self.no_editor {
+            env.push(("GIT_EDITOR", "true"));
         }
         env
     }
@@ -174,6 +189,13 @@ mod tests {
         let write = GitCommand::write(Path::new("/r"), ["commit"]);
         assert!(read.env().contains(&("GIT_OPTIONAL_LOCKS", "0")));
         assert!(!write.env().iter().any(|(k, _)| *k == "GIT_OPTIONAL_LOCKS"));
+    }
+
+    #[test]
+    fn without_editor_accepts_the_prepared_message() {
+        let cmd = GitCommand::write(Path::new("/r"), ["merge", "--continue"]);
+        assert!(!cmd.env().iter().any(|(k, _)| *k == "GIT_EDITOR"));
+        assert!(cmd.without_editor().env().contains(&("GIT_EDITOR", "true")));
     }
 
     #[test]

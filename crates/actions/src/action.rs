@@ -4,7 +4,7 @@ use tgg_git::GitCommand;
 use tgg_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
-use crate::{PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction};
+use crate::{OperationAction, PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction};
 
 /// Abbreviated hash length in confirmation text (git's default).
 const SHORT: usize = 7;
@@ -188,6 +188,8 @@ pub enum Action {
     Stash(StashAction),
     WorkingTree(WorkingTreeAction),
     Repo(RepoAction),
+    /// Continue or abort the operation in progress (the conflict banner).
+    Operation(OperationAction),
     /// An app-only effect from a menu (pickers, the git output view).
     Ui(UiEffect),
 }
@@ -332,6 +334,7 @@ impl Action {
             Self::Stash(action) => action.plan(repo),
             Self::WorkingTree(action) => action.plan(repo),
             Self::Repo(action) => action.plan(repo),
+            Self::Operation(action) => action.plan(repo),
             Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
@@ -462,8 +465,41 @@ impl Action {
             | Self::Stash(_)
             | Self::WorkingTree(_)
             | Self::Repo(_)
+            | Self::Operation(_)
             | Self::Ui(_) => Vec::new(),
         }
+    }
+
+    /// Would start another merge, rebase, cherry-pick or revert, or move
+    /// HEAD or the index (checkout, reset, pull): refused while git is in the
+    /// middle of one. Staging, committing and discarding stay allowed, since
+    /// they are how conflicts get resolved.
+    #[must_use]
+    pub fn conflicts_with_operation(&self) -> bool {
+        matches!(
+            self,
+            Self::CheckoutBranch { .. }
+                | Self::CheckoutRemoteBranch { .. }
+                | Self::CheckoutCommit { .. }
+                | Self::MergeIntoCurrent { .. }
+                | Self::RebaseCurrentOnto { .. }
+                | Self::CherryPick { .. }
+                | Self::Revert { .. }
+                | Self::Drop { .. }
+                | Self::ResetCurrentTo { .. }
+                | Self::CreateBranch { checkout: true, .. }
+                | Self::WorkingTree(WorkingTreeAction::Reset { .. })
+                | Self::Stash(
+                    StashAction::Apply { .. }
+                        | StashAction::Pop { .. }
+                        | StashAction::CreateBranch { .. }
+                )
+                | Self::Repo(
+                    RepoAction::Pull { .. }
+                        | RepoAction::ApplyLatestStash
+                        | RepoAction::PopLatestStash
+                )
+        )
     }
 
     /// Can lose work or rewrite history.
@@ -480,6 +516,7 @@ impl Action {
             Self::Stash(action) => action.is_destructive(),
             Self::WorkingTree(action) => action.is_destructive(),
             Self::Repo(action) => action.is_destructive(),
+            Self::Operation(action) => action.is_destructive(),
             _ => false,
         }
     }
@@ -584,6 +621,7 @@ impl Action {
             Self::Stash(action) => return action.confirmation(),
             Self::WorkingTree(action) => return action.confirmation(),
             Self::Repo(action) => return action.confirmation(),
+            Self::Operation(action) => return action.confirmation(),
             _ => return None,
         };
         Some(confirmation)
