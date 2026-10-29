@@ -292,3 +292,17 @@ fn staging_a_deleted_file_and_unstaging_in_a_repo_without_commits() {
     );
     assert_eq!(status(&fresh), "?? first.txt");
 }
+
+#[test]
+fn discard_restores_changed_files_and_deletes_untracked_ones() {
+    let repo = FixtureRepo::sample();
+    repo.write_file("README.md", "changed\n");
+    ok(
+        &repo,
+        &Action::WorkingTree(WorkingTreeAction::Discard {
+            paths: vec!["README.md".into()],
+            untracked: vec!["notes.txt".into()],
+        }),
+    );
+    assert_eq!(status(&repo), "");
+}

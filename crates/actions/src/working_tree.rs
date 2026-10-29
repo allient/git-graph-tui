@@ -35,11 +35,29 @@ pub enum WorkingTreeAction {
     Commit {
         message: String,
     },
+    /// Throws away unstaged changes: tracked `paths` go back to their staged
+    /// (or committed) content, `untracked` files are deleted.
+    Discard {
+        paths: Vec<String>,
+        untracked: Vec<String>,
+    },
 }
 
 impl WorkingTreeAction {
     #[must_use]
     pub fn plan(&self, repo: &Path) -> Plan {
+        if let Self::Discard { paths, untracked } = self {
+            let mut commands = Vec::new();
+            if !paths.is_empty() {
+                let args = with_paths(&["restore", "--worktree", "--"], paths);
+                commands.push(GitCommand::write(repo, args));
+            }
+            if !untracked.is_empty() {
+                let args = with_paths(&["clean", "--force", "--"], untracked);
+                commands.push(GitCommand::write(repo, args));
+            }
+            return Plan::Git(commands);
+        }
         let args = match self {
             Self::Stash {
                 message,
@@ -64,6 +82,7 @@ impl WorkingTreeAction {
             Self::Unstage { paths } => with_paths(&["reset", "--quiet", "--"], paths),
             // One `--message=` argument, so a message starting with `-` stays a message.
             Self::Commit { message } => vec!["commit".into(), format!("--message={message}")],
+            Self::Discard { .. } => unreachable!("planned above"),
         };
         Plan::Git(vec![GitCommand::write(repo, args)])
     }
@@ -75,11 +94,25 @@ impl WorkingTreeAction {
             Self::Reset {
                 mode: ResetMode::Hard
             } | Self::Clean
+                | Self::Discard { .. }
         )
     }
 
     #[must_use]
     pub fn confirmation(&self) -> Option<Confirmation> {
+        if let Self::Discard { paths, untracked } = self {
+            let message = match (paths.as_slice(), untracked.as_slice()) {
+                ([path], []) => format!("Discard the changes in '{path}'? This can't be undone."),
+                ([], [path]) => {
+                    format!("Delete the untracked file '{path}'? This can't be undone.")
+                }
+                _ => format!(
+                    "Discard the changes in {} files? Untracked files are deleted. This can't be undone.",
+                    paths.len() + untracked.len()
+                ),
+            };
+            return Some(Confirmation::new("Discard Changes", message, "Discard"));
+        }
         let (title, message, label) = match self {
             Self::Reset {
                 mode: ResetMode::Hard,
@@ -102,7 +135,8 @@ impl WorkingTreeAction {
             | Self::OpenSourceControl
             | Self::Stage { .. }
             | Self::Unstage { .. }
-            | Self::Commit { .. } => return None,
+            | Self::Commit { .. }
+            | Self::Discard { .. } => return None,
         };
         Some(Confirmation::new(title, message.to_owned(), label))
     }
@@ -136,7 +170,8 @@ impl WorkingTreeAction {
             | Self::OpenSourceControl
             | Self::Stage { .. }
             | Self::Unstage { .. }
-            | Self::Commit { .. } => Vec::new(),
+            | Self::Commit { .. }
+            | Self::Discard { .. } => Vec::new(),
         }
     }
 
