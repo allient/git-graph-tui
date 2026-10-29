@@ -28,7 +28,8 @@ impl ProcessExecutor {
 
     /// Runs the program with `args` instead of the command's git argv
     /// (environment, timeout and cancellation still come from `command`).
-    #[cfg(test)]
+    /// Only the Unix tests use it (they run `sleep`).
+    #[cfg(all(test, unix))]
     pub fn run_raw(
         &self,
         command: &GitCommand,
@@ -129,7 +130,6 @@ fn kill(child: &mut Child) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
     use tgg_git::{CancelToken, ExecError, Executor, Failure, GitCommand};
     use tgg_testkit::FixtureRepo;
 
