@@ -391,8 +391,10 @@ impl InputDialog {
                 }
                 matches!(key, Key::Char(_) | Key::Backspace | Key::Delete)
             }
+            // Only Space: arrows on the way to a button must not tick, say,
+            // "Force delete".
             Value::Toggle(on) => {
-                if !matches!(key, Key::Char(' ') | Key::Left | Key::Right) {
+                if key != Key::Char(' ') {
                     return;
                 }
                 *on = !*on;
