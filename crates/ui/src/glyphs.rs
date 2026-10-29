@@ -185,21 +185,20 @@ fn render(joints: &[Joints]) -> Vec<GlyphCell> {
         .collect()
 }
 
-/// Lanes are heavy vertical lines (`┃`, and `┠ ┨ ╂ ┰ ┸` where a line
-/// branches off); horizontals stay light and turns use the rounded light
-/// corners (`╭ ╮ ╰ ╯`), as Unicode has no heavy rounded ones.
+/// Every line is light, so lanes, horizontals and the rounded corners
+/// (`╭ ╮ ╰ ╯`) have the same width; Unicode has no heavy rounded corners.
 fn box_char(j: &Joints) -> char {
     match (j.up, j.down, j.left, j.right) {
-        (true, true, true, true) => '╂',
-        (true, true, true, false) => '┨',
-        (true, true, false, true) => '┠',
-        (true, false, true, true) => '┸',
-        (false, true, true, true) => '┰',
+        (true, true, true, true) => '┼',
+        (true, true, true, false) => '┤',
+        (true, true, false, true) => '├',
+        (true, false, true, true) => '┴',
+        (false, true, true, true) => '┬',
         (true, false, true, false) => '╯',
         (true, false, false, true) => '╰',
         (false, true, true, false) => '╮',
         (false, true, false, true) => '╭',
-        (true, _, false, false) | (false, true, false, false) => '┃',
+        (true, _, false, false) | (false, true, false, false) => '│',
         (false, false, true, _) | (false, false, _, true) => '─',
         (false, false, false, false) => ' ',
     }
@@ -242,23 +241,23 @@ mod tests {
     }
 
     #[test]
-    fn lanes_are_heavy_vertical_lines() {
-        assert_eq!(joint("ud"), '┃');
-        assert_eq!(joint("u"), '┃');
-        assert_eq!(joint("d"), '┃');
+    fn lanes_are_vertical_lines() {
+        assert_eq!(joint("ud"), '│');
+        assert_eq!(joint("u"), '│');
+        assert_eq!(joint("d"), '│');
     }
 
     #[test]
-    fn junctions_keep_the_lane_heavy_and_the_branch_light() {
-        assert_eq!(joint("udr"), '┠', "up, down, right");
-        assert_eq!(joint("udl"), '┨', "up, down, left");
-        assert_eq!(joint("udlr"), '╂', "every way");
-        assert_eq!(joint("dlr"), '┰', "down, left, right");
-        assert_eq!(joint("ulr"), '┸', "up, left, right");
+    fn junctions_join_the_lane_and_the_branch() {
+        assert_eq!(joint("udr"), '├', "up, down, right");
+        assert_eq!(joint("udl"), '┤', "up, down, left");
+        assert_eq!(joint("udlr"), '┼', "every way");
+        assert_eq!(joint("dlr"), '┬', "down, left, right");
+        assert_eq!(joint("ulr"), '┴', "up, left, right");
     }
 
     #[test]
-    fn horizontals_and_curves_stay_light_and_rounded() {
+    fn turns_are_rounded() {
         assert_eq!(joint("lr"), '─');
         assert_eq!(joint("dr"), '╭');
         assert_eq!(joint("dl"), '╮');
@@ -270,8 +269,8 @@ mod tests {
     #[test]
     fn a_line_joining_a_lane_from_the_left_turns_on_the_commit_line() {
         let above = row(0, 0, &[e(1, 1, 1)], &[e(1, 1, 1), e(0, 1, 0)]);
-        assert_eq!(text(&lane_glyphs(&above, 2)), "●─┨");
-        assert_eq!(text(&connector_glyphs(&above, None, 2)), "  ┃");
+        assert_eq!(text(&lane_glyphs(&above, 2)), "●─┤");
+        assert_eq!(text(&connector_glyphs(&above, None, 2)), "  │");
     }
 
     #[test]
@@ -283,7 +282,7 @@ mod tests {
     #[test]
     fn pass_through_lanes_are_vertical_lines() {
         let r = row(1, 1, &[e(0, 0, 0), e(1, 1, 1)], &[e(0, 0, 0), e(1, 1, 1)]);
-        assert_eq!(text(&lane_glyphs(&r, 2)), "┃ ●");
+        assert_eq!(text(&lane_glyphs(&r, 2)), "│ ●");
     }
 
     #[test]
@@ -304,7 +303,7 @@ mod tests {
     fn consecutive_commits_are_joined_by_a_line() {
         let above = row(0, 0, &[e(0, 0, 0)], &[e(0, 0, 0)]);
         let below = row(0, 0, &[e(0, 0, 0)], &[e(0, 0, 0)]);
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 1)), "┃");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 1)), "│");
     }
 
     #[test]
@@ -312,16 +311,16 @@ mod tests {
         let merge = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
         let next = row(1, 1, &[e(0, 0, 0), e(1, 1, 1)], &[e(0, 0, 0), e(1, 1, 1)]);
         assert_eq!(text(&lane_glyphs(&merge, 2)), "●─╮");
-        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "┃ ┃");
-        assert_eq!(text(&lane_glyphs(&next, 2)), "┃ ●");
+        assert_eq!(text(&connector_glyphs(&merge, Some(&next), 2)), "│ │");
+        assert_eq!(text(&lane_glyphs(&next, 2)), "│ ●");
     }
 
     #[test]
     fn a_branch_joining_from_the_right_runs_straight_then_turns_into_its_parent() {
         let tip = row(1, 1, &[e(0, 0, 0)], &[e(0, 0, 0), e(1, 1, 1)]);
         let parent = row(0, 0, &[e(0, 0, 0), e(1, 0, 1)], &[e(0, 0, 0)]);
-        assert_eq!(text(&lane_glyphs(&tip, 2)), "┃ ●");
-        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "┃ ┃");
+        assert_eq!(text(&lane_glyphs(&tip, 2)), "│ ●");
+        assert_eq!(text(&connector_glyphs(&tip, Some(&parent), 2)), "│ │");
         assert_eq!(text(&lane_glyphs(&parent, 2)), "●─╯");
     }
 
@@ -330,24 +329,24 @@ mod tests {
         let above = row(1, 1, &[e(1, 1, 1)], &[e(1, 0, 1)]);
         let below = row(0, 1, &[e(0, 0, 1)], &[]);
         assert_eq!(text(&lane_glyphs(&above, 2)), "╭─●");
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 2)), "┃  ");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 2)), "│  ");
     }
 
     #[test]
     fn a_passing_lane_moving_left_by_one() {
         let above = row(0, 0, &[e(0, 0, 0), e(2, 2, 2)], &[e(0, 0, 0), e(2, 1, 2)]);
         let below = row(0, 0, &[e(0, 0, 0), e(1, 1, 2)], &[e(0, 0, 0), e(1, 1, 2)]);
-        assert_eq!(text(&lane_glyphs(&above, 3)), "●   ┃");
-        assert_eq!(text(&connector_glyphs(&above, Some(&below), 3)), "┃ ╭─╯");
-        assert_eq!(text(&lane_glyphs(&below, 3)), "● ┃  ");
+        assert_eq!(text(&lane_glyphs(&above, 3)), "●   │");
+        assert_eq!(text(&connector_glyphs(&above, Some(&below), 3)), "│ ╭─╯");
+        assert_eq!(text(&lane_glyphs(&below, 3)), "● │  ");
     }
 
     #[test]
     fn a_passing_lane_arriving_from_the_right() {
         let above = row(1, 1, &[e(1, 1, 1), e(2, 2, 2)], &[e(1, 1, 1), e(2, 2, 2)]);
         let passing = row(1, 1, &[e(1, 1, 1), e(2, 0, 2)], &[e(0, 0, 2), e(1, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&above, Some(&passing), 3)), "╭─╂─╯");
-        assert_eq!(text(&lane_glyphs(&passing, 3)), "┃ ●  ");
+        assert_eq!(text(&connector_glyphs(&above, Some(&passing), 3)), "╭─┼─╯");
+        assert_eq!(text(&lane_glyphs(&passing, 3)), "│ ●  ");
     }
 
     #[test]
@@ -355,29 +354,29 @@ mod tests {
         let fork = row(0, 0, &[], &[e(0, 0, 0), e(0, 3, 3)]);
         let next = row(3, 3, &[e(0, 0, 0), e(3, 3, 3)], &[e(0, 0, 0), e(3, 3, 3)]);
         assert_eq!(text(&lane_glyphs(&fork, 4)), "●─────╮");
-        assert_eq!(text(&connector_glyphs(&fork, Some(&next), 4)), "┃     ┃");
+        assert_eq!(text(&connector_glyphs(&fork, Some(&next), 4)), "│     │");
     }
 
     #[test]
     fn the_last_loaded_row_continues_down() {
         let r = row(0, 0, &[], &[e(0, 0, 0), e(0, 1, 1)]);
-        assert_eq!(text(&connector_glyphs(&r, None, 2)), "┃ ┃");
+        assert_eq!(text(&connector_glyphs(&r, None, 2)), "│ │");
     }
 
     #[test]
     fn a_line_crossing_a_lane_on_the_commit_line() {
         let above = row(0, 0, &[e(1, 1, 4)], &[e(0, 0, 0), e(1, 1, 4), e(0, 2, 9)]);
         let cells = lane_glyphs(&above, 3);
-        assert_eq!(text(&cells), "●─╂─╮");
+        assert_eq!(text(&cells), "●─┼─╮");
         assert_eq!(cells[2].color, Some(4), "the crossed lane keeps its color");
         assert_eq!(cells[4].color, Some(9), "the turn has the new lane's color");
-        assert_eq!(text(&connector_glyphs(&above, None, 3)), "┃ ┃ ┃");
+        assert_eq!(text(&connector_glyphs(&above, None, 3)), "│ │ │");
     }
 
     #[test]
     fn lines_arriving_and_leaving_on_one_side_combine() {
         let r = row(0, 0, &[e(1, 0, 1)], &[e(0, 1, 2)]);
-        assert_eq!(text(&lane_glyphs(&r, 2)), "●─┨");
+        assert_eq!(text(&lane_glyphs(&r, 2)), "●─┤");
     }
 
     #[test]
