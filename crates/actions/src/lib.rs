@@ -27,5 +27,7 @@ pub use tag::TagAction;
 pub use working_tree::WorkingTreeAction;
 mod repo;
 pub use repo::{PickPurpose, PullMode, RepoAction};
+mod operation;
+pub use operation::{Operation, OperationAction};
 mod forge;
 pub use forge::{IssueRef, issue_refs, issue_url, pull_request_url};

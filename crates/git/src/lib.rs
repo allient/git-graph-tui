@@ -18,6 +18,7 @@ mod command;
 mod error;
 mod exec;
 mod failure;
+pub mod in_progress;
 pub mod log;
 pub mod reflog;
 pub mod refs;
