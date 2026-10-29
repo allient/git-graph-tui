@@ -15,7 +15,7 @@ Branch: feat/herdr-plugin (worktree tui-git-graph-herdr), from origin/main; comm
 | ID | Specs | Route | Status | Commit |
 |---|---|---|---|---|
 | T1 | S1, S3, S4 | inline | done | feat(app): route plain right-click to the app inside herdr |
-| T2 | S1, S2, S4 | inline | todo | |
+| T2 | S1, S2, S4 | inline | done | feat(herdr): add a herdr plugin that opens tui-git-graph in a tab |
 
 Route evidence: two small units (~150 lines each) that a single writer finishes faster than starting workers; inline.
 
@@ -24,3 +24,5 @@ Route evidence: two small units (~150 lines each) that a single writer finishes 
 - **L1** (2026-10-29) "can you plan create a plugin for herdr I have notcied right click do nto work when I use on a cli on herdr plan thsi after you fnishe or ask @w2".
 - **L2** (2026-10-29) Planning (w2): herdr 0.9.5 `herdr pane input --help` shows `--right-click <TARGET> [possible values: herdr, pane]`; the socket schema has `PaneInputSetParams{pane_id, right_click}`, default `herdr`. TTT's plugin (eugenioenko/ttt `herdr-plugin/scripts/open-worktree.sh`) runs `pane input --current --right-click pane` before `exec ttt`. `herdr pane get` doesn't report the routing, so the app can't read the previous value back; on exit it restores herdr's default.
 - **L3** (2026-10-29) "if needed ask for help to @w2 so it work on herdr plugin". Build delegated to w2: own worktree, allowed surfaces `integrations/herdr/**`, `crates/app/src/main.rs`, `crates/app/src/herdr.rs`, this document; the root README is updated by the other session at merge time.
+- **L4** (2026-10-29) T1 done: `crates/app/src/herdr.rs` `RightClick` guard (injected runner, 7 unit tests), wired in `main.rs` next to `MouseCapture`. Gate green, 765 tests.
+- **L5** (2026-10-29) T2 done: `integrations/herdr/` manifest, `open.sh`, `run.sh`, README, `tests/run.sh` (12 checks, pass under sh and dash). run.sh doesn't `exec` the app, so a failure (not a repository) stays on screen until Enter. Checked in herdr 0.9.5: `herdr plugin link` accepted the manifest; `plugin action invoke tui-git-graph.open` opened a tab in the focused pane's directory showing the install hint (the binary isn't installed), closed by Enter; `plugin pane open … --env TGG_BIN=target/debug/tui-git-graph` ran the graph in a herdr tab. Not checked: a real plain right-click (needs a mouse), and `checkout_path` (no worktree context in that invocation). `tests/run.sh` isn't in CI yet (.github is outside this change).
