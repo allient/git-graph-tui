@@ -176,6 +176,27 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 
 Push, pull and fetch never prompt for a password: use SSH keys or a git credential helper. Without one, the command fails and the status bar shows git's error.
 
+### Icons
+
+The toolbar uses plain Unicode symbols by default (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu), which work in any terminal. To get VS Code's own icons (Codicons), install a [Nerd Font](https://www.nerdfonts.com/) first, then turn the icons on.
+
+1. Install a Nerd Font, for example JetBrains Mono:
+
+   ```sh
+   brew install --cask font-jetbrains-mono-nerd-font   # macOS
+   ```
+
+   On Linux, download it from [nerdfonts.com/font-downloads](https://www.nerdfonts.com/font-downloads) and unzip it into `~/.local/share/fonts`, then run `fc-cache -f`.
+2. Select the font in your terminal's settings (for example "JetBrainsMono Nerd Font"). WezTerm, Kitty and Ghostty already include the Nerd Font symbols, so you can skip steps 1 and 2 there.
+3. Turn the icons on, for one run or for every run:
+
+   ```sh
+   cargo run -- --icons nerd                       # one run
+   export TUI_GIT_GRAPH_ICONS=nerd                 # every run (add it to ~/.zshrc or ~/.bashrc)
+   ```
+
+   `--icons unicode` goes back to the plain symbols, and the flag wins over the variable. If the icons show as empty boxes, the terminal isn't using a Nerd Font.
+
 ## Development
 
 ```sh

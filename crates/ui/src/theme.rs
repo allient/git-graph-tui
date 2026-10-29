@@ -1,6 +1,8 @@
 use ratatui::style::Color;
 
-/// Colors used by the widgets. Lane colors cycle through `lanes`.
+use crate::Icons;
+
+/// Colors and icons used by the widgets. Lane colors cycle through `lanes`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
     pub lanes: Vec<Color>,
@@ -17,6 +19,7 @@ pub struct Theme {
     pub date: Color,
     pub author: Color,
     pub hash: Color,
+    pub icons: Icons,
 }
 
 impl Theme {
@@ -51,6 +54,7 @@ impl Default for Theme {
             date: Color::Gray,
             author: Color::Gray,
             hash: Color::DarkGray,
+            icons: Icons::Unicode,
         }
     }
 }

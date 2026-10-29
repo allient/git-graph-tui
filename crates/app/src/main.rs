@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use crossterm::event::{self, Event as TermEvent};
 use ratatui::DefaultTerminal;
-use tgg_ui::Theme;
+use tgg_ui::{Icons, Theme};
 
 use crate::cli::Cli;
 use crate::git::{ProcessExecutor, Runner, discover_repo};
@@ -27,17 +27,21 @@ const INPUT_POLL: Duration = Duration::from_millis(50);
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let icons = cli.icons(std::env::var(cli::ICONS_ENV).ok().as_deref())?;
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
-    ratatui::run(|terminal| run(terminal, repo))
+    ratatui::run(|terminal| run(terminal, repo, icons))
 }
 
-fn run(terminal: &mut DefaultTerminal, repo: PathBuf) -> Result<()> {
+fn run(terminal: &mut DefaultTerminal, repo: PathBuf, icons: Icons) -> Result<()> {
     let _mouse = MouseCapture::enable()?;
     let (runner, results) = Runner::new(ProcessExecutor::new());
-    let theme = Theme::default();
+    let theme = Theme {
+        icons,
+        ..Theme::default()
+    };
     let mut state = AppState::new(repo);
     dispatch(&mut state, &runner, Event::Refresh);
 

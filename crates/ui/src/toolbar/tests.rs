@@ -3,7 +3,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 
 use super::*;
-use crate::{Key, Theme};
+use crate::{Icons, Key, Theme};
 
 fn names(list: &[&str]) -> Vec<String> {
     list.iter().map(|s| (*s).to_owned()).collect()
@@ -14,9 +14,13 @@ fn toolbar() -> Toolbar {
 }
 
 fn render(toolbar: &Toolbar, width: u16) -> (String, ToolbarHitMap) {
+    render_with(toolbar, width, &Theme::default())
+}
+
+fn render_with(toolbar: &Toolbar, width: u16, theme: &Theme) -> (String, ToolbarHitMap) {
     let area = Rect::new(0, 3, width, 1);
     let mut buf = Buffer::empty(Rect::new(0, 0, width, 5));
-    let hits = toolbar.render(area, &mut buf, &Theme::default());
+    let hits = toolbar.render(area, &mut buf, theme);
     let line = (0..width)
         .map(|x| buf[(x, 3)].symbol())
         .collect::<String>()
@@ -150,4 +154,28 @@ fn the_focused_button_is_highlighted() {
     assert_eq!(buf[(refresh.x, 0)].bg, Theme::default().selected_bg);
     let fetch = hits.button(ToolbarButton::Fetch).unwrap();
     assert_ne!(buf[(fetch.x, 0)].bg, Theme::default().selected_bg);
+}
+
+#[test]
+fn nerd_font_icons_replace_the_plain_buttons() {
+    let theme = Theme {
+        icons: Icons::Nerd,
+        ..Theme::default()
+    };
+    let (line, hits) = render_with(&toolbar(), 100, &theme);
+    // Codicons: refresh, cloud-download, ellipsis.
+    assert!(
+        line.ends_with(" \u{eb37}   \u{eac2}   \u{ea7c}"),
+        "{line:?}"
+    );
+    assert!(!line.contains("[↻]"), "{line:?}");
+    let refresh = hits.button(ToolbarButton::Refresh).unwrap();
+    assert_eq!(refresh.width, 3, "the icon with a space on each side");
+}
+
+#[test]
+fn plain_icons_are_the_default() {
+    assert_eq!(Theme::default().icons, Icons::Unicode);
+    let (line, _) = render(&toolbar(), 100);
+    assert!(line.ends_with("[↻] [⇣] [...]"), "{line:?}");
 }

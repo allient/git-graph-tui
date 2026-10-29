@@ -12,12 +12,14 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **S5** Column header: "also add columsn names liek thsi". The graph's first line names the columns: Graph, Description, Date, Author, Commit (as in the VS Code screenshot).
 - **S6** Resizable widths: "if psisbel we can be able to resize width". Assumption: drag the column dividers in the header with the mouse, and the divider between the Source Control section and the graph.
 - **S7** Toolbar icons: "as thes e two icons" (cloud-download for Fetch, circular arrow for Refresh). Plain Unicode so it works without a Nerd Font: `↻` Refresh, `⇣` Fetch.
+- **S8** Nerd Font icons, opt-in: "ok use those icons and add of readme isntructions to isntall forst icons nerd onews" and "do thsi same That's why tools like lazygit and yazi make icons opt-in: they print plain text by default,  if icons use tehm in other case use what we have now". `--icons nerd` or `TUI_GIT_GRAPH_ICONS=nerd` shows Codicons (refresh U+EB37, cloud-download U+EAC2, ellipsis U+EA7C); the default stays the Unicode `[↻] [⇣] [...]`. README explains installing a Nerd Font.
 
 ## Tasks
 
 | ID | Specs | Route | Status | Commit |
 |----|-------|-------|--------|--------|
 | T1 | S1, S2, S5, S7 | inline | done (gate green, 421 tests) | feat/graph-spacing |
+| T5 | S8 | inline | done (429 tests) | feat/graph-spacing |
 | T2 | S3 | inline | pending | |
 | T4 | S6 | inline | pending | |
 | T3 | S4 | user decision | done: 9 branches deleted locally and on origin after checking PRs #16-#24 merged | - |
@@ -31,3 +33,6 @@ Branches: one feature branch per task, each PR against main (no stacked PRs). De
 - **L5** (2026-10-28) User: "if psisbel we can be able to resize width"
 - **L6** (2026-10-28) User: "as thes e two icons [Image #18]"
 - **L7** T1: commit lines carry only verticals and the node; a connector line below each row draws lane changes with rounded corners (glyphs.rs connector_glyphs). Header line with Graph/Description/Date/Author/Commit; toolbar `[↻]` `[⇣]`. Rows take 2 lines (ROW_HEIGHT), so the viewport shows about half as many commits. Glyph tests were written with the code, not RED first.
+- **L8** (2026-10-28) User: "ok use those icons and add of readme isntructions to isntall forst icons nerd onews"
+- **L9** (2026-10-28) User: "do thsi same That's why tools like lazygit and yazi make icons opt-in: they print plain text by default,  if icons use tehm in other case use what we have now"
+- **L10** (2026-10-28) User: "Do not forget to create 2 panes one is source controls and teho other is gitgraph [Image #20]" (T2, S3).
