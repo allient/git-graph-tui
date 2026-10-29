@@ -249,14 +249,19 @@ fn repo_submenu_entry(h: &mut Harness, submenu: &str, entry: &str) {
     let (left, below) = find(h, "Fetch");
     let (x, y) = find_in_menu(h, &format!("{submenu} "), left, below);
     mouse(h, MouseEventKind::Down(MouseButton::Left), x, y);
-    let (x, y) = find_in_menu(h, entry, left, below);
+    // The submenu opens right of the menu, shifted up when it would not fit.
+    let arrow = (x..W)
+        .find(|&col| h.screen[(col, y)].symbol() == "▸")
+        .expect("submenu row has an arrow");
+    let (x, y) = find_in_menu(h, entry, arrow + 2, 0);
     mouse(h, MouseEventKind::Down(MouseButton::Left), x, y);
 }
 
-/// Like [`find_below`], counting only cells from column `left` on.
+/// The first `text` at or below line `min_y`, counting only cells from
+/// column `left` on.
 fn find_in_menu(h: &Harness, text: &str, left: u16, min_y: u16) -> (u16, u16) {
     let area = h.screen.area;
-    (min_y + 1..area.bottom())
+    (min_y..area.bottom())
         .find_map(|y| {
             let line: String = (left..area.right())
                 .map(|x| h.screen[(x, y)].symbol())
@@ -474,4 +479,18 @@ fn tags_submenu_deletes_a_picked_tag_here_or_on_the_remote() {
     pick(&mut h, "v0.1.0");
     accept_dialogs(&mut h);
     assert_eq!(repo.git(&["tag", "--list"]), "");
+}
+
+#[test]
+fn view_and_sort_change_how_source_control_lists_files() {
+    let repo = FixtureRepo::sample();
+    repo.write_file("src/lib.rs", "pub fn x() {}\n");
+    let mut h = open(&repo);
+    open_repo_menu(&mut h);
+    click_text(&mut h, "View as Tree");
+    assert!(h.find_on_screen("▾ src").is_some(), "the folder row shows");
+    // The menu now offers the list back.
+    open_repo_menu(&mut h);
+    assert!(h.find_on_screen("View as List").is_some());
+    press(&mut h, KeyCode::Esc);
 }

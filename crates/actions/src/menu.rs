@@ -2,9 +2,9 @@ use tgg_git::worktree::Worktree;
 use tgg_model::{Oid, Stash};
 
 use crate::{
-    Action, CommitScope, CommitTarget, GraphColumn, MenuContext, Operation, OperationAction,
-    PickPurpose, RepoAction, ResetMode, Rev, StashAction, TagAction, Target, UiEffect,
-    WorkingTreeAction, WorktreeAction,
+    Action, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget, GraphColumn,
+    MenuContext, Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction,
+    TagAction, Target, UiEffect, WorkingTreeAction, WorktreeAction,
 };
 
 /// One row of a context menu.
@@ -524,7 +524,18 @@ fn pick(purpose: PickPurpose) -> Action {
 fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
     let remote = ctx.default_remote();
     let on_branch_with_remote = ctx.current_branch().is_some() && remote.is_some();
+    let (toggle_label, other_view) = match ctx.changes.view {
+        ChangesView::List => ("View as Tree", ChangesView::Tree),
+        ChangesView::Tree => ("View as List", ChangesView::List),
+    };
     vec![
+        entry(
+            toggle_label,
+            Action::Ui(UiEffect::SetChangesView(other_view)),
+        ),
+        Some(MenuItem::Separator),
+        Some(submenu("View & Sort", view_sort_submenu(ctx.changes))),
+        Some(MenuItem::Separator),
         entry_if(on_branch_with_remote, "Pull", || {
             Action::Repo(RepoAction::PullUpstream { rebase: false })
         }),
@@ -736,6 +747,37 @@ fn pull_push_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 repo(RepoAction::Fetch { prune: false }),
             ),
         ])
+        .collect()
+}
+
+/// VS Code's "View & Sort" submenu; `✓` marks the current choices.
+fn view_sort_submenu(layout: ChangesLayout) -> Vec<Option<MenuItem>> {
+    let checked = |on: bool, label: &str| format!("{} {label}", if on { '✓' } else { ' ' });
+    let views = [
+        (ChangesView::List, "View as List"),
+        (ChangesView::Tree, "View as Tree"),
+    ]
+    .map(|(view, label)| {
+        entry(
+            &checked(layout.view == view, label),
+            Action::Ui(UiEffect::SetChangesView(view)),
+        )
+    });
+    let sorts = [
+        (ChangesSort::Name, "Sort Changes by Name"),
+        (ChangesSort::Path, "Sort Changes by Path"),
+        (ChangesSort::Status, "Sort Changes by Status"),
+    ]
+    .map(|(sort, label)| {
+        entry(
+            &checked(layout.sort == sort, label),
+            Action::Ui(UiEffect::SetChangesSort(sort)),
+        )
+    });
+    views
+        .into_iter()
+        .chain([Some(MenuItem::Separator)])
+        .chain(sorts)
         .collect()
 }
 

@@ -5,6 +5,7 @@ use tgg_model::{Change, ChangedFile};
 
 use super::*;
 use crate::{Icons, Key, Theme};
+use tgg_actions::{ChangesSort, ChangesView};
 
 const W: u16 = 36;
 
@@ -622,4 +623,85 @@ fn left_and_right_collapse_and_expand_the_selected_header() {
     let (lines, _) = render(&mut pane, 13, true);
     assert_eq!(lines[6], "▾ Staged Changes              ⧉ − 2");
     assert_eq!(lines[7], "  app.rs src                  ↗ − M");
+}
+
+/// Changes only: `b/z.rs` modified, `a.txt` added, `b/c/y.rs` deleted.
+fn changes_pane() -> SourceControl {
+    let mut pane = SourceControl::default();
+    pane.set_changes(
+        vec![
+            file("a.txt", None, Some(Change::Untracked)),
+            file("b/c/y.rs", None, Some(Change::Deleted)),
+            file("b/z.rs", None, Some(Change::Modified)),
+        ],
+        Some("main".into()),
+    );
+    pane
+}
+
+#[test]
+fn files_sort_by_path_name_or_status() {
+    let mut pane = changes_pane();
+    let rows = |pane: &mut SourceControl| render(pane, 10, false).0[7..10].to_vec();
+    // By path: git's order.
+    assert_eq!(
+        rows(&mut pane),
+        [
+            "  a.txt                     ↗ ↶ + U",
+            "  y.rs b/c                  ↗ ↶ + D",
+            "  z.rs b                    ↗ ↶ + M",
+        ]
+    );
+    pane.set_sort(ChangesSort::Status);
+    assert_eq!(
+        rows(&mut pane),
+        [
+            "  y.rs b/c                  ↗ ↶ + D",
+            "  z.rs b                    ↗ ↶ + M",
+            "  a.txt                     ↗ ↶ + U",
+        ]
+    );
+    pane.set_sort(ChangesSort::Name);
+    assert_eq!(rows(&mut pane)[0], "  a.txt                     ↗ ↶ + U");
+    assert_eq!(rows(&mut pane)[1], "  y.rs b/c                  ↗ ↶ + D");
+    assert_eq!(pane.layout().sort, ChangesSort::Name);
+}
+
+#[test]
+fn tree_view_groups_files_under_their_folders() {
+    let mut pane = changes_pane();
+    pane.set_view(ChangesView::Tree);
+    let (lines, _) = render(&mut pane, 12, false);
+    assert_eq!(
+        lines[6..12],
+        [
+            "▾ Changes                   ⧉ ↶ + 3",
+            "  ▾ b                         ↶ +",
+            "    ▾ c                       ↶ +",
+            "      y.rs                  ↗ ↶ + D",
+            "    z.rs                    ↗ ↶ + M",
+            "  a.txt                     ↗ ↶ + U",
+        ]
+    );
+}
+
+#[test]
+fn a_folder_row_stages_or_discards_the_files_under_it() {
+    let mut pane = changes_pane();
+    pane.set_view(ChangesView::Tree);
+    let (_, hits) = render(&mut pane, 12, false);
+    // "▾ b" is on line 7: ↶ at x 30, + at x 32.
+    assert_eq!(
+        pane.handle_click(&hits, 32, 7),
+        SourceControlOutcome::Stage(paths(&["b/c/y.rs", "b/z.rs"]))
+    );
+    assert_eq!(
+        pane.handle_click(&hits, 30, 8),
+        SourceControlOutcome::Discard {
+            paths: paths(&["b/c/y.rs"]),
+            untracked: Vec::new(),
+        }
+    );
+    // Clicking a folder's name opens nothing.
+    assert_eq!(pane.handle_click(&hits, 5, 7), SourceControlOutcome::Stay);
 }

@@ -755,6 +755,7 @@ impl AppState {
             branch_filter: self.toolbar.branch_filter.clone(),
             compare_base: self.compare_base.clone(),
             operation: self.operation,
+            changes: self.source_control.view.layout(),
         }
     }
 

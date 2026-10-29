@@ -3,9 +3,9 @@ use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
 use crate::{
-    Action, CommitScope, CommitTarget, GraphColumn, Operation, OperationAction, PickPurpose,
-    RepoAction, ResetMode, Rev, StashAction, TagAction, UiEffect, WorkingTreeAction,
-    WorktreeAction,
+    Action, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget, GraphColumn,
+    Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction, TagAction,
+    UiEffect, WorkingTreeAction, WorktreeAction,
 };
 use tgg_git::worktree::Worktree;
 
@@ -22,6 +22,7 @@ fn ctx() -> MenuContext {
         branch_filter: Vec::new(),
         compare_base: None,
         operation: None,
+        changes: ChangesLayout::default(),
     }
 }
 
@@ -716,6 +717,10 @@ fn repository_menu_matches_the_vs_code_order() {
     assert_eq!(
         labels(&menu),
         [
+            "View as Tree",
+            "---",
+            "View & Sort ▸",
+            "---",
             "Pull",
             "Push",
             "Checkout to...",
@@ -1047,6 +1052,51 @@ fn stash_and_tags_submenus_stash_or_pick() {
 }
 
 #[test]
+fn view_and_sort_switch_the_source_control_list() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    assert_eq!(
+        action(&menu, "View as Tree"),
+        &Action::Ui(UiEffect::SetChangesView(ChangesView::Tree))
+    );
+    let sort = submenu(&menu, "View & Sort");
+    assert_eq!(
+        labels(sort),
+        [
+            "✓ View as List",
+            "  View as Tree",
+            "---",
+            "  Sort Changes by Name",
+            "✓ Sort Changes by Path",
+            "  Sort Changes by Status",
+        ]
+    );
+    assert_eq!(
+        action(sort, "  Sort Changes by Status"),
+        &Action::Ui(UiEffect::SetChangesSort(ChangesSort::Status))
+    );
+
+    // In tree view the top entry switches back, and the check moves.
+    let tree = MenuContext {
+        changes: ChangesLayout {
+            view: ChangesView::Tree,
+            sort: ChangesSort::Name,
+        },
+        ..ctx()
+    };
+    let menu = menu_for(&Target::Repository, &tree);
+    assert_eq!(
+        action(&menu, "View as List"),
+        &Action::Ui(UiEffect::SetChangesView(ChangesView::List))
+    );
+    let sort = labels(submenu(&menu, "View & Sort"));
+    assert!(sort.contains(&"✓ View as Tree".to_owned()), "{sort:?}");
+    assert!(
+        sort.contains(&"✓ Sort Changes by Name".to_owned()),
+        "{sort:?}"
+    );
+}
+
+#[test]
 fn abort_rebase_and_undo_depend_on_the_repository_state() {
     let rebasing = MenuContext {
         operation: Some(Operation::Rebase),
@@ -1133,6 +1183,10 @@ fn repository_menu_without_remotes_or_branch() {
     assert_eq!(
         labels(&menu),
         [
+            "View as Tree",
+            "---",
+            "View & Sort ▸",
+            "---",
             "Checkout to...",
             "---",
             "Commit ▸",
@@ -1172,6 +1226,7 @@ fn empty_submenus_are_dropped() {
         branch_filter: Vec::new(),
         compare_base: None,
         operation: None,
+        changes: ChangesLayout::default(),
     };
     let menu = menu_for(&Target::Repository, &ctx);
     assert!(
