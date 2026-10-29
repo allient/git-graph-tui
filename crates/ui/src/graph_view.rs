@@ -375,7 +375,7 @@ impl GraphView<'_> {
                 BadgeKind::Stash => theme.stash,
                 _ => theme.lane(lane_color),
             };
-            let mut style = Style::new().fg(theme.badge_fg).bg(bg);
+            let mut style = Style::new().fg(theme.badge_text(bg)).bg(bg);
             if badge.kind == BadgeKind::Head {
                 style = style.add_modifier(Modifier::BOLD);
             }
