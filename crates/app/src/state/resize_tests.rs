@@ -128,3 +128,25 @@ fn a_saved_layout_is_applied_and_read_back() {
         "the dragged graph column is saved"
     );
 }
+
+#[test]
+fn default_widths_written_in_the_config_are_not_a_change() {
+    use crate::config::Layout;
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    // The README's example spells out the default column widths.
+    let example = Layout {
+        source_control_width: Some(36),
+        graph_column: Some(12),
+        date_column: Some(16),
+        author_column: Some(14),
+        hash_column: Some(8),
+    };
+    let baseline = h.state.apply_layout(example);
+    h.draw(150, H);
+    assert_eq!(
+        h.state.layout(),
+        baseline,
+        "quitting without resizing leaves the file alone"
+    );
+}

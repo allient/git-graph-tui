@@ -65,8 +65,9 @@ impl AppState {
 }
 
 impl AppState {
-    /// Uses the widths saved in the config file.
-    pub fn apply_layout(&mut self, layout: Layout) {
+    /// Uses the widths saved in the config file, and returns them as
+    /// [`AppState::layout`] reports them, to tell later whether anything changed.
+    pub fn apply_layout(&mut self, layout: Layout) -> Layout {
         let default = ColumnWidths::default();
         self.source_control.width = layout.source_control_width;
         self.columns = ColumnWidths {
@@ -75,6 +76,7 @@ impl AppState {
             author: layout.author_column.unwrap_or(default.author),
             hash: layout.hash_column.unwrap_or(default.hash),
         };
+        self.layout()
     }
 
     /// The current widths, for saving; default widths are left out.

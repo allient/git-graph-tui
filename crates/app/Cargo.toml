@@ -22,7 +22,6 @@ anyhow.workspace = true
 clap.workspace = true
 crossbeam-channel.workspace = true
 crossterm.workspace = true
-dirs.workspace = true
 ratatui.workspace = true
 serde.workspace = true
 tgg-actions.workspace = true
