@@ -510,6 +510,26 @@ fn remote_names_on_a_badge_are_italic() {
 }
 
 #[test]
+fn a_remote_name_on_a_badge_targets_the_remote_branch() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let (buf, hits) = render(&view(&loaded), 110, 16);
+    let (x, y) = find(&buf, "│ origin ");
+    match hits.hit(x + 3, y) {
+        Some(HitTarget::Ref { full_name, .. }) => {
+            assert_eq!(full_name, "refs/remotes/origin/main");
+        }
+        other => panic!("expected origin/main, got {other:?}"),
+    }
+    // The branch name still targets the local branch.
+    let (x, y) = find(&buf, " main ");
+    match hits.hit(x + 2, y) {
+        Some(HitTarget::Ref { full_name, .. }) => assert_eq!(full_name, "refs/heads/main"),
+        other => panic!("expected main, got {other:?}"),
+    }
+}
+
+#[test]
 fn nerd_badges_have_an_icon_and_rounded_ends() {
     let repo = FixtureRepo::sample();
     let loaded = load(&repo);

@@ -380,13 +380,24 @@ impl GraphView<'_> {
         let right = cols.description.right();
         for badge in badges_for(&commit.id, self.refs) {
             let start = x;
-            x = draw_badge(buf, x, y, right, &badge, lane_color, theme);
+            let remotes;
+            (x, remotes) = draw_badge(buf, x, y, right, &badge, lane_color, theme);
             if x > start {
                 hits.push(
                     Rect::new(start, y, x - start, 1),
                     HitTarget::Ref {
                         commit: index,
                         full_name: badge.full_name,
+                    },
+                );
+            }
+            // Pushed after the badge, so a remote's name wins over it.
+            for (from, to, remote) in remotes.into_iter().filter(|(from, to, _)| to > from) {
+                hits.push(
+                    Rect::new(from, y, to - from, 1),
+                    HitTarget::Ref {
+                        commit: index,
+                        full_name: format!("refs/remotes/{remote}/{}", badge.label),
                     },
                 );
             }
@@ -421,7 +432,8 @@ impl GraphView<'_> {
     }
 }
 
-/// Draws one ref badge from `x` and returns where it ends. The current
+/// Draws one ref badge from `x` and returns where it ends, with the
+/// columns (start, end) each remote's name covers. The current
 /// branch gets a circle before it and a bold name; remote names are italic.
 /// With Nerd icons the badge is VS Code's: rounded ends, an icon on the lane
 /// color, then the name on `badge_bg`.
@@ -433,7 +445,7 @@ fn draw_badge(
     badge: &Badge,
     lane_color: usize,
     theme: &Theme,
-) -> u16 {
+) -> (u16, Vec<(u16, u16, String)>) {
     let color = match badge.kind {
         BadgeKind::Tag => theme.tag,
         BadgeKind::Stash => theme.stash,
@@ -468,14 +480,17 @@ fn draw_badge(
         x = put(buf, x, y, right, &format!("{icon} "), style);
     }
     x = put(buf, x, y, right, &format!(" {} ", badge.label), name);
+    let mut remotes = Vec::new();
     for name in &badge.remotes {
         x = put(buf, x, y, right, "│", body(Style::new()));
+        let start = x;
         x = put(buf, x, y, right, &format!(" {name} "), remote);
+        remotes.push((start, x, name.clone()));
     }
     if let Some((_, end)) = ends {
         x = put(buf, x, y, right, &end.to_string(), Style::new().fg(body_bg));
     }
-    x
+    (x, remotes)
 }
 
 /// The lines leaving a commit, run straight down through the gap opened
