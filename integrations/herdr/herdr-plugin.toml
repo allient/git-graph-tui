@@ -1,7 +1,7 @@
-# herdr plugin for tui-git-graph: opens the Git Graph for the active
+# herdr plugin for git-graph-tui: opens the Git Graph for the active
 # repository in a herdr tab, with plain right-click going to its menus.
-id = "tui-git-graph"
-name = "tui-git-graph"
+id = "git-graph-tui"
+name = "git-graph-tui"
 version = "0.1.0"
 description = "A Git Graph for the terminal: the commit graph with right-click menus, in a herdr tab."
 # The version these scripts were checked against (`pane input --right-click`,
@@ -13,7 +13,7 @@ platforms = ["linux", "macos"]
 [[actions]]
 id = "open"
 title = "Open Git Graph"
-description = "Open tui-git-graph for the active worktree, the focused pane's directory or the workspace."
+description = "Open git-graph-tui for the active worktree, the focused pane's directory or the workspace."
 contexts = ["workspace"]
 command = ["sh", "scripts/open.sh"]
 

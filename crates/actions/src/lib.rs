@@ -1,4 +1,4 @@
-//! Git actions for tui-git-graph.
+//! Git actions for git-graph-tui.
 //!
 //! Each action (checkout, create branch, merge, rebase, cherry-pick, reset,
 //! push, ...) is plain data: the git arguments to run, whether it is

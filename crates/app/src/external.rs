@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 /// Environment variable naming the diff pager; it wins over the config file.
-pub const PAGER_ENV: &str = "TUI_GIT_GRAPH_PAGER";
+pub const PAGER_ENV: &str = "GIT_GRAPH_TUI_PAGER";
 
 /// A program to run with the terminal handed over to it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +21,7 @@ pub struct External {
     pub refresh: bool,
 }
 
-/// The diff pager to use: `$TUI_GIT_GRAPH_PAGER`, else the config file's
+/// The diff pager to use: `$GIT_GRAPH_TUI_PAGER`, else the config file's
 /// `[diff] pager`. None (or an empty value) keeps the built-in diff view.
 pub fn pager(env: &dyn Fn(&str) -> Option<String>, config: Option<String>) -> Option<String> {
     env(PAGER_ENV)
@@ -260,7 +260,7 @@ mod tests {
         assert_eq!(run(&fine), None);
         let missing = External {
             label: "nope".into(),
-            program: "tui-git-graph-no-such-program".into(),
+            program: "git-graph-tui-no-such-program".into(),
             args: Vec::new(),
             refresh: false,
         };

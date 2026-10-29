@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI agents (and humans) working on **tui-git-graph**, a standalone terminal Git Graph written in Rust with ratatui. Read `README.md` first for the goals, scope, stack and architecture. This file covers **how** to build it.
+Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone terminal Git Graph written in Rust with ratatui. Read `README.md` first for the goals, scope, stack and architecture. This file covers **how** to build it.
 
 > If a fact here conflicts with the code or with a library's docs, check the source, fix this file, and don't guess.
 
@@ -18,7 +18,7 @@ Guidance for AI agents (and humans) working on **tui-git-graph**, a standalone t
 
 ## 2. Workspace layout
 
-See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `tgg-` except the binary `tui-git-graph`.
+See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `tgg-` except the binary `git-graph-tui`.
 
 Workspace rules:
 - **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`. **Never use `cargo remove`**: it also deletes the dependency from root `[workspace.dependencies]` when no member uses it anymore, which drops planned catalog entries. Remove a dependency by editing the member's `Cargo.toml` by hand.

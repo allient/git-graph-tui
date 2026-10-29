@@ -1,5 +1,5 @@
 #!/bin/sh
-# Tests for the herdr plugin scripts, with herdr and tui-git-graph stubbed.
+# Tests for the herdr plugin scripts, with herdr and git-graph-tui stubbed.
 # Run from anywhere: sh integrations/herdr/tests/run.sh
 set -u
 SH=${SH:-sh}
@@ -17,13 +17,13 @@ cat > "$scratch/bin/herdr" <<'STUB'
 printf '%s\n' "$*" >> "$STUB_LOG"
 exit "${STUB_EXIT:-0}"
 STUB
-# A tui-git-graph stub that records where it ran and with what.
-cat > "$scratch/bin/tui-git-graph" <<'STUB'
+# A git-graph-tui stub that records where it ran and with what.
+cat > "$scratch/bin/git-graph-tui" <<'STUB'
 #!/bin/sh
 printf 'cwd=%s args=%s\n' "$(pwd)" "$*" >> "$STUB_LOG"
 exit "${STUB_APP_EXIT:-0}"
 STUB
-chmod +x "$scratch/bin/herdr" "$scratch/bin/tui-git-graph"
+chmod +x "$scratch/bin/herdr" "$scratch/bin/git-graph-tui"
 export STUB_LOG="$scratch/log"
 mkdir -p "$scratch/repo"
 repo=$(cd "$scratch/repo" && pwd -P)
@@ -48,7 +48,7 @@ open_with() { # context-json
   cat "$STUB_LOG"
 }
 
-opens="plugin pane open --plugin tui-git-graph --entrypoint graph --focus --env TGG_TARGET_DIR"
+opens="plugin pane open --plugin git-graph-tui --entrypoint graph --focus --env TGG_TARGET_DIR"
 
 check "open: checkout_path wins" "$opens=/wt" \
   "$(open_with '{"workspace_cwd":"/ws","focused_pane_cwd":"/pane","checkout_path":"/wt"}')"
@@ -64,7 +64,7 @@ check "open: paths with spaces" "$opens=/my repo/x" \
 run_with() { # entrypoint-id herdr-exit [binary]
   reset
   HERDR_BIN_PATH="$scratch/bin/herdr" HERDR_PLUGIN_ENTRYPOINT_ID="$1" STUB_EXIT="$2" \
-    TGG_TARGET_DIR="$repo" TGG_BIN="${3:-$scratch/bin/tui-git-graph}" \
+    TGG_TARGET_DIR="$repo" TGG_BIN="${3:-$scratch/bin/git-graph-tui}" \
     $SH "$scripts/run.sh" </dev/null >"$scratch/out" 2>&1
   echo "exit=$?"
   cat "$STUB_LOG"
@@ -83,7 +83,7 @@ check "run: outside a plugin pane, no routing" \
 check "run: the app's failure is kept on screen and passed on" "exit=3 Press Enter to close." \
   "$(STUB_APP_EXIT=3 run_with graph 0 | head -1) $(tail -1 "$scratch/out")"
 check "run: a missing binary exits 1" "exit=1" \
-  "$(run_with '' 0 "$scratch/missing/tui-git-graph" | head -1)"
+  "$(run_with '' 0 "$scratch/missing/git-graph-tui" | head -1)"
 check "run: a missing binary shows the install hint" "yes" \
   "$(grep -q 'cargo install' "$scratch/out" && echo yes || echo no)"
 

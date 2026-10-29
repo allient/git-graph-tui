@@ -1,6 +1,6 @@
 [package]
 name = "tgg-git"
-description = "Git CLI access for tui-git-graph: safe command building, process execution and output parsing."
+description = "Git CLI access for git-graph-tui: safe command building, process execution and output parsing."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

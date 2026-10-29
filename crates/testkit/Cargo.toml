@@ -1,6 +1,6 @@
 [package]
 name = "tgg-testkit"
-description = "Test fixtures for tui-git-graph: throwaway git repositories built in temp dirs."
+description = "Test fixtures for git-graph-tui: throwaway git repositories built in temp dirs."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -258,7 +258,7 @@ fn clone_asks_for_a_url_and_a_parent_folder() {
     action
         .set_input(
             InputId::Url,
-            InputValue::Text("https://github.com/allient/tui-git-graph.git".into()),
+            InputValue::Text("https://github.com/allient/git-graph-tui.git".into()),
         )
         .unwrap();
     assert_eq!(
@@ -266,11 +266,11 @@ fn clone_asks_for_a_url_and_a_parent_folder() {
         [network(&[
             "clone",
             "--",
-            "https://github.com/allient/tui-git-graph.git",
-            "/work/tui-git-graph"
+            "https://github.com/allient/git-graph-tui.git",
+            "/work/git-graph-tui"
         ])]
     );
-    assert_eq!(action.destination().as_deref(), Some("/work/tui-git-graph"));
+    assert_eq!(action.destination().as_deref(), Some("/work/git-graph-tui"));
 }
 
 #[test]

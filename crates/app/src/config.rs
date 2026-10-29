@@ -1,5 +1,5 @@
-//! The config file: `~/.config/tui-git-graph/config.toml` (or under
-//! `$XDG_CONFIG_HOME`, or wherever `$TUI_GIT_GRAPH_CONFIG` points).
+//! The config file: `~/.config/git-graph-tui/config.toml` (or under
+//! `$XDG_CONFIG_HOME`, or wherever `$GIT_GRAPH_TUI_CONFIG` points).
 //!
 //! ```toml
 //! icons = "auto"          # "auto", "nerd" or "unicode"
@@ -17,7 +17,7 @@
 //!
 //! [diff]
 //! pager = "delta"         # pipe file diffs into this command; "" or unset:
-//!                         # the built-in view ($TUI_GIT_GRAPH_PAGER wins)
+//!                         # the built-in view ($GIT_GRAPH_TUI_PAGER wins)
 //!
 //! [issues]                # `#123` in commit messages opens this page;
 //! url = "https://jira.example.com/browse/PROJ-$1"   # $1 is the number
@@ -35,7 +35,7 @@ use tgg_actions::{ChangesSort, ChangesView, GraphColumn};
 use crate::cli::IconStyle;
 
 /// Environment variable naming the config file to use instead of the default.
-pub const CONFIG_ENV: &str = "TUI_GIT_GRAPH_CONFIG";
+pub const CONFIG_ENV: &str = "GIT_GRAPH_TUI_CONFIG";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -206,7 +206,7 @@ pub fn path(env: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
                 .filter(|dir| !dir.is_empty())
                 .map(|home| PathBuf::from(home).join(".config"))
         })?;
-    Some(base.join("tui-git-graph").join("config.toml"))
+    Some(base.join("git-graph-tui").join("config.toml"))
 }
 
 /// Reads the config file; a missing file is the default config.
@@ -331,7 +331,7 @@ mod tests {
     fn the_file_lives_under_the_config_directory() {
         assert_eq!(
             path(&env(&[("XDG_CONFIG_HOME", "/xdg")])),
-            Some(PathBuf::from("/xdg/tui-git-graph/config.toml"))
+            Some(PathBuf::from("/xdg/git-graph-tui/config.toml"))
         );
         assert_eq!(
             path(&env(&[
@@ -342,12 +342,12 @@ mod tests {
         );
         assert_eq!(
             path(&env(&[("HOME", "/home/me")])),
-            Some(PathBuf::from("/home/me/.config/tui-git-graph/config.toml"))
+            Some(PathBuf::from("/home/me/.config/git-graph-tui/config.toml"))
         );
         assert_eq!(
             path(&env(&[("USERPROFILE", "C:/Users/me")])),
             Some(PathBuf::from(
-                "C:/Users/me/.config/tui-git-graph/config.toml"
+                "C:/Users/me/.config/git-graph-tui/config.toml"
             ))
         );
         assert_eq!(path(&env(&[])), None, "no home, no config file");

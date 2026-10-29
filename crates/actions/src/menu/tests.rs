@@ -1448,6 +1448,6 @@ fn the_main_and_the_current_worktree_cannot_be_removed() {
         ]
     );
     assert!(labels(&worktree_menu(&linked_worktree(), true)).contains(
-        &"Remove Worktree... (disabled: tui-git-graph is running in this worktree.)".to_owned()
+        &"Remove Worktree... (disabled: git-graph-tui is running in this worktree.)".to_owned()
     ));
 }

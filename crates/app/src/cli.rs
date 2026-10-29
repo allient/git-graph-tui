@@ -7,11 +7,11 @@ use clap::{Parser, ValueEnum};
 use tgg_ui::Icons;
 
 /// Environment variable that picks the icons when `--icons` isn't given.
-pub const ICONS_ENV: &str = "TUI_GIT_GRAPH_ICONS";
+pub const ICONS_ENV: &str = "GIT_GRAPH_TUI_ICONS";
 
 /// A Git Graph for the terminal.
 #[derive(Debug, Parser)]
-#[command(name = "tui-git-graph", version, about, long_about = None)]
+#[command(name = "git-graph-tui", version, about, long_about = None)]
 pub struct Cli {
     /// Path inside the repository to open.
     #[arg(default_value = ".")]
@@ -19,7 +19,7 @@ pub struct Cli {
 
     /// Toolbar icons: VS Code's icons from a Nerd Font, or plain Unicode.
     /// `auto` uses the icons in terminals that ship Nerd Font symbols
-    /// (Ghostty, WezTerm, Kitty). Defaults to `$TUI_GIT_GRAPH_ICONS`, then auto.
+    /// (Ghostty, WezTerm, Kitty). Defaults to `$GIT_GRAPH_TUI_ICONS`, then auto.
     #[arg(long, value_enum, value_name = "STYLE")]
     pub icons: Option<IconStyle>,
 }
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn path_defaults_to_current_directory() {
-        let cli = Cli::try_parse_from(["tui-git-graph"]).unwrap();
+        let cli = Cli::try_parse_from(["git-graph-tui"]).unwrap();
         assert_eq!(cli.path, PathBuf::from("."));
     }
 
@@ -105,7 +105,7 @@ mod tests {
     }
 
     fn icons(args: &[&str], vars: &[(&str, &str)]) -> Result<Icons> {
-        let cli = Cli::try_parse_from(std::iter::once("tui-git-graph").chain(args.iter().copied()))
+        let cli = Cli::try_parse_from(std::iter::once("git-graph-tui").chain(args.iter().copied()))
             .unwrap();
         cli.icons(&env(vars), None)
     }
@@ -160,14 +160,14 @@ mod tests {
     #[test]
     fn the_environment_variable_picks_icons_when_the_flag_is_missing() {
         assert_eq!(
-            icons(&[], &[("TUI_GIT_GRAPH_ICONS", "nerd")]).unwrap(),
+            icons(&[], &[("GIT_GRAPH_TUI_ICONS", "nerd")]).unwrap(),
             Icons::Nerd
         );
         assert_eq!(
             icons(
                 &[],
                 &[
-                    ("TUI_GIT_GRAPH_ICONS", "Unicode"),
+                    ("GIT_GRAPH_TUI_ICONS", "Unicode"),
                     ("TERM_PROGRAM", "ghostty")
                 ]
             )
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(
             icons(
                 &[],
-                &[("TUI_GIT_GRAPH_ICONS", "auto"), ("TERM_PROGRAM", "ghostty")]
+                &[("GIT_GRAPH_TUI_ICONS", "auto"), ("TERM_PROGRAM", "ghostty")]
             )
             .unwrap(),
             Icons::Nerd
@@ -187,47 +187,47 @@ mod tests {
     #[test]
     fn the_flag_wins_over_the_environment_variable() {
         assert_eq!(
-            icons(&["--icons", "unicode"], &[("TUI_GIT_GRAPH_ICONS", "nerd")]).unwrap(),
+            icons(&["--icons", "unicode"], &[("GIT_GRAPH_TUI_ICONS", "nerd")]).unwrap(),
             Icons::Unicode
         );
     }
 
     #[test]
     fn an_unknown_environment_value_is_an_error() {
-        let err = icons(&[], &[("TUI_GIT_GRAPH_ICONS", "emoji")]).unwrap_err();
+        let err = icons(&[], &[("GIT_GRAPH_TUI_ICONS", "emoji")]).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "TUI_GIT_GRAPH_ICONS must be \"auto\", \"unicode\" or \"nerd\", not \"emoji\""
+            "GIT_GRAPH_TUI_ICONS must be \"auto\", \"unicode\" or \"nerd\", not \"emoji\""
         );
     }
 
     #[test]
     fn an_unknown_flag_value_is_rejected() {
-        assert!(Cli::try_parse_from(["tui-git-graph", "--icons", "emoji"]).is_err());
+        assert!(Cli::try_parse_from(["git-graph-tui", "--icons", "emoji"]).is_err());
     }
 
     #[test]
     fn path_can_be_given_as_positional_argument() {
-        let cli = Cli::try_parse_from(["tui-git-graph", "../other-repo"]).unwrap();
+        let cli = Cli::try_parse_from(["git-graph-tui", "../other-repo"]).unwrap();
         assert_eq!(cli.path, PathBuf::from("../other-repo"));
     }
 
     #[test]
     fn the_config_file_picks_icons_after_the_flag_and_the_variable() {
-        let cli = Cli::try_parse_from(["tui-git-graph"]).unwrap();
+        let cli = Cli::try_parse_from(["git-graph-tui"]).unwrap();
         assert_eq!(
             cli.icons(&env(&[]), Some(IconStyle::Nerd)).unwrap(),
             Icons::Nerd
         );
         assert_eq!(
             cli.icons(
-                &env(&[("TUI_GIT_GRAPH_ICONS", "unicode")]),
+                &env(&[("GIT_GRAPH_TUI_ICONS", "unicode")]),
                 Some(IconStyle::Nerd)
             )
             .unwrap(),
             Icons::Unicode
         );
-        let flag = Cli::try_parse_from(["tui-git-graph", "--icons", "unicode"]).unwrap();
+        let flag = Cli::try_parse_from(["git-graph-tui", "--icons", "unicode"]).unwrap();
         assert_eq!(
             flag.icons(&env(&[]), Some(IconStyle::Nerd)).unwrap(),
             Icons::Unicode

@@ -1,6 +1,6 @@
 [package]
 name = "tgg-model"
-description = "Domain types for tui-git-graph: commits, refs, signatures."
+description = "Domain types for git-graph-tui: commits, refs, signatures."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

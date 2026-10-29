@@ -8,8 +8,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
-repository = "https://github.com/allient/tui-git-graph"
-homepage = "https://github.com/allient/tui-git-graph"
+repository = "https://github.com/allient/git-graph-tui"
+homepage = "https://github.com/allient/git-graph-tui"
 authors = ["Allient"]
 publish = false
 

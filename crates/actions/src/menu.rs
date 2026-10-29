@@ -577,7 +577,7 @@ pub fn worktree_menu(worktree: &Worktree, is_current: bool) -> Vec<MenuItem> {
     let why_not_removed = if worktree.is_main {
         Some("The main worktree can't be removed.")
     } else if is_current {
-        Some("tui-git-graph is running in this worktree.")
+        Some("git-graph-tui is running in this worktree.")
     } else {
         None
     };

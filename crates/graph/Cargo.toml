@@ -1,6 +1,6 @@
 [package]
 name = "tgg-graph"
-description = "Commit graph lane layout for tui-git-graph."
+description = "Commit graph lane layout for git-graph-tui."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

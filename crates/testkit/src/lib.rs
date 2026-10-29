@@ -1,4 +1,4 @@
-//! Test fixtures for tui-git-graph.
+//! Test fixtures for git-graph-tui.
 //!
 //! Builds throwaway git repositories in temporary directories (branches,
 //! merges, tags, stashes, a local bare `origin`) so tests never touch a real
