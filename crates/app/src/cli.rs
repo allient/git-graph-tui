@@ -17,42 +17,58 @@ pub struct Cli {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
-    /// Toolbar icons: plain Unicode, or VS Code's icons from a Nerd Font
-    /// (install one first). Defaults to `$TUI_GIT_GRAPH_ICONS`, then unicode.
+    /// Toolbar icons: VS Code's icons from a Nerd Font, or plain Unicode.
+    /// `auto` uses the icons in terminals that ship Nerd Font symbols
+    /// (Ghostty, WezTerm, Kitty). Defaults to `$TUI_GIT_GRAPH_ICONS`, then auto.
     #[arg(long, value_enum, value_name = "STYLE")]
     pub icons: Option<IconStyle>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum IconStyle {
+    Auto,
     Unicode,
     Nerd,
 }
 
-impl From<IconStyle> for Icons {
-    fn from(style: IconStyle) -> Self {
-        match style {
-            IconStyle::Unicode => Self::Unicode,
-            IconStyle::Nerd => Self::Nerd,
-        }
+impl Cli {
+    /// The icons to draw: the flag, else [`ICONS_ENV`], else `auto`, which
+    /// picks Nerd Font icons when the terminal is known to have them. `env`
+    /// looks up an environment variable.
+    pub fn icons(&self, env: &dyn Fn(&str) -> Option<String>) -> Result<Icons> {
+        let style = match (self.icons, env(ICONS_ENV)) {
+            (Some(style), _) => style,
+            (None, None) => IconStyle::Auto,
+            (None, Some(value)) => match IconStyle::from_str(&value, true) {
+                Ok(style) => style,
+                Err(_) => {
+                    bail!("{ICONS_ENV} must be \"auto\", \"unicode\" or \"nerd\", not \"{value}\"")
+                }
+            },
+        };
+        Ok(match style {
+            IconStyle::Nerd => Icons::Nerd,
+            IconStyle::Auto if ships_nerd_font_symbols(env) => Icons::Nerd,
+            IconStyle::Auto | IconStyle::Unicode => Icons::Unicode,
+        })
     }
 }
 
-impl Cli {
-    /// The icons to draw: the flag, else `env` (the value of [`ICONS_ENV`]),
-    /// else plain Unicode.
-    pub fn icons(&self, env: Option<&str>) -> Result<Icons> {
-        if let Some(style) = self.icons {
-            return Ok(style.into());
-        }
-        let Some(value) = env else {
-            return Ok(Icons::Unicode);
-        };
-        match IconStyle::from_str(value, true) {
-            Ok(style) => Ok(style.into()),
-            Err(_) => bail!("{ICONS_ENV} must be \"unicode\" or \"nerd\", not \"{value}\""),
-        }
-    }
+/// Whether the terminal draws Nerd Font symbols whatever font the user picked:
+/// Ghostty, WezTerm and Kitty bundle them. Their variables survive inside
+/// tmux or herdr, where the outer terminal still draws the cells.
+fn ships_nerd_font_symbols(env: &dyn Fn(&str) -> Option<String>) -> bool {
+    let program = env("TERM_PROGRAM").unwrap_or_default().to_lowercase();
+    let term = env("TERM").unwrap_or_default();
+    matches!(program.as_str(), "ghostty" | "wezterm")
+        || matches!(term.as_str(), "xterm-ghostty" | "xterm-kitty")
+        || [
+            "GHOSTTY_RESOURCES_DIR",
+            "WEZTERM_EXECUTABLE",
+            "KITTY_WINDOW_ID",
+        ]
+        .iter()
+        .any(|name| env(name).is_some())
 }
 
 #[cfg(test)]
@@ -74,38 +90,109 @@ mod tests {
         assert_eq!(cli.path, PathBuf::from("."));
     }
 
-    #[test]
-    fn icons_are_plain_unless_asked_for() {
-        let cli = Cli::try_parse_from(["tui-git-graph"]).unwrap();
-        assert_eq!(cli.icons(None).unwrap(), Icons::Unicode);
+    /// An environment with only `vars` set.
+    fn env(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let vars: Vec<(String, String)> = vars
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        move |name| vars.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
+    }
+
+    fn icons(args: &[&str], vars: &[(&str, &str)]) -> Result<Icons> {
+        let cli = Cli::try_parse_from(std::iter::once("tui-git-graph").chain(args.iter().copied()))
+            .unwrap();
+        cli.icons(&env(vars))
     }
 
     #[test]
-    fn the_icons_flag_picks_nerd_font_icons() {
-        let cli = Cli::try_parse_from(["tui-git-graph", "--icons", "nerd"]).unwrap();
-        assert_eq!(cli.icons(None).unwrap(), Icons::Nerd);
+    fn icons_are_plain_in_an_unknown_terminal() {
+        assert_eq!(icons(&[], &[]).unwrap(), Icons::Unicode);
+        assert_eq!(
+            icons(&[], &[("TERM_PROGRAM", "Apple_Terminal")]).unwrap(),
+            Icons::Unicode
+        );
+    }
+
+    #[test]
+    fn terminals_that_ship_nerd_font_symbols_get_icons_automatically() {
+        for vars in [
+            [("TERM_PROGRAM", "ghostty")],
+            [(
+                "GHOSTTY_RESOURCES_DIR",
+                "/Applications/Ghostty.app/Contents/Resources/ghostty",
+            )],
+            [("TERM_PROGRAM", "WezTerm")],
+            [("TERM", "xterm-kitty")],
+            [("KITTY_WINDOW_ID", "1")],
+        ] {
+            assert_eq!(icons(&[], &vars).unwrap(), Icons::Nerd, "{vars:?}");
+        }
+        // Inside a multiplexer the outer terminal still draws the icons.
+        assert_eq!(
+            icons(
+                &[],
+                &[
+                    ("TERM_PROGRAM", "herdr"),
+                    ("GHOSTTY_RESOURCES_DIR", "/Applications/Ghostty.app")
+                ]
+            )
+            .unwrap(),
+            Icons::Nerd
+        );
+    }
+
+    #[test]
+    fn the_icons_flag_forces_either_style() {
+        assert_eq!(icons(&["--icons", "nerd"], &[]).unwrap(), Icons::Nerd);
+        assert_eq!(
+            icons(&["--icons", "unicode"], &[("TERM_PROGRAM", "ghostty")]).unwrap(),
+            Icons::Unicode
+        );
+        assert_eq!(icons(&["--icons", "auto"], &[]).unwrap(), Icons::Unicode);
     }
 
     #[test]
     fn the_environment_variable_picks_icons_when_the_flag_is_missing() {
-        let cli = Cli::try_parse_from(["tui-git-graph"]).unwrap();
-        assert_eq!(cli.icons(Some("nerd")).unwrap(), Icons::Nerd);
-        assert_eq!(cli.icons(Some("Unicode")).unwrap(), Icons::Unicode);
+        assert_eq!(
+            icons(&[], &[("TUI_GIT_GRAPH_ICONS", "nerd")]).unwrap(),
+            Icons::Nerd
+        );
+        assert_eq!(
+            icons(
+                &[],
+                &[
+                    ("TUI_GIT_GRAPH_ICONS", "Unicode"),
+                    ("TERM_PROGRAM", "ghostty")
+                ]
+            )
+            .unwrap(),
+            Icons::Unicode
+        );
+        assert_eq!(
+            icons(
+                &[],
+                &[("TUI_GIT_GRAPH_ICONS", "auto"), ("TERM_PROGRAM", "ghostty")]
+            )
+            .unwrap(),
+            Icons::Nerd
+        );
     }
 
     #[test]
     fn the_flag_wins_over_the_environment_variable() {
-        let cli = Cli::try_parse_from(["tui-git-graph", "--icons", "unicode"]).unwrap();
-        assert_eq!(cli.icons(Some("nerd")).unwrap(), Icons::Unicode);
+        assert_eq!(
+            icons(&["--icons", "unicode"], &[("TUI_GIT_GRAPH_ICONS", "nerd")]).unwrap(),
+            Icons::Unicode
+        );
     }
 
     #[test]
     fn an_unknown_environment_value_is_an_error() {
-        let cli = Cli::try_parse_from(["tui-git-graph"]).unwrap();
-        let err = cli.icons(Some("emoji")).unwrap_err();
+        let err = icons(&[], &[("TUI_GIT_GRAPH_ICONS", "emoji")]).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "TUI_GIT_GRAPH_ICONS must be \"unicode\" or \"nerd\", not \"emoji\""
+            "TUI_GIT_GRAPH_ICONS must be \"auto\", \"unicode\" or \"nerd\", not \"emoji\""
         );
     }
 

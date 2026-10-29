@@ -14,6 +14,8 @@ const DATE_WIDTH: u16 = 16;
 const AUTHOR_WIDTH: u16 = 14;
 /// Room for the "Graph" header and its divider.
 const MIN_GRAPH_WIDTH: u16 = 7;
+/// Blank columns left of the lanes.
+const GRAPH_PADDING: u16 = 2;
 /// Narrowest and widest a dragged column gets.
 const MIN_COLUMN: u16 = 4;
 const MAX_COLUMN: u16 = 80;
@@ -258,7 +260,7 @@ impl GraphView<'_> {
     ) {
         let Some(index) = self.commit_index(display) else {
             // A dotted line from the uncommitted row down to HEAD's lane.
-            let x = cols.graph.x + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
+            let x = cols.lanes_x() + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
             if x < cols.graph.right() {
                 buf[(x, y)].set_char('┆').set_fg(theme.muted);
             }
@@ -300,7 +302,7 @@ impl GraphView<'_> {
     }
 
     fn draw_uncommitted(&self, buf: &mut Buffer, cols: &Columns, y: u16, theme: &Theme) {
-        let x = cols.graph.x + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
+        let x = cols.lanes_x() + u16::try_from(2 * self.head_lane()).unwrap_or(u16::MAX);
         if x < cols.graph.right() {
             buf[(x, y)].set_char('○').set_fg(theme.text);
         }
@@ -387,7 +389,7 @@ impl GraphView<'_> {
 }
 
 fn draw_glyphs(buf: &mut Buffer, cols: &Columns, y: u16, cells: &[GlyphCell], theme: &Theme) {
-    for (x, cell) in (cols.graph.x..cols.graph.right()).zip(cells) {
+    for (x, cell) in (cols.lanes_x()..cols.graph.right()).zip(cells) {
         let target = &mut buf[(x, y)];
         target.set_char(cell.ch);
         if let Some(color) = cell.color {
@@ -459,6 +461,11 @@ struct Columns {
 }
 
 impl Columns {
+    /// Where lane 0 is drawn, after the padding.
+    fn lanes_x(&self) -> u16 {
+        self.graph.x + GRAPH_PADDING.min(self.graph.width)
+    }
+
     fn for_width(area: Rect, lanes: usize, widths: ColumnWidths) -> Self {
         let lanes = lanes.max(1);
         let graph_width = widths
@@ -466,6 +473,7 @@ impl Columns {
             .unwrap_or_else(|| {
                 u16::try_from(2 * lanes)
                     .unwrap_or(u16::MAX)
+                    .saturating_add(GRAPH_PADDING)
                     .max(MIN_GRAPH_WIDTH)
             })
             .min(area.width);

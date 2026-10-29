@@ -1,3 +1,5 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-print-in-tests = true
+# Product names that doc comments (and --help text) spell as they are.
+doc-valid-idents = ["WezTerm", ".."]

@@ -27,7 +27,7 @@ const INPUT_POLL: Duration = Duration::from_millis(50);
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let icons = cli.icons(std::env::var(cli::ICONS_ENV).ok().as_deref())?;
+    let icons = cli.icons(&|name| std::env::var(name).ok())?;
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
