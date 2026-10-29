@@ -23,6 +23,18 @@ pub enum WorkingTreeAction {
     /// Deletes untracked files and directories (ignored files are kept).
     Clean,
     OpenSourceControl,
+    /// Stages files, including deletions (the Source Control pane's `+`).
+    Stage {
+        paths: Vec<String>,
+    },
+    /// Unstages files, keeping their changes. Works before the first commit too.
+    Unstage {
+        paths: Vec<String>,
+    },
+    /// Commits what is staged.
+    Commit {
+        message: String,
+    },
 }
 
 impl WorkingTreeAction {
@@ -48,6 +60,10 @@ impl WorkingTreeAction {
             }
             Self::Clean => strings(&["clean", "-d", "--force", "--"]),
             Self::OpenSourceControl => return Plan::Ui(UiEffect::OpenSourceControl),
+            Self::Stage { paths } => with_paths(&["add", "--all", "--"], paths),
+            Self::Unstage { paths } => with_paths(&["reset", "--quiet", "--"], paths),
+            // One `--message=` argument, so a message starting with `-` stays a message.
+            Self::Commit { message } => vec!["commit".into(), format!("--message={message}")],
         };
         Plan::Git(vec![GitCommand::write(repo, args)])
     }
@@ -82,7 +98,11 @@ impl WorkingTreeAction {
                 "Delete all untracked files and directories? This can't be undone (git clean -d --force). Ignored files are kept.",
                 "Delete",
             ),
-            Self::Stash { .. } | Self::OpenSourceControl => return None,
+            Self::Stash { .. }
+            | Self::OpenSourceControl
+            | Self::Stage { .. }
+            | Self::Unstage { .. }
+            | Self::Commit { .. } => return None,
         };
         Some(Confirmation::new(title, message.to_owned(), label))
     }
@@ -112,7 +132,11 @@ impl WorkingTreeAction {
                 InputKind::Choice(RESET_CHOICES),
                 mode.name(),
             )],
-            Self::Clean | Self::OpenSourceControl => Vec::new(),
+            Self::Clean
+            | Self::OpenSourceControl
+            | Self::Stage { .. }
+            | Self::Unstage { .. }
+            | Self::Commit { .. } => Vec::new(),
         }
     }
 
@@ -141,3 +165,10 @@ impl WorkingTreeAction {
 
 #[cfg(test)]
 mod tests;
+
+/// `prefix` followed by `paths` as literal pathspecs (no globs, no magic).
+fn with_paths(prefix: &[&str], paths: &[String]) -> Vec<String> {
+    let mut args = strings(prefix);
+    args.extend(paths.iter().map(|p| format!(":(literal){p}")));
+    args
+}

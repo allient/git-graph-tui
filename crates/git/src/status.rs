@@ -1,6 +1,6 @@
 //! `git status --porcelain=v2`: HEAD state and uncommitted changes.
 
-use tgg_model::{HeadState, WorkingTreeStatus};
+use tgg_model::{Change, ChangedFile, HeadState, WorkingTreeStatus};
 
 use crate::ParseError;
 
@@ -38,19 +38,33 @@ pub fn parse(output: &str) -> Result<WorkingTreeStatus, ParseError> {
             continue;
         }
         match record.as_bytes().first() {
-            Some(b'1') => count_xy(&mut status, record, index)?,
+            Some(b'1') => {
+                let (staged, unstaged) = count_xy(&mut status, record, index)?;
+                let path = field(record, 9, index)?;
+                status.changes.push(changed(path, None, staged, unstaged));
+            }
             Some(b'2') => {
-                count_xy(&mut status, record, index)?;
+                let (staged, unstaged) = count_xy(&mut status, record, index)?;
+                let path = field(record, 10, index)?;
                 // Renames and copies carry their original path as the next record.
-                records.next();
+                let orig = records.next().map(|(_, r)| r.to_owned());
+                status.changes.push(changed(path, orig, staged, unstaged));
             }
             Some(b'u') => {
                 status.files += 1;
                 status.conflicted += 1;
+                let path = field(record, 11, index)?;
+                status
+                    .changes
+                    .push(changed(path, None, None, Some(Change::Conflicted)));
             }
             Some(b'?') => {
                 status.files += 1;
                 status.untracked += 1;
+                let path = field(record, 2, index)?;
+                status
+                    .changes
+                    .push(changed(path, None, None, Some(Change::Untracked)));
             }
             Some(b'!') => {}
             _ => {
@@ -68,8 +82,52 @@ pub fn parse(output: &str) -> Result<WorkingTreeStatus, ParseError> {
     Ok(status)
 }
 
-/// Counts an ordinary or renamed entry from its `XY` field (`.` means unchanged).
-fn count_xy(status: &mut WorkingTreeStatus, record: &str, index: usize) -> Result<(), ParseError> {
+fn changed(
+    path: &str,
+    orig_path: Option<String>,
+    staged: Option<Change>,
+    unstaged: Option<Change>,
+) -> ChangedFile {
+    ChangedFile {
+        path: path.to_owned(),
+        orig_path,
+        staged,
+        unstaged,
+    }
+}
+
+/// The last of a record's `count` space-separated fields: the path, which may
+/// itself contain spaces.
+fn field(record: &str, count: usize, index: usize) -> Result<&str, ParseError> {
+    record
+        .splitn(count, ' ')
+        .nth(count - 1)
+        .ok_or(ParseError::MissingField {
+            record: index,
+            field: "path",
+        })
+}
+
+/// A change letter from the `XY` field; `.` means unchanged.
+fn change(letter: u8) -> Option<Change> {
+    Some(match letter {
+        b'.' => return None,
+        b'A' => Change::Added,
+        b'D' => Change::Deleted,
+        b'R' => Change::Renamed,
+        b'C' => Change::Copied,
+        b'T' => Change::TypeChanged,
+        _ => Change::Modified,
+    })
+}
+
+/// Counts an ordinary or renamed entry from its `XY` field and returns its
+/// staged and unstaged changes.
+fn count_xy(
+    status: &mut WorkingTreeStatus,
+    record: &str,
+    index: usize,
+) -> Result<(Option<Change>, Option<Change>), ParseError> {
     let xy = record
         .get(2..4)
         .ok_or(ParseError::MissingField {
@@ -84,14 +142,14 @@ fn count_xy(status: &mut WorkingTreeStatus, record: &str, index: usize) -> Resul
     if xy[1] != b'.' {
         status.unstaged += 1;
     }
-    Ok(())
+    Ok((change(xy[0]), change(xy[1])))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use tgg_model::HeadState;
+    use tgg_model::{Change, ChangedFile, HeadState};
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -153,6 +211,46 @@ mod tests {
         assert_eq!(status.files, 2);
         assert_eq!(status.staged, 1);
         assert_eq!(status.untracked, 1);
+    }
+
+    #[test]
+    fn lists_each_changed_file_with_its_staged_and_unstaged_change() {
+        let out = [
+            "# branch.oid (initial)".to_owned(),
+            "# branch.head main".to_owned(),
+            ordinary("M.", "staged.rs"),
+            ordinary(".D", "src/gone.rs"),
+            ordinary("AM", "with space.rs"),
+            format!("2 R. N... 100644 100644 100644 {A} {A} R100 new.rs"),
+            "old.rs".to_owned(),
+            format!("u UU N... 100644 100644 100644 100644 {A} {A} {A} conflict.rs"),
+            "? new file.txt".to_owned(),
+            "! ignored.log".to_owned(),
+        ]
+        .join("\0");
+        let files = parse(&out).unwrap().changes;
+        let file = |path: &str, orig: Option<&str>, staged, unstaged| ChangedFile {
+            path: path.to_owned(),
+            orig_path: orig.map(str::to_owned),
+            staged,
+            unstaged,
+        };
+        assert_eq!(
+            files,
+            [
+                file("staged.rs", None, Some(Change::Modified), None),
+                file("src/gone.rs", None, None, Some(Change::Deleted)),
+                file(
+                    "with space.rs",
+                    None,
+                    Some(Change::Added),
+                    Some(Change::Modified)
+                ),
+                file("new.rs", Some("old.rs"), Some(Change::Renamed), None),
+                file("conflict.rs", None, None, Some(Change::Conflicted)),
+                file("new file.txt", None, None, Some(Change::Untracked)),
+            ]
+        );
     }
 
     #[test]
