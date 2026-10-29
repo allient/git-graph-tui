@@ -287,6 +287,88 @@ pub fn compare_diff_args(base: &Oid, other: Option<&Oid>, file: &FileChange) -> 
     args
 }
 
+/// Arguments for the unified diff of uncommitted changes, for the Source
+/// Control pane: the working tree against the index, or (`staged`) the index
+/// against HEAD, which also works before the first commit. `paths` (literal
+/// pathspecs; both sides of a rename) limit it; none means every file. Parse
+/// one file with [`parse_diff`], several with [`split_diff`].
+#[must_use]
+pub fn working_diff_args(staged: bool, paths: &[String]) -> Vec<String> {
+    let mut args: Vec<String> = vec!["diff".into()];
+    if staged {
+        args.push("--cached".into());
+    }
+    args.extend([
+        // A configured external diff tool would print something else.
+        "--no-ext-diff".into(),
+        "--find-renames".into(),
+        "--".into(),
+    ]);
+    args.extend(paths.iter().map(|p| format!(":(literal){p}")));
+    args
+}
+
+/// Arguments for the diff of an untracked file (`path`, relative to the
+/// repository root) against nothing, so every line shows as added. git
+/// exits 1 when there is a difference: run it with
+/// [`crate::GitCommand::succeeding_with`]`(1)`.
+#[must_use]
+pub fn untracked_diff_args(path: &str) -> Vec<String> {
+    vec![
+        "diff".into(),
+        "--no-index".into(),
+        "--no-ext-diff".into(),
+        "--".into(),
+        "/dev/null".into(),
+        path.to_owned(),
+    ]
+}
+
+/// Splits the diff of several files into one [`Diff`] per file, each with
+/// the path it shows (the new path of a rename).
+#[must_use]
+pub fn split_diff(output: &str) -> Vec<(String, Diff)> {
+    let mut blocks: Vec<String> = Vec::new();
+    for line in output.lines() {
+        if line.starts_with("diff --git ") || blocks.is_empty() {
+            blocks.push(String::new());
+        }
+        if let Some(block) = blocks.last_mut() {
+            block.push_str(line);
+            block.push('\n');
+        }
+    }
+    blocks
+        .into_iter()
+        .filter_map(|block| Some((block_path(&block)?, parse_diff(&block))))
+        .collect()
+}
+
+/// The path one file's diff is about: from `+++ b/`, `rename to`, `--- a/`
+/// (a deleted file), or else `diff --git a/<path> b/<path>` (binary files,
+/// mode changes and empty files have no `+++` line).
+fn block_path(block: &str) -> Option<String> {
+    let headers: Vec<&str> = block.lines().take_while(|l| !l.starts_with("@@")).collect();
+    // git ends `---`/`+++` paths that contain a space with a tab.
+    let find = |prefix: &str| {
+        headers
+            .iter()
+            .find_map(|l| l.strip_prefix(prefix))
+            .map(|p| p.trim_end_matches('\t').to_owned())
+    };
+    if let Some(path) = find("+++ b/").or_else(|| find("rename to ")) {
+        return Some(path);
+    }
+    if let Some(path) = find("--- a/") {
+        return Some(path);
+    }
+    // `a/<path> b/<path>`: both halves are the same path.
+    let rest = headers.first()?.strip_prefix("diff --git a/")?;
+    let half = rest.len().checked_sub(3)? / 2;
+    let (path, other) = (rest.get(..half)?, rest.get(half..)?);
+    (other.strip_prefix(" b/") == Some(path)).then(|| path.to_owned())
+}
+
 /// The empty tree's hash (SHA-1 repositories): the "parent" of a root commit.
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 

@@ -342,3 +342,91 @@ fn file_at_a_revision_is_its_content_then() {
         "one\ntwo\n"
     );
 }
+
+fn texts(diff: &show::Diff) -> Vec<&str> {
+    diff.lines
+        .iter()
+        .filter(|l| matches!(l.kind, LineKind::Added | LineKind::Deleted))
+        .map(|l| l.text.as_str())
+        .collect()
+}
+
+#[test]
+fn working_diffs_show_unstaged_and_staged_changes_apart() {
+    let repo = FixtureRepo::new();
+    repo.commit_file("a b.txt", "old\n", "Base");
+    repo.write_file("a b.txt", "staged\n");
+    repo.git(&["add", "a b.txt"]);
+    repo.write_file("a b.txt", "unstaged\n");
+    let paths = ["a b.txt".to_owned()];
+    assert_eq!(
+        show::working_diff_args(true, &paths),
+        [
+            "diff",
+            "--cached",
+            "--no-ext-diff",
+            "--find-renames",
+            "--",
+            ":(literal)a b.txt"
+        ]
+    );
+    let unstaged = show::parse_diff(&run(&repo, show::working_diff_args(false, &paths)));
+    assert_eq!(texts(&unstaged), ["-staged", "+unstaged"]);
+    let staged = show::parse_diff(&run(&repo, show::working_diff_args(true, &paths)));
+    assert_eq!(texts(&staged), ["-old", "+staged"]);
+}
+
+#[test]
+fn the_staged_diff_works_before_the_first_commit() {
+    let repo = FixtureRepo::new();
+    repo.write_file("first.txt", "hello\n");
+    repo.git(&["add", "first.txt"]);
+    let diff = show::parse_diff(&run(&repo, show::working_diff_args(true, &[])));
+    assert_eq!(texts(&diff), ["+hello"]);
+}
+
+#[test]
+fn an_untracked_file_diffs_as_all_added_with_exit_code_one() {
+    let repo = FixtureRepo::new();
+    repo.commit_file("base.txt", "x\n", "Base");
+    repo.write_file("new file.txt", "one\ntwo\n");
+    let command =
+        GitCommand::read(repo.path(), show::untracked_diff_args("new file.txt")).succeeding_with(1);
+    let output = std::process::Command::new("git")
+        .args(command.argv())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(command.accepts_exit(output.status.code()));
+    let diff = show::parse_diff(&String::from_utf8(output.stdout).unwrap());
+    assert_eq!(texts(&diff), ["+one", "+two"]);
+    let two = diff.lines.iter().find(|l| l.text == "+two").unwrap();
+    assert_eq!(two.new_line, Some(2));
+}
+
+#[test]
+fn a_section_diff_splits_into_one_diff_per_file() {
+    let repo = FixtureRepo::new();
+    repo.write_file("keep.txt", "a\n");
+    repo.write_file("gone.txt", "bye\n");
+    repo.write_file("old.txt", "one\ntwo\nthree\nfour\n");
+    repo.write_file("logo.bin", "\0\x01");
+    repo.git(&["add", "--all"]);
+    repo.git(&["commit", "--quiet", "--message", "Base"]);
+    repo.write_file("keep.txt", "a\nb\n");
+    repo.git(&["rm", "--quiet", "gone.txt"]);
+    repo.git(&["mv", "old.txt", "new name.txt"]);
+    repo.write_file("logo.bin", "\0\x02");
+    repo.git(&["add", "--all"]);
+    let files = show::split_diff(&run(&repo, show::working_diff_args(true, &[])));
+    let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+    assert_eq!(paths, ["gone.txt", "keep.txt", "logo.bin", "new name.txt"]);
+    assert_eq!(texts(&files[0].1), ["-bye"]);
+    assert_eq!(texts(&files[1].1), ["+b"]);
+    assert!(files[2].1.is_binary());
+    assert!(
+        files[1].1.lines[0]
+            .text
+            .starts_with("diff --git a/keep.txt")
+    );
+}
