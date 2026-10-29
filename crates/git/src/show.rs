@@ -6,7 +6,7 @@
 //! `git show` diffs them against the empty tree, which also keeps this
 //! independent of the object format (SHA-1 or SHA-256 empty-tree ids).
 
-use tgg_model::{Commit, Oid, Signature};
+use tgg_model::{Change, Commit, Oid, Signature};
 
 use crate::ParseError;
 use crate::error::{fields, oid};
@@ -110,16 +110,20 @@ pub struct FileChange {
     pub path: String,
     /// Path before the commit, for renames and copies.
     pub old_path: Option<String>,
+    /// What the commit did to the file (added, modified, deleted, ...).
+    pub status: Change,
     pub stat: Numstat,
 }
 
-/// Arguments for the files `commit` changed, with line counts.
+/// Arguments for the files `commit` changed, with their status and line
+/// counts.
 #[must_use]
 pub fn files_args(commit: &Oid) -> Vec<String> {
     vec![
         "show".into(),
         "--diff-merges=first-parent".into(),
         "--find-renames".into(),
+        "--raw".into(),
         "--numstat".into(),
         "-z".into(),
         // No header: only the numstat records.
@@ -129,17 +133,42 @@ pub fn files_args(commit: &Oid) -> Vec<String> {
     ]
 }
 
-/// Parses `--numstat -z` output.
+/// Parses `--raw --numstat -z` output.
 ///
-/// Each record is `added\tdeleted\tpath\0`. For a rename the path is empty
-/// and the old and new paths follow as two more NUL-terminated fields.
-/// Paths can contain tabs, so only the first two tabs separate counts.
+/// git prints one raw record per file, then one numstat record per file, in
+/// the same order. A raw record is `:modes shas STATUS\0path\0`, with a
+/// second path for renames and copies (`R100\0old\0new\0`); only its status
+/// letter is used. A numstat record is `added\tdeleted\tpath\0`; for a
+/// rename the path is empty and the old and new paths follow as two more
+/// NUL-terminated fields. Paths can contain tabs, so only the first two tabs
+/// separate counts.
+///
+/// Without raw records (plain `--numstat`), a file is `Renamed` when it has
+/// an old path and `Modified` otherwise.
 pub fn parse_files(output: &str) -> Result<Vec<FileChange>, ParseError> {
     let mut files = Vec::new();
+    let mut statuses = Vec::new();
     let mut tokens = output.split('\0');
     while let Some(token) = tokens.next() {
         let token = token.trim_start_matches('\n');
         if token.is_empty() {
+            continue;
+        }
+        if let Some(raw) = token.strip_prefix(':') {
+            let record = statuses.len();
+            let letter = raw
+                .rsplit(' ')
+                .next()
+                .and_then(|s| s.bytes().next())
+                .unwrap_or(b'M');
+            let paths = if matches!(letter, b'R' | b'C') { 2 } else { 1 };
+            for field in ["path", "new path"].into_iter().take(paths) {
+                tokens
+                    .next()
+                    .filter(|p| !p.is_empty())
+                    .ok_or(ParseError::MissingField { record, field })?;
+            }
+            statuses.push(raw_status(letter));
             continue;
         }
         let record = files.len();
@@ -172,13 +201,35 @@ pub fn parse_files(output: &str) -> Result<Vec<FileChange>, ParseError> {
         } else {
             (path.to_owned(), None)
         };
+        let status = statuses
+            .get(record)
+            .copied()
+            .unwrap_or(if old_path.is_some() {
+                Change::Renamed
+            } else {
+                Change::Modified
+            });
         files.push(FileChange {
             path,
             old_path,
+            status,
             stat,
         });
     }
     Ok(files)
+}
+
+/// The change a `--raw` status letter stands for.
+fn raw_status(letter: u8) -> Change {
+    match letter {
+        b'A' => Change::Added,
+        b'D' => Change::Deleted,
+        b'R' => Change::Renamed,
+        b'C' => Change::Copied,
+        b'T' => Change::TypeChanged,
+        b'U' => Change::Conflicted,
+        _ => Change::Modified,
+    }
 }
 
 /// Arguments for the unified diff of one file in `commit`, using both
@@ -201,11 +252,13 @@ pub fn diff_args(commit: &Oid, file: &FileChange) -> Vec<String> {
 }
 
 /// Arguments for the files that differ between `base` and `other` (the
-/// working tree when `None`), with line counts; parse with [`parse_files`].
+/// working tree when `None`), with their status and line counts; parse with
+/// [`parse_files`].
 #[must_use]
 pub fn compare_files_args(base: &Oid, other: Option<&Oid>) -> Vec<String> {
     let mut args: Vec<String> = vec![
         "diff".into(),
+        "--raw".into(),
         "--numstat".into(),
         "-z".into(),
         "--find-renames".into(),

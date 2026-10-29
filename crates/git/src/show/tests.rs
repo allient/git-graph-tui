@@ -1,5 +1,5 @@
 use pretty_assertions::assert_eq;
-use tgg_model::Oid;
+use tgg_model::{Change, Oid};
 
 use super::*;
 
@@ -71,6 +71,7 @@ fn files_args_diff_merges_against_the_first_parent_and_detect_renames() {
             "show",
             "--diff-merges=first-parent",
             "--find-renames",
+            "--raw",
             "--numstat",
             "-z",
             "--format=",
@@ -91,6 +92,7 @@ fn parses_numstat_with_renames_binaries_and_odd_paths() {
             FileChange {
                 path: "src/main.rs".into(),
                 old_path: None,
+                status: Change::Modified,
                 stat: Numstat::Lines {
                     added: 3,
                     deleted: 1
@@ -99,11 +101,13 @@ fn parses_numstat_with_renames_binaries_and_odd_paths() {
             FileChange {
                 path: "logo.png".into(),
                 old_path: None,
+                status: Change::Modified,
                 stat: Numstat::Binary,
             },
             FileChange {
                 path: "new\tname.txt".into(),
                 old_path: Some("old name.txt".into()),
+                status: Change::Renamed,
                 stat: Numstat::Lines {
                     added: 1,
                     deleted: 0
@@ -112,6 +116,7 @@ fn parses_numstat_with_renames_binaries_and_odd_paths() {
             FileChange {
                 path: "dir é/文件.md".into(),
                 old_path: None,
+                status: Change::Modified,
                 stat: Numstat::Lines {
                     added: 0,
                     deleted: 0
@@ -119,6 +124,59 @@ fn parses_numstat_with_renames_binaries_and_odd_paths() {
             },
         ]
     );
+}
+
+#[test]
+fn raw_records_give_each_file_its_status() {
+    // `--raw --numstat -z`: every raw record, then every numstat record,
+    // in the same order.
+    let out = "\n:000000 100644 0000000 3e75765 A\0added.txt\0\
+               :100644 000000 587be6b 0000000 D\0del.txt\0\
+               :100644 100644 9405325 0fdf397 M\0keep.txt\0\
+               :100644 100644 b566061 b566061 R100\0old.txt\0sub/new.txt\0\
+               :100644 100644 b566061 b566061 C075\0a.txt\0b.txt\0\
+               :100644 120000 1111111 2222222 T\0link\0\
+               1\t0\tadded.txt\0\
+               0\t1\tdel.txt\0\
+               1\t0\tkeep.txt\0\
+               0\t0\t\0old.txt\0sub/new.txt\0\
+               2\t0\t\0a.txt\0b.txt\0\
+               1\t1\tlink\0";
+    let files = parse_files(out).unwrap();
+    let got: Vec<(&str, Option<&str>, Change)> = files
+        .iter()
+        .map(|f| (f.path.as_str(), f.old_path.as_deref(), f.status))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("added.txt", None, Change::Added),
+            ("del.txt", None, Change::Deleted),
+            ("keep.txt", None, Change::Modified),
+            ("sub/new.txt", Some("old.txt"), Change::Renamed),
+            ("b.txt", Some("a.txt"), Change::Copied),
+            ("link", None, Change::TypeChanged),
+        ]
+    );
+    assert_eq!(
+        files[0].stat,
+        Numstat::Lines {
+            added: 1,
+            deleted: 0
+        }
+    );
+}
+
+#[test]
+fn a_raw_record_without_its_path_is_an_error() {
+    assert!(matches!(
+        parse_files(":100644 100644 a b M\0"),
+        Err(ParseError::MissingField { .. })
+    ));
+    assert!(matches!(
+        parse_files(":100644 100644 a b R100\0only-old\0"),
+        Err(ParseError::MissingField { .. })
+    ));
 }
 
 #[test]
@@ -151,6 +209,7 @@ fn diff_args_cover_both_sides_of_a_rename_literally() {
     let renamed = FileChange {
         path: "new*.txt".into(),
         old_path: Some("old.txt".into()),
+        status: Change::Renamed,
         stat: Numstat::Binary,
     };
     assert_eq!(
