@@ -147,6 +147,9 @@ pub struct SourceControl {
     message_width: usize,
     /// Below the header's "..." button in the last frame.
     more_at: Position,
+    /// Sections whose files are hidden, by clicking their header.
+    staged_collapsed: bool,
+    changes_collapsed: bool,
 }
 
 impl SourceControl {
@@ -173,26 +176,53 @@ impl SourceControl {
         self.focus = Focus::Message;
     }
 
+    /// Indexes into `changes` of the files in the staged or the changes
+    /// section, whether or not the section is collapsed.
+    fn section(&self, staged: bool) -> Vec<usize> {
+        (0..self.changes.len())
+            .filter(|&i| {
+                let file = &self.changes[i];
+                if staged {
+                    file.staged.is_some()
+                } else {
+                    file.unstaged.is_some()
+                }
+            })
+            .collect()
+    }
+
     fn items(&self) -> Vec<Item> {
         let mut items = Vec::new();
-        let staged: Vec<usize> = (0..self.changes.len())
-            .filter(|&i| self.changes[i].staged.is_some())
-            .collect();
-        let unstaged: Vec<usize> = (0..self.changes.len())
-            .filter(|&i| self.changes[i].unstaged.is_some())
-            .collect();
+        let staged = self.section(true);
+        let unstaged = self.section(false);
         if !staged.is_empty() {
             items.push(Item::StagedHeader);
-            items.extend(staged.into_iter().map(Item::Staged));
+            if !self.staged_collapsed {
+                items.extend(staged.into_iter().map(Item::Staged));
+            }
         }
         if !unstaged.is_empty() {
             if !items.is_empty() {
                 items.push(Item::Gap);
             }
             items.push(Item::ChangesHeader);
-            items.extend(unstaged.into_iter().map(Item::Unstaged));
+            if !self.changes_collapsed {
+                items.extend(unstaged.into_iter().map(Item::Unstaged));
+            }
         }
         items
+    }
+
+    /// Collapses (`Some(true)`), expands (`Some(false)`) or flips (`None`)
+    /// the section a header item heads; false when `item` isn't a header.
+    fn collapse(&mut self, item: usize, collapsed: Option<bool>) -> bool {
+        let flag = match self.items().get(item) {
+            Some(Item::StagedHeader) => &mut self.staged_collapsed,
+            Some(Item::ChangesHeader) => &mut self.changes_collapsed,
+            _ => return false,
+        };
+        *flag = collapsed.unwrap_or(!*flag);
+        true
     }
 
     pub fn handle_key(&mut self, key: Key) -> SourceControlOutcome {
@@ -241,6 +271,12 @@ impl SourceControl {
                     }
                     Key::Home => self.selected = 0,
                     Key::End => self.selected = last,
+                    Key::Left => {
+                        self.collapse(self.selected, Some(true));
+                    }
+                    Key::Right => {
+                        self.collapse(self.selected, Some(false));
+                    }
                     Key::Enter => return self.open(self.selected),
                     Key::Char(' ') => return self.toggle(self.selected),
                     Key::Char('o') => return self.open_changes(self.selected),
@@ -275,11 +311,8 @@ impl SourceControl {
             }
             Some(Hit::Row(item)) => {
                 self.select(item);
-                // A file row opens its diff, a header only takes the selection.
-                if matches!(
-                    self.items().get(item),
-                    Some(Item::Staged(_) | Item::Unstaged(_))
-                ) {
+                // A file row opens its diff, a header collapses or expands.
+                if !self.collapse(item, None) {
                     return self.open(item);
                 }
             }
@@ -345,6 +378,11 @@ impl SourceControl {
             Item::Unstaged(i) => (*i, false),
             _ => return None,
         };
+        self.file_in(i, staged)
+    }
+
+    /// `changes[i]` as the staged or the changes section lists it.
+    fn file_in(&self, i: usize, staged: bool) -> Option<PaneFile> {
         let file = &self.changes[i];
         let change = if staged { file.staged } else { file.unstaged }?;
         let deleted = file.unstaged == Some(Change::Deleted)
@@ -374,13 +412,10 @@ impl SourceControl {
             Some(Item::ChangesHeader | Item::Unstaged(_)) => false,
             Some(Item::Gap) | None => return SourceControlOutcome::Stay,
         };
-        let files = (0..items.len())
-            .filter(|&i| match items[i] {
-                Item::Staged(_) => staged,
-                Item::Unstaged(_) => !staged,
-                _ => false,
-            })
-            .filter_map(|i| self.pane_file(i))
+        let files = self
+            .section(staged)
+            .into_iter()
+            .filter_map(|i| self.file_in(i, staged))
             .collect();
         SourceControlOutcome::OpenChanges { staged, files }
     }
@@ -403,20 +438,10 @@ impl SourceControl {
     /// The changes (`Item::Unstaged`) or staged files (`Item::Staged`) an item
     /// stands for: itself, or its whole section for a header.
     fn files_of(&self, item: usize, staged: bool) -> Option<Vec<usize>> {
-        let items = self.items();
-        let section = |want_staged: bool| -> Vec<usize> {
-            items
-                .iter()
-                .filter_map(|it| match (it, want_staged) {
-                    (Item::Staged(i), true) | (Item::Unstaged(i), false) => Some(*i),
-                    _ => None,
-                })
-                .collect()
-        };
-        match (items.get(item)?, staged) {
+        match (self.items().get(item)?, staged) {
             (Item::Unstaged(i), false) | (Item::Staged(i), true) => Some(vec![*i]),
-            (Item::ChangesHeader, false) => Some(section(false)),
-            (Item::StagedHeader, true) => Some(section(true)),
+            (Item::ChangesHeader, false) => Some(self.section(false)),
+            (Item::StagedHeader, true) => Some(self.section(true)),
             _ => None,
         }
     }
@@ -521,7 +546,7 @@ impl SourceControl {
                 continue;
             }
             hits.regions.push((row_area, Hit::Row(index)));
-            self.draw_item(buf, row_area, index, *item, &items, theme, &mut hits);
+            self.draw_item(buf, row_area, index, *item, theme, &mut hits);
         }
         hits
     }
@@ -621,14 +646,12 @@ impl SourceControl {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "one row's drawing context")]
     fn draw_item(
         &self,
         buf: &mut Buffer,
         area: Rect,
         index: usize,
         item: Item,
-        items: &[Item],
         theme: &Theme,
         hits: &mut SourceControlHitMap,
     ) {
@@ -640,24 +663,18 @@ impl SourceControl {
             Item::Gap => return,
             Item::StagedHeader | Item::ChangesHeader => {
                 let staged = item == Item::StagedHeader;
-                let count = items
-                    .iter()
-                    .filter(|it| {
-                        matches!(
-                            (it, staged),
-                            (Item::Staged(_), true) | (Item::Unstaged(_), false)
-                        )
-                    })
-                    .count();
-                let title = if staged {
-                    "▾ Staged Changes"
+                let count = self.section(staged).len();
+                let collapsed = if staged {
+                    self.staged_collapsed
                 } else {
-                    "▾ Changes"
+                    self.changes_collapsed
                 };
+                let chevron = if collapsed { '▸' } else { '▾' };
+                let name = if staged { "Staged Changes" } else { "Changes" };
                 buf.set_stringn(
                     area.x,
                     area.y,
-                    title,
+                    format!("{chevron} {name}"),
                     usize::from(area.width),
                     text.add_modifier(Modifier::BOLD),
                 );

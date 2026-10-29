@@ -510,11 +510,13 @@ fn e_opens_the_selected_file_and_knows_a_deleted_one_is_gone() {
 fn clicks_on_rows_and_the_new_buttons_open_diffs_and_files() {
     let mut pane = pane();
     let (_, hits) = render(&mut pane, 13, true);
-    // A file row's name opens its diff; a header row only takes the selection.
+    // A file row's name opens its diff; a header row collapses (and a
+    // second click expands) its section without opening anything.
     assert_eq!(
         pane.handle_click(&hits, 4, 12),
         SourceControlOutcome::OpenDiff(pane_file("notes.txt", Change::Untracked, false))
     );
+    assert_eq!(pane.handle_click(&hits, 4, 10), SourceControlOutcome::Stay);
     assert_eq!(pane.handle_click(&hits, 4, 10), SourceControlOutcome::Stay);
     // ↗ at x 28 on an unstaged row, x 30 on a staged one.
     assert_eq!(
@@ -564,4 +566,60 @@ fn every_new_icon_is_followed_by_a_blank_cell() {
         }
         assert_eq!(found, 6, "two headers and four file rows");
     }
+}
+
+#[test]
+fn clicking_a_section_header_collapses_and_expands_it() {
+    let mut pane = pane();
+    let (_, hits) = render(&mut pane, 13, false);
+    // "▾ Staged Changes" is on line 6.
+    assert_eq!(pane.handle_click(&hits, 4, 6), SourceControlOutcome::Stay);
+    let (lines, hits) = render(&mut pane, 13, false);
+    assert_eq!(
+        lines[6..],
+        [
+            "▸ Staged Changes              ⧉ − 2",
+            "",
+            "▾ Changes                   ⧉ ↶ + 2",
+            "  README.md                 ↗ ↶ + M",
+            "  notes.txt                 ↗ ↶ + U",
+            "",
+            "",
+        ]
+    );
+    pane.handle_click(&hits, 4, 6);
+    let (lines, _) = render(&mut pane, 13, false);
+    assert_eq!(lines[6], "▾ Staged Changes              ⧉ − 2");
+    assert_eq!(lines[7], "  app.rs src                  ↗ − M");
+}
+
+#[test]
+fn a_collapsed_section_header_still_acts_on_all_its_files() {
+    let mut pane = pane();
+    let (_, hits) = render(&mut pane, 13, false);
+    // Collapse "▾ Changes" (line 10), then press its + button.
+    pane.handle_click(&hits, 4, 10);
+    let (lines, hits) = render(&mut pane, 13, false);
+    assert_eq!(lines[10], "▸ Changes                   ⧉ ↶ + 2");
+    assert_eq!(
+        pane.handle_click(&hits, 32, 10),
+        SourceControlOutcome::Stage(paths(&["README.md", "notes.txt"]))
+    );
+}
+
+#[test]
+fn left_and_right_collapse_and_expand_the_selected_header() {
+    let mut pane = pane();
+    press(&mut pane, &TO_LIST);
+    press(&mut pane, &[Key::Left]);
+    let (lines, _) = render(&mut pane, 13, true);
+    assert_eq!(lines[6], "▸ Staged Changes              ⧉ − 2");
+    // Down skips the hidden files and the gap, to the next header.
+    press(&mut pane, &[Key::Down, Key::Left]);
+    let (lines, _) = render(&mut pane, 13, true);
+    assert_eq!(lines[8], "▸ Changes                   ⧉ ↶ + 2");
+    press(&mut pane, &[Key::Up, Key::Right]);
+    let (lines, _) = render(&mut pane, 13, true);
+    assert_eq!(lines[6], "▾ Staged Changes              ⧉ − 2");
+    assert_eq!(lines[7], "  app.rs src                  ↗ − M");
 }
