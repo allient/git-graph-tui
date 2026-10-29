@@ -26,6 +26,10 @@ pub enum WorkingTreeAction {
         message: String,
         include_untracked: bool,
     },
+    /// Stashes only what is staged (`git stash push --staged`).
+    StashStaged {
+        message: String,
+    },
     /// Mixed unstages everything; hard discards every change to tracked files.
     Reset {
         mode: ResetMode,
@@ -99,6 +103,13 @@ impl WorkingTreeAction {
                 if *include_untracked {
                     args.push("--include-untracked".into());
                 }
+                if !message.is_empty() {
+                    args.extend(strings(&["--message", message]));
+                }
+                args
+            }
+            Self::StashStaged { message } => {
+                let mut args = strings(&["stash", "push", "--staged"]);
                 if !message.is_empty() {
                     args.extend(strings(&["--message", message]));
                 }
@@ -196,6 +207,7 @@ impl WorkingTreeAction {
                 "Delete",
             ),
             Self::Stash { .. }
+            | Self::StashStaged { .. }
             | Self::OpenSourceControl
             | Self::Stage { .. }
             | Self::Unstage { .. }
@@ -225,6 +237,12 @@ impl WorkingTreeAction {
                     *include_untracked,
                 ),
             ],
+            Self::StashStaged { message } => vec![InputSpec::text(
+                InputId::Message,
+                "Message (optional)",
+                InputKind::Text,
+                message,
+            )],
             Self::Reset { mode } => vec![InputSpec::text(
                 InputId::Mode,
                 "Mode",
@@ -244,7 +262,9 @@ impl WorkingTreeAction {
 
     pub fn set_input(&mut self, id: InputId, value: InputValue) -> Result<(), InputError> {
         match (self, id) {
-            (Self::Stash { message, .. }, InputId::Message) => *message = input::text(id, value)?,
+            (Self::Stash { message, .. } | Self::StashStaged { message }, InputId::Message) => {
+                *message = input::text(id, value)?;
+            }
             (
                 Self::Stash {
                     include_untracked, ..

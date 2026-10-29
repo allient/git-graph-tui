@@ -128,3 +128,24 @@ fn inputs_and_validation() {
         Err(InputError::InvalidName(_))
     ));
 }
+
+#[test]
+fn delete_remote_tag_only_touches_the_remote_after_asking() {
+    let action = TagAction::DeleteRemote {
+        name: "v1.0".into(),
+        remote: "origin".into(),
+    };
+    assert_eq!(
+        commands(&action),
+        [(
+            CommandKind::Network,
+            argv(&["push", "--delete", "--", "origin", "refs/tags/v1.0"])
+        )]
+    );
+    assert!(action.is_destructive());
+    let confirmation = action.confirmation().unwrap();
+    assert!(
+        confirmation.message.contains("'v1.0' on 'origin'"),
+        "{confirmation:?}"
+    );
+}

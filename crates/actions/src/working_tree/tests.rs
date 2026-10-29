@@ -252,3 +252,19 @@ fn undo_last_commit_and_discard_all() {
     assert!(WorkingTreeAction::DiscardAll.confirmation().is_some());
     assert!(!WorkingTreeAction::UndoLastCommit.is_destructive());
 }
+
+#[test]
+fn stash_staged_stashes_only_the_index() {
+    let mut stash = WorkingTreeAction::StashStaged {
+        message: String::new(),
+    };
+    assert_eq!(args(&stash), ["stash", "push", "--staged"]);
+    stash
+        .set_input(InputId::Message, InputValue::Text("WIP".into()))
+        .unwrap();
+    assert_eq!(
+        args(&stash),
+        ["stash", "push", "--staged", "--message", "WIP"]
+    );
+    assert!(!stash.is_destructive());
+}

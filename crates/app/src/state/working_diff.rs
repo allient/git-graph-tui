@@ -3,7 +3,7 @@
 //! user's editor.
 
 use tgg_git::show::{self, Diff};
-use tgg_model::Change;
+use tgg_model::{Change, Stash};
 use tgg_ui::{DiffView, PaneFile};
 
 use super::{AppState, Command, Request};
@@ -62,6 +62,7 @@ fn diff_args(request: &Request) -> Vec<String> {
     match request {
         Request::UntrackedDiff(path) => show::untracked_diff_args(path),
         Request::WorkingDiff { staged, paths } => show::working_diff_args(*staged, paths),
+        Request::StashDiff(selector) => tgg_git::stash::show_args(selector),
         _ => Vec::new(),
     }
 }
@@ -77,6 +78,20 @@ impl AppState {
             ))];
         }
         let title = format!("{} ({})", display_path(file), side(file.staged));
+        self.load_working_diff(Shape::File { title }, vec![request])
+    }
+
+    /// Stash ▸ "View Stash...": the stash's changes, in the pager when
+    /// there is one.
+    pub(super) fn open_stash_diff(&mut self, stash: &Stash) -> Vec<Command> {
+        let request = Request::StashDiff(stash.selector());
+        if let Some(pager) = &self.pager {
+            let args = diff_args(&request);
+            return vec![Command::External(external::pager_command(
+                &self.repo, &args, pager,
+            ))];
+        }
+        let title = format!("{}: {}", stash.selector(), stash.subject);
         self.load_working_diff(Shape::File { title }, vec![request])
     }
 

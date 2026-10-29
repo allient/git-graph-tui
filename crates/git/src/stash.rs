@@ -19,6 +19,18 @@ pub fn args() -> Vec<String> {
     ]
 }
 
+/// Arguments for `git stash show --patch <selector>`: a stash's changes
+/// against the commit it was made on, as one diff.
+#[must_use]
+pub fn show_args(selector: &str) -> Vec<String> {
+    vec![
+        "stash".into(),
+        "show".into(),
+        "--patch".into(),
+        selector.into(),
+    ]
+}
+
 /// Parses NUL-separated records produced with [`FORMAT`]. Position in the
 /// output is the stash index (`stash@{0}` first).
 pub fn parse(output: &str) -> Result<Vec<Stash>, ParseError> {

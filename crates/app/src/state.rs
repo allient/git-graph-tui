@@ -14,7 +14,7 @@ use tgg_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Operation, T
 use tgg_git::show::{self, FileChange};
 use tgg_git::{CancelToken, ExecError, GitCommand, in_progress, log, refs, status};
 use tgg_graph::Graph;
-use tgg_model::{Commit, Oid, Ref, RefKind, WorkingTreeStatus, split_remote};
+use tgg_model::{Commit, Oid, Ref, RefKind, Stash, WorkingTreeStatus, split_remote};
 use tgg_ui::{
     BadgeKind, BannerHitMap, ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome,
     PopupMenu, badges_for,
@@ -147,6 +147,10 @@ pub enum Request {
     },
     /// An untracked file against nothing: every line added.
     UntrackedDiff(String),
+    /// The stash list, for the Stash submenu's pickers.
+    Stashes,
+    /// A stash's changes (`stash@{n}`), for "View Stash...".
+    StashDiff(String),
 }
 
 impl Request {
@@ -185,6 +189,10 @@ impl Request {
             Self::WorkingDiff { staged, paths } => {
                 GitCommand::read(repo, show::working_diff_args(*staged, paths))
             }
+            Self::Stashes => GitCommand::read(repo, tgg_git::stash::args()),
+            Self::StashDiff(selector) => {
+                GitCommand::read(repo, tgg_git::stash::show_args(selector))
+            }
             // `diff --no-index` exits 1 when the file has content.
             Self::UntrackedDiff(path) => {
                 GitCommand::read(repo, show::untracked_diff_args(path)).succeeding_with(1)
@@ -196,7 +204,12 @@ impl Request {
     fn is_refresh(&self) -> bool {
         matches!(
             self,
-            Self::Head | Self::Refs | Self::Status | Self::InProgress | Self::Log { .. }
+            Self::Head
+                | Self::Refs
+                | Self::Status
+                | Self::InProgress
+                | Self::Stashes
+                | Self::Log { .. }
         )
     }
 }
@@ -208,6 +221,8 @@ pub struct AppState {
     pub commits: Vec<Commit>,
     pub graph: Graph,
     pub refs: Vec<Ref>,
+    /// The stash list, newest first.
+    pub stashes: Vec<Stash>,
     pub status: WorkingTreeStatus,
     pub head: Option<Oid>,
     /// Selected display row (0 is the uncommitted row when the tree is dirty).
@@ -297,6 +312,7 @@ impl AppState {
             commits: Vec::new(),
             graph: Graph::new(None),
             refs: Vec::new(),
+            stashes: Vec::new(),
             status: WorkingTreeStatus::default(),
             head: None,
             selected: 0,
@@ -412,6 +428,7 @@ impl AppState {
             Request::Refs,
             Request::Status,
             Request::InProgress,
+            Request::Stashes,
         ]
         .into_iter()
         .chain(reflog)
@@ -796,6 +813,12 @@ impl AppState {
                 self.parsed(refs::parse(&out.stdout), |s, refs| s.refs = refs);
                 Vec::new()
             }
+            (Request::Stashes, Ok(out)) => {
+                self.parsed(tgg_git::stash::parse(&out.stdout), |s, stashes| {
+                    s.stashes = stashes;
+                });
+                Vec::new()
+            }
             (Request::Status, Ok(out)) => {
                 self.parsed(status::parse(&out.stdout), Self::apply_status);
                 Vec::new()
@@ -844,7 +867,12 @@ impl AppState {
                 self.on_details_read(request, &out.stdout);
                 Vec::new()
             }
-            (request @ (Request::WorkingDiff { .. } | Request::UntrackedDiff(_)), Ok(out)) => {
+            (
+                request @ (Request::WorkingDiff { .. }
+                | Request::UntrackedDiff(_)
+                | Request::StashDiff(_)),
+                Ok(out),
+            ) => {
                 self.on_working_diff_read(&request, out.stdout);
                 Vec::new()
             }
@@ -859,7 +887,7 @@ impl AppState {
                 }
                 if matches!(
                     request,
-                    Request::WorkingDiff { .. } | Request::UntrackedDiff(_)
+                    Request::WorkingDiff { .. } | Request::UntrackedDiff(_) | Request::StashDiff(_)
                 ) {
                     // A part failed: the rest of that diff is not shown.
                     self.working_diff = None;

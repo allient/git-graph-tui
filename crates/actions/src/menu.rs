@@ -831,19 +831,38 @@ fn remote_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
 }
 
 fn stash_submenu() -> Vec<Option<MenuItem>> {
+    let stash = |include_untracked| {
+        Action::WorkingTree(WorkingTreeAction::Stash {
+            message: String::new(),
+            include_untracked,
+        })
+    };
     vec![
+        entry("Stash", stash(false)),
+        entry("Stash (Include Untracked)", stash(true)),
         entry(
-            "Stash Changes...",
-            Action::WorkingTree(WorkingTreeAction::Stash {
+            "Stash Staged",
+            Action::WorkingTree(WorkingTreeAction::StashStaged {
                 message: String::new(),
-                include_untracked: true,
             }),
         ),
+        Some(MenuItem::Separator),
         entry(
             "Apply Latest Stash",
             Action::Repo(RepoAction::ApplyLatestStash),
         ),
+        entry("Apply Stash...", pick(PickPurpose::ApplyStash)),
+        Some(MenuItem::Separator),
         entry("Pop Latest Stash", Action::Repo(RepoAction::PopLatestStash)),
+        entry("Pop Stash...", pick(PickPurpose::PopStash)),
+        Some(MenuItem::Separator),
+        entry("Drop Stash...", pick(PickPurpose::DropStash)),
+        entry(
+            "Drop All Stashes...",
+            Action::Repo(RepoAction::DropAllStashes),
+        ),
+        Some(MenuItem::Separator),
+        entry("View Stash...", pick(PickPurpose::ViewStash)),
     ]
 }
 
@@ -862,9 +881,19 @@ fn tags_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 },
             )
         }),
+        // No commits, no tags.
+        entry_if(ctx.head_commit.is_some(), "Delete Tag...", || {
+            pick(PickPurpose::DeleteTag)
+        }),
+        entry_if(
+            ctx.default_remote().is_some(),
+            "Delete Remote Tag...",
+            || pick(PickPurpose::DeleteRemoteTag),
+        ),
+        Some(MenuItem::Separator),
         ctx.default_remote().and_then(|remote| {
             entry(
-                "Push All Tags",
+                "Push Tags",
                 Action::Repo(RepoAction::PushTags {
                     remote: remote.to_owned(),
                 }),
