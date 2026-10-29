@@ -131,7 +131,7 @@ fn a_saved_layout_is_applied_and_read_back() {
 
 #[test]
 fn default_widths_written_in_the_config_are_not_a_change() {
-    use crate::config::Layout;
+    use crate::config::{ChangesSortName, ChangesViewName, Layout};
     let repo = FixtureRepo::sample();
     let mut h = Harness::open(&repo);
     // The README's example spells out the default column widths.
@@ -142,6 +142,8 @@ fn default_widths_written_in_the_config_are_not_a_change() {
         author_column: Some(14),
         hash_column: Some(8),
         hidden_columns: Vec::new(),
+        changes_view: Some(ChangesViewName::List),
+        changes_sort: Some(ChangesSortName::Path),
     };
     let baseline = h.state.apply_layout(example);
     h.draw(150, H);
@@ -233,4 +235,28 @@ fn hidden_columns_are_saved_and_applied() {
     choose(&mut h, "  Date", 150);
     assert!(h.find_on_screen("│Date").is_some());
     assert_eq!(h.state.layout().hidden_columns, [ColumnName::Commit]);
+}
+
+#[test]
+fn source_control_view_and_sort_are_saved_and_applied() {
+    use crate::config::{ChangesSortName, ChangesViewName, Layout};
+    use tgg_actions::{ChangesSort, ChangesView};
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::open(&repo);
+    // The defaults (list, by path) aren't written.
+    assert_eq!(h.state.layout(), Layout::default());
+
+    let saved = Layout {
+        changes_view: Some(ChangesViewName::Tree),
+        changes_sort: Some(ChangesSortName::Status),
+        ..Layout::default()
+    };
+    assert_eq!(h.state.apply_layout(saved.clone()), saved);
+    let applied = h.state.source_control.view.layout();
+    assert_eq!(applied.view, ChangesView::Tree);
+    assert_eq!(applied.sort, ChangesSort::Status);
+
+    h.state.source_control.view.set_view(ChangesView::List);
+    assert_eq!(h.state.layout().changes_view, None);
+    assert_eq!(h.state.layout().changes_sort, Some(ChangesSortName::Status));
 }

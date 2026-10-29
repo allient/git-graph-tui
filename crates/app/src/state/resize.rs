@@ -3,7 +3,7 @@
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
-use tgg_actions::{GraphColumn, column_menu};
+use tgg_actions::{ChangesSort, ChangesView, GraphColumn, column_menu};
 use tgg_ui::{ColumnDivider, ColumnWidths, PopupMenu};
 
 use crate::config::Layout;
@@ -94,6 +94,12 @@ impl AppState {
             author: layout.author_column.unwrap_or(default.author),
             hash: layout.hash_column.unwrap_or(default.hash),
         };
+        if let Some(view) = layout.changes_view {
+            self.source_control.view.set_view(view.into());
+        }
+        if let Some(sort) = layout.changes_sort {
+            self.source_control.view.set_sort(sort.into());
+        }
         self.hidden_columns = layout.hidden_columns.into_iter().map(Into::into).collect();
         self.hidden_columns.sort_unstable();
         self.hidden_columns.dedup();
@@ -105,6 +111,7 @@ impl AppState {
     pub fn layout(&self) -> Layout {
         let default = ColumnWidths::default();
         let changed = |value: u16, default: u16| (value != default).then_some(value);
+        let files = self.source_control.view.layout();
         Layout {
             source_control_width: self.source_control.width,
             graph_column: self.columns.graph,
@@ -117,6 +124,12 @@ impl AppState {
                 .copied()
                 .map(Into::into)
                 .collect(),
+            changes_view: Some(files.view)
+                .filter(|v| *v != ChangesView::default())
+                .map(Into::into),
+            changes_sort: Some(files.sort)
+                .filter(|s| *s != ChangesSort::default())
+                .map(Into::into),
         }
     }
 }

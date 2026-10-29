@@ -12,6 +12,8 @@
 //! hash_column = 8
 //! hidden_columns = ["author"]  # hidden from the header's right-click menu:
 //!                              # "date", "author" or "commit"
+//! changes_view = "tree"   # Source Control files: "list" (default) or "tree"
+//! changes_sort = "name"   # "path" (default), "name" or "status"
 //!
 //! [diff]
 //! pager = "delta"         # pipe file diffs into this command; "" or unset:
@@ -28,7 +30,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use tgg_actions::GraphColumn;
+use tgg_actions::{ChangesSort, ChangesView, GraphColumn};
 
 use crate::cli::IconStyle;
 
@@ -98,6 +100,66 @@ pub struct Layout {
     pub hash_column: Option<u16>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub hidden_columns: Vec<ColumnName>,
+    /// The Source Control pane's View & Sort choices.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changes_view: Option<ChangesViewName>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changes_sort: Option<ChangesSortName>,
+}
+
+/// The Source Control view, as the config file names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChangesViewName {
+    List,
+    Tree,
+}
+
+/// The Source Control sort, as the config file names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChangesSortName {
+    Name,
+    Path,
+    Status,
+}
+
+impl From<ChangesViewName> for ChangesView {
+    fn from(name: ChangesViewName) -> Self {
+        match name {
+            ChangesViewName::List => Self::List,
+            ChangesViewName::Tree => Self::Tree,
+        }
+    }
+}
+
+impl From<ChangesView> for ChangesViewName {
+    fn from(view: ChangesView) -> Self {
+        match view {
+            ChangesView::List => Self::List,
+            ChangesView::Tree => Self::Tree,
+        }
+    }
+}
+
+impl From<ChangesSortName> for ChangesSort {
+    fn from(name: ChangesSortName) -> Self {
+        match name {
+            ChangesSortName::Name => Self::Name,
+            ChangesSortName::Path => Self::Path,
+            ChangesSortName::Status => Self::Status,
+        }
+    }
+}
+
+impl From<ChangesSort> for ChangesSortName {
+    fn from(sort: ChangesSort) -> Self {
+        match sort {
+            ChangesSort::Name => Self::Name,
+            ChangesSort::Path => Self::Path,
+            ChangesSort::Status => Self::Status,
+        }
+    }
 }
 
 /// A graph column the header's menu can hide, as the config file names it.
@@ -376,6 +438,20 @@ mod tests {
         fs::write(&file, "[diff]\npager = \"delta\"\n").unwrap();
         save_layout(&file, Layout::default()).unwrap();
         assert_eq!(load(&file).unwrap().diff.pager.as_deref(), Some("delta"));
+    }
+
+    #[test]
+    fn reads_the_source_control_view_and_sort() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        fs::write(
+            &file,
+            "[layout]\nchanges_view = \"tree\"\nchanges_sort = \"name\"\n",
+        )
+        .unwrap();
+        let layout = load(&file).unwrap().layout;
+        assert_eq!(layout.changes_view, Some(ChangesViewName::Tree));
+        assert_eq!(layout.changes_sort, Some(ChangesSortName::Name));
     }
 
     #[test]

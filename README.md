@@ -80,7 +80,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Stash submenu, as in VS Code: Stash, Stash (Include Untracked), Stash Staged (git 2.35 or newer); Apply Latest Stash, Apply Stash...; Pop Latest Stash, Pop Stash...; Drop Stash..., Drop All Stashes... (asks first); View Stash... (its diff). The "..." entries pick a stash from a list
 - [x] Tags submenu: Create Tag..., Delete Tag..., Delete Remote Tag... (keeps the local tag), Push Tags
 - [x] Branch submenu, as in VS Code: Merge... and Rebase Branch... (pick a branch), Create Branch... (from HEAD, checked out), Create Branch From... (pick a branch or tag), Rename Branch..., Delete Branch..., Delete Remote Branch... (asks first), Publish Branch... (push with upstream); Remote: Add Remote..., Remove Remote, Fetch, Prune
-- [x] View as Tree / View as List and View & Sort, as in VS Code: the Source Control files flat (name, then folder) or grouped under their folders, whose row buttons stage, unstage or discard everything under them; sorted by path (git's order), name or status; `✓` marks the current choices
+- [x] View as Tree / View as List and View & Sort, as in VS Code: the Source Control files flat (name, then folder) or grouped under their folders, whose row buttons stage, unstage or discard everything under them; sorted by path (git's order), name or status; `✓` marks the current choices, and the choice is saved for next time
 - [x] Commit submenu, as in VS Code's Source Control: Commit (what is staged, or everything when nothing is), Commit Staged, Commit All (untracked files too), each also as Amend (an empty message keeps the last one) and Signed Off; Undo Last Commit (its changes stay staged); Abort Rebase while a rebase is stopped. The message is the one typed in the Source Control pane
 - [x] Changes submenu: Stage All, Unstage All and Discard All Changes (asks first; untracked files are deleted, staged changes kept)
 - [x] Show the reflog and recover commits from it
@@ -253,6 +253,8 @@ date_column = 16
 author_column = 14
 hash_column = 8
 hidden_columns = ["author"] # hidden from the header's right-click menu: "date", "author", "commit"
+changes_view = "tree"       # Source Control files: "list" (default) or "tree"
+changes_sort = "name"       # "path" (default), "name" or "status"
 
 [diff]
 pager = "delta"           # pipe file diffs into this command; unset or "" uses the built-in view
@@ -266,7 +268,7 @@ Without `[issues] url`, `#123` opens issue 123 on origin's GitHub (`/issues/123`
 
 `pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `TUI_GIT_GRAPH_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 
-Drag the pane or column dividers, or show and hide columns, and quit: the new layout is written to `[layout]` and used next time. Only the `[layout]` table is rewritten: other settings, tables, blank lines and comments elsewhere in the file are kept as they are, while comments inside `[layout]` are lost (a layout set with dotted keys such as `layout.date_column = 16` makes the whole file be rewritten, without its comments). A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
+Drag the pane or column dividers, show and hide columns, or pick a View & Sort choice, and quit: the new layout is written to `[layout]` and used next time. Only the `[layout]` table is rewritten: other settings, tables, blank lines and comments elsewhere in the file are kept as they are, while comments inside `[layout]` are lost (a layout set with dotted keys such as `layout.date_column = 16` makes the whole file be rewritten, without its comments). A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
 
 ## Development
 
