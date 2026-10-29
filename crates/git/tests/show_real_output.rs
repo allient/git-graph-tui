@@ -195,6 +195,71 @@ fn pathspec_characters_in_names_are_literal() {
 }
 
 #[test]
+fn comparing_two_commits_lists_and_diffs_every_change_between_them() {
+    let repo = FixtureRepo::new();
+    let base = Oid::parse(&repo.commit_file("old.txt", "same\nlines\nhere\n", "Base")).unwrap();
+    repo.git(&["mv", "old.txt", "new.txt"]);
+    repo.git(&["commit", "--quiet", "--message", "Rename"]);
+    let other = Oid::parse(&repo.commit_file("b.txt", "b\n", "Add b")).unwrap();
+
+    assert_eq!(
+        show::compare_files_args(&base, Some(&other)),
+        [
+            "diff",
+            "--numstat",
+            "-z",
+            "--find-renames",
+            base.as_str(),
+            other.as_str(),
+            "--"
+        ]
+    );
+    let files =
+        show::parse_files(&run(&repo, show::compare_files_args(&base, Some(&other)))).unwrap();
+    assert_eq!(paths(&files), ["b.txt", "new.txt"]);
+    let renamed = &files[1];
+    assert_eq!(renamed.old_path.as_deref(), Some("old.txt"));
+
+    let diff = show::parse_diff(&run(
+        &repo,
+        show::compare_diff_args(&base, Some(&other), renamed),
+    ));
+    assert!(
+        diff.lines.iter().any(|l| l.text == "rename to new.txt"),
+        "{diff:?}"
+    );
+    let diff = show::parse_diff(&run(
+        &repo,
+        show::compare_diff_args(&base, Some(&other), &files[0]),
+    ));
+    assert_eq!(diff.added(), 1);
+}
+
+#[test]
+fn comparing_a_commit_with_the_working_tree_includes_uncommitted_edits() {
+    let repo = FixtureRepo::new();
+    let base = Oid::parse(&repo.commit_file("a.txt", "a\n", "Base")).unwrap();
+    repo.commit_file("a.txt", "a\nb\n", "More");
+    repo.write_file("a.txt", "a\nb\nc\n");
+
+    assert_eq!(
+        show::compare_files_args(&base, None),
+        [
+            "diff",
+            "--numstat",
+            "-z",
+            "--find-renames",
+            base.as_str(),
+            "--"
+        ]
+    );
+    let files = show::parse_files(&run(&repo, show::compare_files_args(&base, None))).unwrap();
+    assert_eq!(files[0].stat, lines(2, 0));
+    let diff = show::parse_diff(&run(&repo, show::compare_diff_args(&base, None, &files[0])));
+    assert!(diff.lines.iter().any(|l| l.text == "+c"), "{diff:?}");
+}
+
+#[test]
 fn file_at_a_revision_is_its_content_then() {
     let repo = FixtureRepo::new();
     let first = Oid::parse(&repo.commit_file("src/a b.txt", "one\ntwo\n", "Base")).unwrap();

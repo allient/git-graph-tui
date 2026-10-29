@@ -76,7 +76,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Click a commit to expand its metadata (hash, parents, author, committer, date) and changed files
 - [ ] View the diff of any file (built-in viewer, or your configured `git difftool` / pager such as delta)
 - [x] View a file at that revision
-- [ ] Compare any two commits, or a commit with the working tree
+- [x] Compare any two commits, or a commit with the working tree
 
 ### Repository settings
 - [x] Manage remotes (add, remove, fetch, prune)
@@ -169,6 +169,7 @@ cargo install --path crates/app    # then: tui-git-graph ~/code/my-project
 | `H` | Jump to the HEAD commit |
 | `Enter` / left click | Open or close the commit's details; in the details, `j`/`k` pick a file, `Enter` opens its diff and `v` shows the whole file as it was in that commit |
 | `m` / right click | Context menu for the commit, branch, tag, stash or uncommitted row |
+| Compare (commit menu) | "Select for Compare" marks a commit; on another commit, "Compare with Selected" lists the files changed from the marked one to it, and "Compare with Working Tree" lists what changed since the commit, uncommitted edits included. `Enter` opens a file's diff, `Esc` closes the comparison |
 | `Tab` | Move to the toolbar (branch filter, Show Remote Branches, `↻` Refresh, `⇣` Fetch; `...` repository menu when the Source Control pane is hidden); arrows move, `Enter` presses |
 | `/` | Find: type to search the loaded commits by message, author, date, hash, or branch or tag name; matches are highlighted. `Enter` or `↓` goes to the next match, `↑` to the previous one, `Esc` closes |
 | `c` | Move to the Source Control pane on the left (shown from 90 columns). Type the commit message (`Alt+Enter`, `Shift+Enter` or `Ctrl+J` starts a new line) and press `Enter` to commit what is staged. `↓` moves to the Commit button and the files: `Space`/`Enter` stages or unstages a file or a whole section, as do `+` and `-`; `d` discards a file's changes (or the whole Changes section) after asking; `m` opens the repository menu; `Esc` goes back to the graph. The header's `✓` `↻` `…` commit, refresh and open the repository menu; each row's `↶` `+` `−` discard, stage and unstage |

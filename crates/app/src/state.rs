@@ -19,6 +19,7 @@ use tgg_ui::{ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome, Popu
 use crate::git::{JobHandle, JobId, JobResult};
 
 mod actions;
+mod compare;
 mod details;
 mod find;
 mod info;
@@ -31,6 +32,7 @@ mod toolbar;
 
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
+pub use compare::Comparison;
 pub use details::{Details, DiffPanel};
 pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
@@ -92,6 +94,10 @@ pub enum Request {
     Diff(Oid, FileChange),
     /// A file's whole content as it was in a commit (`v` in the details).
     FileAt(Oid, String),
+    /// Files that differ between the two sides of a comparison.
+    CompareFiles(Comparison),
+    /// The diff of one file between the two sides of a comparison.
+    CompareDiff(Comparison, FileChange),
     /// A tag's target and annotation, for its info dialog.
     Tag(String),
     /// A remote's URL, to open a pull request page for `branch`.
@@ -124,6 +130,8 @@ impl Request {
             Self::Files(id) => GitCommand::read(repo, show::files_args(id)),
             Self::Diff(id, file) => GitCommand::read(repo, show::diff_args(id, file)),
             Self::FileAt(id, path) => GitCommand::read(repo, show::file_at_args(id, path)),
+            Self::CompareFiles(c) => GitCommand::read(repo, c.files_args()),
+            Self::CompareDiff(c, file) => GitCommand::read(repo, c.diff_args(file)),
             Self::Tag(name) => GitCommand::read(repo, tgg_git::tag::args(name)),
             Self::RemoteUrl { remote, .. } => {
                 GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
@@ -189,6 +197,8 @@ pub struct AppState {
     pub find: Option<Find>,
     /// The graph's column widths, set by dragging the header dividers.
     pub columns: ColumnWidths,
+    /// The commit marked with "Select for Compare".
+    pub compare_base: Option<Oid>,
     drag: Option<resize::Drag>,
     running: Option<Running>,
     pending: HashMap<JobId, (Job, CancelToken)>,
@@ -231,6 +241,7 @@ impl AppState {
             source_control: SourceControlState::default(),
             find: None,
             columns: ColumnWidths::default(),
+            compare_base: None,
             drag: None,
             running: None,
             pending: HashMap::new(),
@@ -528,6 +539,7 @@ impl AppState {
             head_commit: self.head.clone(),
             remotes,
             branch_filter: self.toolbar.branch_filter.clone(),
+            compare_base: self.compare_base.clone(),
         }
     }
 
@@ -614,6 +626,10 @@ impl AppState {
                 Ok(out),
             ) => {
                 self.on_details_read(request, &out.stdout);
+                Vec::new()
+            }
+            (request @ (Request::CompareFiles(_) | Request::CompareDiff(..)), Ok(out)) => {
+                self.on_compare_read(request, &out.stdout);
                 Vec::new()
             }
             (request, Err(err)) => {
@@ -752,6 +768,8 @@ fn menu_key(key: KeyEvent) -> Option<Key> {
 
 #[cfg(test)]
 mod action_tests;
+#[cfg(test)]
+mod compare_tests;
 #[cfg(test)]
 mod details_tests;
 #[cfg(test)]

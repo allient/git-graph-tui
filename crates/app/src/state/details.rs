@@ -8,18 +8,30 @@ use tgg_ui::{
     DiffView, Key,
 };
 
+use super::compare::Comparison;
 use super::{AppState, Command, Job, Request, SCROLL_LINES, actions::widget_key};
 
-/// The details of one commit, filled in as its two reads arrive.
+/// The details of one commit, filled in as its two reads arrive; or a
+/// comparison (S12), shown in the same place.
 #[derive(Debug)]
 pub struct Details {
+    /// The commit whose row the panel opens below.
     pub commit: Oid,
-    info: Option<CommitDetails>,
-    files: Option<Vec<FileChange>>,
-    /// Built once both reads arrived.
+    pub(super) info: Option<CommitDetails>,
+    pub(super) files: Option<Vec<FileChange>>,
+    /// Built once both reads arrived (a comparison: once its files arrived).
     pub view: Option<CommitDetailsView>,
     /// Where the last frame drew the panel.
     pub hits: Option<DetailsHitMap>,
+    /// Set when the panel compares two revisions instead of showing `commit`.
+    pub compare: Option<Comparison>,
+}
+
+impl Details {
+    /// Shows the details of `id` (not a comparison anchored at its row).
+    fn shows_commit(&self, id: &Oid) -> bool {
+        self.compare.is_none() && self.commit == *id
+    }
 }
 
 /// The open diff and where the last frame drew it.
@@ -57,6 +69,7 @@ impl AppState {
             files: None,
             view: None,
             hits: None,
+            compare: None,
         });
         vec![
             Command::Git(Request::Details(commit.clone())),
@@ -123,6 +136,9 @@ impl AppState {
                 Vec::new()
             }
             DetailsOutcome::OpenFile(file) => match &self.details {
+                Some(Details {
+                    compare: Some(c), ..
+                }) => vec![Command::Git(Request::CompareDiff(c.clone(), file))],
                 Some(d) => vec![Command::Git(Request::Diff(d.commit.clone(), file))],
                 None => Vec::new(),
             },
@@ -173,21 +189,23 @@ impl AppState {
             return;
         };
         match request {
-            Request::Details(id) if id == details.commit => match show::parse_details(stdout) {
-                Ok(info) => details.info = Some(info),
-                Err(err) => self.message = Some(format!("Could not read the commit: {err}")),
-            },
-            Request::Files(id) if id == details.commit => match show::parse_files(stdout) {
+            Request::Details(id) if details.shows_commit(&id) => {
+                match show::parse_details(stdout) {
+                    Ok(info) => details.info = Some(info),
+                    Err(err) => self.message = Some(format!("Could not read the commit: {err}")),
+                }
+            }
+            Request::Files(id) if details.shows_commit(&id) => match show::parse_files(stdout) {
                 Ok(files) => details.files = Some(files),
                 Err(err) => self.message = Some(format!("Could not read changed files: {err}")),
             },
-            Request::Diff(id, file) if id == details.commit => {
+            Request::Diff(id, file) if details.shows_commit(&id) => {
                 self.diff = Some(DiffPanel {
                     view: DiffView::new(&file, show::parse_diff(stdout)),
                     hits: None,
                 });
             }
-            Request::FileAt(id, path) if id == details.commit => {
+            Request::FileAt(id, path) if details.shows_commit(&id) => {
                 let title = format!("{path} @ {}", id.short(7));
                 self.diff = Some(DiffPanel {
                     view: DiffView::text(title, stdout),

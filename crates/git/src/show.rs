@@ -205,6 +205,45 @@ pub fn diff_args(commit: &Oid, file: &FileChange) -> Vec<String> {
     args
 }
 
+/// Arguments for the files that differ between `base` and `other` (the
+/// working tree when `None`), with line counts; parse with [`parse_files`].
+#[must_use]
+pub fn compare_files_args(base: &Oid, other: Option<&Oid>) -> Vec<String> {
+    let mut args: Vec<String> = vec![
+        "diff".into(),
+        "--numstat".into(),
+        "-z".into(),
+        "--find-renames".into(),
+        base.to_string(),
+    ];
+    args.extend(other.map(Oid::to_string));
+    args.push("--".into());
+    args
+}
+
+/// Arguments for the unified diff of one file between `base` and `other`
+/// (the working tree when `None`), using both sides of a rename; parse with
+/// [`parse_diff`]. Paths are literal pathspecs, as in [`diff_args`].
+#[must_use]
+pub fn compare_diff_args(base: &Oid, other: Option<&Oid>, file: &FileChange) -> Vec<String> {
+    let mut args: Vec<String> = vec![
+        "diff".into(),
+        "--find-renames".into(),
+        // A configured external diff tool would print something else.
+        "--no-ext-diff".into(),
+        base.to_string(),
+    ];
+    args.extend(other.map(Oid::to_string));
+    args.push("--".into());
+    args.extend(
+        file.old_path
+            .iter()
+            .chain(std::iter::once(&file.path))
+            .map(|p| format!(":(literal){p}")),
+    );
+    args
+}
+
 /// Arguments for the whole content of `path` as it was in `commit`
 /// (`git show <commit>:<path>`). `path` is relative to the repository root;
 /// git fails when the file doesn't exist in that commit (it deleted it).
