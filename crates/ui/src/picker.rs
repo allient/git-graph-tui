@@ -14,6 +14,9 @@ use crate::{Key, TextField, Theme, fit};
 pub struct PickerItem {
     pub value: String,
     pub kind: Option<String>,
+    /// The kind is a description to search too (a stash's message), not a
+    /// label like `remote` that would match every remote branch.
+    pub search_kind: bool,
 }
 
 /// A row of the list.
@@ -195,6 +198,11 @@ impl Picker {
                         glob_match(query, &item.value)
                     } else {
                         item.value.to_lowercase().contains(&lower)
+                            || (item.search_kind
+                                && item
+                                    .kind
+                                    .as_ref()
+                                    .is_some_and(|k| k.to_lowercase().contains(&lower)))
                     }
                 })
                 .map(|(i, _)| Row::Item(i)),

@@ -43,6 +43,20 @@ impl ExecError {
         }
     }
 
+    /// Like [`Self::failed`], also looking at stdout when stderr names no
+    /// known cause: `git merge` and friends report conflicts there.
+    #[must_use]
+    pub fn failed_with_stdout(code: i32, stderr: String, stdout: &str) -> Self {
+        let mut err = Self::failed(code, stderr);
+        if let Self::Failed { failure, .. } = &mut err
+            && matches!(failure, Failure::Other(_))
+            && Failure::classify(stdout) == Failure::Conflict
+        {
+            *failure = Failure::Conflict;
+        }
+        err
+    }
+
     /// A short message for the status bar.
     #[must_use]
     pub fn user_message(&self) -> String {
@@ -91,6 +105,39 @@ mod tests {
         assert!(!clone.is_cancelled());
         token.cancel();
         assert!(clone.is_cancelled());
+    }
+
+    #[test]
+    fn conflicts_reported_on_stdout_are_conflicts() {
+        // `git merge` prints its CONFLICT lines on stdout.
+        let err = ExecError::failed_with_stdout(
+            1,
+            String::new(),
+            "Auto-merging a.txt\nCONFLICT (content): Merge conflict in a.txt\nAutomatic merge failed; fix conflicts and then commit the result.\n",
+        );
+        assert!(
+            matches!(
+                err,
+                ExecError::Failed {
+                    failure: Failure::Conflict,
+                    ..
+                }
+            ),
+            "{err:?}"
+        );
+        // A known cause on stderr still wins.
+        let err = ExecError::failed_with_stdout(
+            128,
+            "fatal: not a git repository".into(),
+            "CONFLICT (content): x",
+        );
+        assert!(matches!(
+            err,
+            ExecError::Failed {
+                failure: Failure::NotARepository,
+                ..
+            }
+        ));
     }
 
     #[test]

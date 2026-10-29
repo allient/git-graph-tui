@@ -532,3 +532,13 @@ fn clone_copies_a_repository_into_the_chosen_folder_and_says_where() {
     assert!(message.starts_with("✓ Cloned into "), "{message}");
     assert!(message.contains(name), "{message}");
 }
+
+#[test]
+fn create_tag_from_the_menu_is_annotated_even_without_a_message() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    repo_submenu_entry(&mut h, "Tags", "Create Tag...");
+    type_text(&mut h, "v9");
+    accept_dialogs(&mut h);
+    assert_eq!(repo.git(&["cat-file", "-t", "v9"]), "tag");
+}

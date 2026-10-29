@@ -22,7 +22,7 @@ Branch: build/release-setup (same PR as the release setup). Delivery: ask-on-ris
 | T1 | S2 | inline | done | fix(graph): stash rows |
 | T2 | S3 | inline | done | fix(app): keyboard badge menus |
 | T3 | S4, S5 | inline | done | fix(ui): focus and checkboxes |
-| T4 | S6, S7, S8, S9 | inline | todo | |
+| T4 | S6, S7, S8, S9 | inline | done | fix: conflict message, HEAD marker, empty hint, picker |
 | T5 | S1 | QA rerun on a new release binary | todo | |
 
 Route evidence: the fixes share crates/app/src/state.rs, so they run inline one after another.
@@ -34,3 +34,9 @@ Route evidence: the fixes share crates/app/src/state.rs, so they run inline one 
 - **L3** (2026-10-29) T1 done: `git stash list` is read in the log format (`stash::parse_commits`, first parent only); the app inserts each stash just above its base commit as history pages load (`log_loaded` counts real commits for paging) and re-lays out when the stash list arrives after the history; one `stash@{n}` badge per stash (`visible_refs`), and right-clicking a stash row or badge opens the stash menu. Tests that counted the sample repo's 7 rows now count its stash row (8). 802 tests pass.
 - **L4** (2026-10-29) T2 done: `m` / Shift+F10 on a commit row with badges opens one submenu per branch, remote branch (including remote names on a local badge) and tag (`Branch main ▸`, `Remote origin/main ▸`, `Tag v0.1.0 ▸`), then the commit's entries; a stash row keeps its stash menu. 803 tests pass.
 - **L5** (2026-10-29) T3 done: opening the "..." menu from the Source Control header gives the keys back to the graph; dialog checkboxes toggle only with Space (arrows still cycle choices). RED observed on the old code for the checkbox test. 805 tests pass.
+- **L6** (2026-10-29) T4 done.
+  - S6: `git merge` prints CONFLICT on stdout, which the classifier never saw. `ExecError::failed_with_stdout` now also checks stdout when stderr names no known cause, so the message is "Conflicts found. Resolve them, then continue or abort." RED on the old code reproduced the exact QA message.
+  - S7: a `HEAD` badge on a detached HEAD's commit (not a ref, so a click on it is a click on the commit), and an empty repository shows "No commits yet".
+  - S8: pickers search a stash's message (`PickerItem::search_kind`), but not a ref's kind label.
+  - S9: not reproduced. An empty-message Create Tag is annotated; the QA run likely pressed Left on the Type choice. Kept as a regression test.
+  - 811 tests pass.

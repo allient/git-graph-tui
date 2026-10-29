@@ -82,7 +82,11 @@ impl ProcessExecutor {
             Ok(Output { stdout, stderr })
         } else {
             // A signal-terminated process has no code; report it as -1.
-            Err(ExecError::failed(status.code().unwrap_or(-1), stderr))
+            Err(ExecError::failed_with_stdout(
+                status.code().unwrap_or(-1),
+                stderr,
+                &stdout,
+            ))
         }
     }
 }
