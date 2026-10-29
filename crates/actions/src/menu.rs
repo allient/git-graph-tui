@@ -184,6 +184,13 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
                 local_name: branch.to_owned(),
             },
         ),
+        entry(
+            "Delete Remote Branch...",
+            Action::Repo(RepoAction::DeleteRemoteBranch {
+                remote: remote.to_owned(),
+                branch: branch.to_owned(),
+            }),
+        ),
         Some(fetch_into_local(remote, branch, ctx)),
         entry_if(current.is_some(), "Merge into current branch...", || {
             Action::MergeIntoCurrent {
@@ -191,6 +198,12 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
                 current: current.clone(),
                 no_ff: true,
             }
+        }),
+        entry_if(current.is_some(), "Pull into current branch...", || {
+            Action::Repo(RepoAction::PullFrom {
+                remote: remote.to_owned(),
+                branch: branch.to_owned(),
+            })
         }),
         entry_if(
             current.is_some(),
@@ -745,20 +758,29 @@ fn changes_submenu() -> Vec<Option<MenuItem>> {
 }
 
 fn branch_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
+    let current = ctx.current_branch();
+    let remote = ctx.default_remote();
     vec![
+        entry_if(current.is_some(), "Merge...", || pick(PickPurpose::Merge)),
+        entry_if(current.is_some(), "Rebase Branch...", || {
+            pick(PickPurpose::Rebase)
+        }),
+        Some(MenuItem::Separator),
         ctx.head_commit.as_ref().and_then(|at| {
             entry(
                 "Create Branch...",
                 Action::CreateBranch {
                     at: at.clone(),
                     name: String::new(),
-                    checkout: false,
+                    checkout: true,
                 },
             )
         }),
-        ctx.current_branch().and_then(|branch| {
+        entry("Create Branch From...", pick(PickPurpose::CreateBranchFrom)),
+        Some(MenuItem::Separator),
+        current.and_then(|branch| {
             entry(
-                "Rename Current Branch...",
+                "Rename Branch...",
                 Action::RenameBranch {
                     from: branch.to_owned(),
                     to: branch.to_owned(),
@@ -766,6 +788,21 @@ fn branch_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
             )
         }),
         entry("Delete Branch...", pick(PickPurpose::DeleteBranch)),
+        entry_if(remote.is_some(), "Delete Remote Branch...", || {
+            pick(PickPurpose::DeleteRemoteBranch)
+        }),
+        Some(MenuItem::Separator),
+        current.zip(remote).and_then(|(branch, remote)| {
+            entry(
+                "Publish Branch...",
+                Action::PushBranch {
+                    branch: branch.to_owned(),
+                    remote: remote.to_owned(),
+                    set_upstream: true,
+                    force_with_lease: false,
+                },
+            )
+        }),
     ]
 }
 
@@ -779,7 +816,7 @@ fn remote_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 url: String::new(),
             }),
         ),
-        entry_if(has_remotes, "Remove Remote...", || {
+        entry_if(has_remotes, "Remove Remote", || {
             pick(PickPurpose::RemoveRemote)
         }),
         entry_if(has_remotes, "Fetch", || {

@@ -235,8 +235,10 @@ fn remote_branch_menu_checks_out_a_tracking_branch() {
         labels(&menu),
         [
             "Checkout Branch...",
+            "Delete Remote Branch...",
             "Fetch into local branch...",
             "Merge into current branch...",
+            "Pull into current branch...",
             "Rebase current branch on Branch...",
             "Create Pull Request",
             "---",
@@ -735,14 +737,22 @@ fn repository_menu_matches_the_vs_code_order() {
     assert_eq!(
         labels(submenu(&menu, "Branch")),
         [
+            "Merge...",
+            "Rebase Branch...",
+            "---",
             "Create Branch...",
-            "Rename Current Branch...",
-            "Delete Branch..."
+            "Create Branch From...",
+            "---",
+            "Rename Branch...",
+            "Delete Branch...",
+            "Delete Remote Branch...",
+            "---",
+            "Publish Branch...",
         ]
     );
     assert_eq!(
         labels(submenu(&menu, "Remote")),
-        ["Add Remote...", "Remove Remote...", "Fetch", "Prune"]
+        ["Add Remote...", "Remove Remote", "Fetch", "Prune"]
     );
     assert_eq!(
         labels(submenu(&menu, "Stash")),
@@ -885,6 +895,75 @@ fn pull_push_submenu_matches_vs_code() {
 }
 
 #[test]
+fn branch_submenu_entries_pick_a_ref_or_act_on_the_current_branch() {
+    let menu = menu_for(&Target::Repository, &ctx());
+    let branch = submenu(&menu, "Branch");
+    let pick_for = |purpose| Action::Ui(UiEffect::PickRef { purpose });
+    assert_eq!(action(branch, "Merge..."), &pick_for(PickPurpose::Merge));
+    assert_eq!(
+        action(branch, "Rebase Branch..."),
+        &pick_for(PickPurpose::Rebase)
+    );
+    assert_eq!(
+        action(branch, "Create Branch From..."),
+        &pick_for(PickPurpose::CreateBranchFrom)
+    );
+    assert_eq!(
+        action(branch, "Delete Remote Branch..."),
+        &pick_for(PickPurpose::DeleteRemoteBranch)
+    );
+    // As in VS Code, a new branch is checked out.
+    assert_eq!(
+        action(branch, "Create Branch..."),
+        &Action::CreateBranch {
+            at: oid('a'),
+            name: String::new(),
+            checkout: true
+        }
+    );
+    assert_eq!(
+        action(branch, "Rename Branch..."),
+        &Action::RenameBranch {
+            from: "main".into(),
+            to: "main".into()
+        }
+    );
+    assert_eq!(
+        action(branch, "Publish Branch..."),
+        &Action::PushBranch {
+            branch: "main".into(),
+            remote: "origin".into(),
+            set_upstream: true,
+            force_with_lease: false
+        }
+    );
+}
+
+#[test]
+fn remote_branch_menu_deletes_and_pulls_like_vs_code() {
+    let target = Target::RemoteBranch {
+        remote: "origin".into(),
+        branch: "feature/x".into(),
+        target: oid('b'),
+    };
+    let menu = menu_for(&target, &ctx());
+    assert_eq!(
+        action(&menu, "Delete Remote Branch..."),
+        &Action::Repo(RepoAction::DeleteRemoteBranch {
+            remote: "origin".into(),
+            branch: "feature/x".into()
+        })
+    );
+    assert_eq!(
+        action(&menu, "Pull into current branch..."),
+        &Action::Repo(RepoAction::PullFrom {
+            remote: "origin".into(),
+            branch: "feature/x".into()
+        })
+    );
+}
+
+#[test]
 fn abort_rebase_and_undo_depend_on_the_repository_state() {
     let rebasing = MenuContext {
         operation: Some(Operation::Rebase),
@@ -931,7 +1010,7 @@ fn repository_actions_are_prefilled() {
         &Action::CreateBranch {
             at: oid('a'),
             name: String::new(),
-            checkout: false
+            checkout: true
         }
     );
     assert_eq!(
@@ -987,7 +1066,12 @@ fn repository_menu_without_remotes_or_branch() {
     );
     assert_eq!(
         labels(submenu(&menu, "Branch")),
-        ["Create Branch...", "Delete Branch..."]
+        [
+            "Create Branch...",
+            "Create Branch From...",
+            "---",
+            "Delete Branch..."
+        ]
     );
     assert_eq!(labels(submenu(&menu, "Remote")), ["Add Remote..."]);
     assert_eq!(labels(submenu(&menu, "Tags")), ["Create Tag..."]);
