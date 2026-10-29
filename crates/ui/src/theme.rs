@@ -64,7 +64,8 @@ impl Theme {
     }
 
     /// Readable text on a badge colored `bg`: `badge_fg_on_dark` on a dark
-    /// RGB color, `badge_fg` on anything else.
+    /// RGB color or a dark gray from the 256-color ramp, `badge_fg` on
+    /// anything else.
     #[must_use]
     pub fn badge_text(&self, bg: Color) -> Color {
         match bg {
@@ -77,6 +78,8 @@ impl Theme {
                     self.badge_fg
                 }
             }
+            // 232..=255 runs from near black to near white.
+            Color::Indexed(232..=243) => self.badge_fg_on_dark,
             _ => self.badge_fg,
         }
     }
@@ -164,6 +167,15 @@ mod tests {
         assert_eq!(theme.badge_text(Color::Rgb(0x6f, 0x24, 0xd6)), Color::White);
         // Named colors keep the configured badge text.
         assert_eq!(theme.badge_text(Color::Yellow), theme.badge_fg);
+    }
+
+    #[test]
+    fn badge_names_are_white_on_the_dark_badge_background() {
+        let theme = Theme::default();
+        assert_eq!(theme.badge_text(theme.badge_bg), Color::White);
+        // The grayscale ramp: dark half white, light half black.
+        assert_eq!(theme.badge_text(Color::Indexed(232)), Color::White);
+        assert_eq!(theme.badge_text(Color::Indexed(250)), Color::Black);
     }
 
     #[test]
