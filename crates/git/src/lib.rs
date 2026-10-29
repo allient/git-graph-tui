@@ -24,6 +24,7 @@ pub mod reflog;
 pub mod refs;
 pub mod stash;
 pub mod status;
+pub mod worktree;
 
 pub use command::{CommandKind, GitCommand};
 pub use error::ParseError;
