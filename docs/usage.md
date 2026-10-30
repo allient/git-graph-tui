@@ -80,9 +80,14 @@ pager = "delta"           # pipe file diffs into this command; unset or "" uses 
 [issues]                  # where issue references in commit messages link to
 url = "https://jira.example.com/browse/PROJ-$1"   # $1 is replaced by the number
 prefix = "PROJ-"          # what starts a reference; default "#"
+[refresh]                 # pick up changes made outside the app
+watch = true              # reload when git's own files change (default true)
+status_interval = 3       # seconds between working-tree checks while the terminal has focus; 0 turns them off
 ```
 
 Without `[issues] url`, `#123` opens issue 123 on origin's GitHub (`/issues/123`), GitLab (`/-/issues/123`) or Bitbucket (`/issues/123`) page; for any other origin, clicking a reference says how to set `url`. With `prefix = "PROJ-"`, `PROJ-123` is the reference and `#123` is plain text.
+
+`[refresh]` keeps the graph current without pressing `r`. A commit, checkout, branch, tag, stash, rebase or fetch made in another terminal or by your editor shows up within about a second: the app watches git's own files (`HEAD`, `index`, `refs/`), never your working tree, so it stays cheap even with `node_modules` or `target`. Where file events don't work (network drives, WSL `/mnt`, some containers), it compares those files' timestamps once a second instead. Edited files are found with `git status` every `status_interval` seconds while the terminal has focus, and right away when you switch back to it; on a repository where `git status` is slow, the checks are spaced out so they never take more than a tenth of the time. A reload keeps the selected commit and all the history already loaded.
 
 `pager` is a shell command (run with `sh -c`, `cmd /C` on Windows), so `"delta --side-by-side"` or `"less -R"` work too. `GIT_GRAPH_TUI_PAGER` wins over it, and setting it to an empty value turns a configured pager off for one run.
 

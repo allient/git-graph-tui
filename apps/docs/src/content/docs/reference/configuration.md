@@ -26,11 +26,15 @@ pager = "delta"           # pipe file diffs into this command; unset or "" uses 
 [issues]                  # where issue references in commit messages link to
 url = "https://jira.example.com/browse/PROJ-$1"   # $1 is replaced by the number
 prefix = "PROJ-"          # what starts a reference; default "#"
+[refresh]                 # pick up changes made outside the app
+watch = true              # reload when git's own files change (default true)
+status_interval = 3       # seconds between working-tree checks while the terminal has focus; 0 turns them off
 ```
 
 - **`[layout]`** is written for you when you quit after dragging a divider, hiding a column or picking a View & Sort choice. Only that table is rewritten; the rest of the file keeps its comments.
 - **`[diff] pager`** is a shell command, so `"delta --side-by-side"` or `"less -R"` work too.
 - **`[issues]`**: without `url`, `#123` opens issue 123 on origin's GitHub, GitLab or Bitbucket page.
+- **`[refresh]`**: commits, checkouts and fetches made elsewhere show up within about a second (the app watches git's own files, not your working tree). Edited files are found with `git status` while the terminal has focus.
 
 A mistake in the file (an unknown setting or value) stops the app with a message naming the file and the line.
 

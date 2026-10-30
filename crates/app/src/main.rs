@@ -12,9 +12,10 @@ mod state;
 #[cfg(test)]
 mod testing;
 mod view;
+mod watch;
 
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -26,6 +27,7 @@ use crate::cli::Cli;
 use crate::external::External;
 use crate::git::{ProcessExecutor, Runner, discover_repo};
 use crate::state::{AppState, Command, Event};
+use crate::watch::{GitDirs, RepoWatch};
 
 /// How long to wait for input before checking for git results.
 const INPUT_POLL: Duration = Duration::from_millis(50);
@@ -42,13 +44,15 @@ fn main() -> Result<()> {
     let pager = external::pager(&env, config.diff.pager);
     let editor = external::editor(&env);
     let issues = config.issues;
+    let refresh = config.refresh;
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
     let (before, after) = ratatui::run(|terminal| {
         let programs = Programs { pager, editor };
-        run(terminal, repo, icons, config.layout, programs, issues)
+        let settings = Settings { issues, refresh };
+        run(terminal, repo, icons, config.layout, programs, settings)
     })?;
     // Remember resized panes and columns for next time.
     if let Some(path) = config_path.filter(|_| after != before) {
@@ -77,6 +81,12 @@ struct Programs {
     editor: String,
 }
 
+/// Settings from the config file the event loop needs.
+struct Settings {
+    issues: config::Issues,
+    refresh: config::Refresh,
+}
+
 /// Runs the app until it quits. Returns the pane and column widths it started
 /// with and those it ended with.
 fn run(
@@ -85,9 +95,22 @@ fn run(
     icons: Icons,
     layout: config::Layout,
     programs: Programs,
-    issues: config::Issues,
+    settings: Settings,
 ) -> Result<(config::Layout, config::Layout)> {
     let _mouse = MouseCapture::enable()?;
+    // Focus reports tell when to look for edited files; terminals that don't
+    // send them count as always focused.
+    let _focus = FocusReporting::enable();
+    let mut focused = true;
+    let mut watch = settings
+        .refresh
+        .watch
+        .then(|| GitDirs::resolve(&ProcessExecutor::new(), &repo))
+        .flatten()
+        .map(RepoWatch::start);
+    // Clamped to a day: `Instant + Duration` panics on overflow.
+    let status_every = Duration::from_secs(settings.refresh.status_interval.min(86_400));
+    let mut next_status = Instant::now() + status_every;
     // Inside herdr, plain right-click opens the app's menus, not herdr's.
     let env = |name: &str| std::env::var(name).ok();
     let _right_click = herdr::RightClick::enable(&env, herdr::run_quietly);
@@ -99,7 +122,7 @@ fn run(
     let mut state = AppState::new(repo);
     state.pager = programs.pager;
     state.editor = programs.editor;
-    state.issues = issues;
+    state.issues = settings.issues;
     let before = state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
 
@@ -117,13 +140,31 @@ fn run(
                 TermEvent::Mouse(mouse) => {
                     external = dispatch(&mut state, &runner, Event::Mouse(mouse));
                 }
+                // Back from another window: files may have been edited there.
+                TermEvent::FocusGained if !status_every.is_zero() => {
+                    focused = true;
+                    dispatch(&mut state, &runner, Event::StatusTick);
+                    next_status = Instant::now() + state.status_poll_interval(status_every);
+                }
+                TermEvent::FocusLost => focused = false,
                 _ => {}
             }
+        }
+        let now = Instant::now();
+        if let Some((change, since)) = watch.as_mut().and_then(|w| w.poll(now)) {
+            dispatch(&mut state, &runner, Event::RepoChanged { change, since });
+        }
+        if focused && !status_every.is_zero() && now >= next_status {
+            dispatch(&mut state, &runner, Event::StatusTick);
+            next_status = now + state.status_poll_interval(status_every);
         }
         for program in external {
             if let Some(message) = hand_over(terminal, &program)? {
                 state.message = Some(message);
             }
+            // Focus reports were off while the program ran; the user is back
+            // in this terminal.
+            focused = true;
             // An editor may have changed files: show them as they are now.
             if program.refresh {
                 dispatch(&mut state, &runner, Event::Refresh);
@@ -143,6 +184,7 @@ fn hand_over(terminal: &mut DefaultTerminal, program: &External) -> Result<Optio
     crossterm::execute!(
         std::io::stdout(),
         event::DisableMouseCapture,
+        event::DisableFocusChange,
         crossterm::terminal::LeaveAlternateScreen,
         crossterm::cursor::Show
     )?;
@@ -151,7 +193,8 @@ fn hand_over(terminal: &mut DefaultTerminal, program: &External) -> Result<Optio
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
-        event::EnableMouseCapture
+        event::EnableMouseCapture,
+        event::EnableFocusChange
     )?;
     // Redraw everything on the next frame. `resize` clears the screen and the
     // back buffer without asking the terminal where its cursor is, which
@@ -206,5 +249,22 @@ impl Drop for MouseCapture {
     fn drop(&mut self) {
         // Nothing useful to do if the terminal is already gone.
         let _ = crossterm::execute!(std::io::stdout(), event::DisableMouseCapture);
+    }
+}
+
+/// Turns on focus reports (`FocusGained` / `FocusLost`) for the session and
+/// off again on drop. Terminals without them simply never send any.
+struct FocusReporting;
+
+impl FocusReporting {
+    fn enable() -> Self {
+        let _ = crossterm::execute!(std::io::stdout(), event::EnableFocusChange);
+        Self
+    }
+}
+
+impl Drop for FocusReporting {
+    fn drop(&mut self) {
+        let _ = crossterm::execute!(std::io::stdout(), event::DisableFocusChange);
     }
 }

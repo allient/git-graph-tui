@@ -356,3 +356,27 @@ fn q_quits() {
         })
         .expect("git-graph-tui exits on q");
 }
+
+#[test]
+fn a_commit_made_in_another_terminal_appears_on_its_own() {
+    let repo = Repo::new();
+    let app = App::launch(&repo);
+    repo.commit("outside.txt", "made in another terminal");
+    app.wait_for("made in another terminal");
+}
+
+#[test]
+fn a_branch_made_in_another_terminal_appears_on_its_own() {
+    let repo = Repo::new();
+    let app = App::launch(&repo);
+    repo.git(&["branch", "from-outside"]);
+    app.wait_for("from-outside");
+}
+
+#[test]
+fn a_file_edited_elsewhere_shows_up_as_uncommitted() {
+    let repo = Repo::new();
+    let app = App::launch(&repo);
+    std::fs::write(repo.path().join("a.txt"), "edited in an editor\n").expect("write");
+    app.wait_for("Uncommitted Changes (1)");
+}

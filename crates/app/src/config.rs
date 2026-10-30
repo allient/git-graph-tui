@@ -22,6 +22,11 @@
 //! [issues]                # `#123` in commit messages opens this page;
 //! url = "https://jira.example.com/browse/PROJ-$1"   # $1 is the number
 //! prefix = "PROJ-"        # what starts a reference; default "#"
+//!
+//! [refresh]               # pick up changes made outside the app
+//! watch = true            # reload when git's files change (default true)
+//! status_interval = 3     # seconds between working-tree checks while the
+//!                         # terminal has focus; 0 turns them off
 //! ```
 
 use std::fs;
@@ -44,6 +49,27 @@ pub struct Config {
     pub layout: Layout,
     pub diff: Diff,
     pub issues: Issues,
+    pub refresh: Refresh,
+}
+
+/// Picking up changes made outside the app (another terminal, an editor).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Refresh {
+    /// Reload when git's own files change (commits, checkouts, fetches).
+    pub watch: bool,
+    /// Seconds between `git status` checks for edited files, while the
+    /// terminal has focus; 0 turns them off.
+    pub status_interval: u64,
+}
+
+impl Default for Refresh {
+    fn default() -> Self {
+        Self {
+            watch: true,
+            status_interval: 3,
+        }
+    }
 }
 
 /// Issue links in commit messages (S20). Unset, `#123` opens issue 123 on
@@ -382,6 +408,7 @@ mod tests {
                 },
                 diff: Diff::default(),
                 issues: Issues::default(),
+                refresh: Refresh::default(),
             }
         );
     }
@@ -398,6 +425,30 @@ mod tests {
         fs::write(&file, "[diff]\nviewer = \"delta\"\n").unwrap();
         let err = format!("{:#}", load(&file).unwrap_err());
         assert!(err.contains("unknown field `viewer`"), "{err}");
+    }
+
+    #[test]
+    fn reads_the_refresh_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        assert_eq!(
+            load(&file).unwrap().refresh,
+            Refresh {
+                watch: true,
+                status_interval: 3
+            }
+        );
+        fs::write(&file, "[refresh]\nwatch = false\nstatus_interval = 0\n").unwrap();
+        assert_eq!(
+            load(&file).unwrap().refresh,
+            Refresh {
+                watch: false,
+                status_interval: 0
+            }
+        );
+        fs::write(&file, "[refresh]\npoll = 1\n").unwrap();
+        let err = format!("{:#}", load(&file).unwrap_err());
+        assert!(err.contains("unknown field `poll`"), "{err}");
     }
 
     #[test]
