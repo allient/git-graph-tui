@@ -1,0 +1,40 @@
+---
+title: git-graph-tui
+description: A Git Graph for the terminal. See your repository's colored commit graph and act on it with right-click menus.
+template: splash
+hero:
+  tagline: A Git Graph for the terminal. See every branch, tag, stash and merge as a colored graph, and act on it with right-click menus, just like the Git Graph extension for VS Code.
+  actions:
+    - text: Install
+      link: /getting-started/installation/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/allient/git-graph-tui
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+![git-graph-tui showing a repository with branches, tags, a stash and uncommitted changes](../../assets/screenshots/graph.png)
+
+<CardGrid>
+	<Card title="See everything" icon="seti:git">
+		Local and remote branches, tags, stashes, merges and your uncommitted changes, drawn as a clear, color-coded graph.
+	</Card>
+	<Card title="Act on it" icon="right-caret">
+		Right-click a commit, branch, tag or stash to check out, merge, rebase, cherry-pick, reset, push and more.
+	</Card>
+	<Card title="Mouse and keyboard" icon="laptop">
+		Click, right-click and scroll, or do everything from the keyboard.
+	</Card>
+	<Card title="Safe" icon="approve-check">
+		Every destructive action asks first and says exactly what will happen.
+	</Card>
+	<Card title="One binary" icon="rocket">
+		Its only dependency is the `git` CLI. It runs in any terminal, in tmux and in herdr.
+	</Card>
+	<Card title="Fast" icon="star">
+		History loads page by page and git runs in the background, so the UI never blocks.
+	</Card>
+</CardGrid>
