@@ -38,7 +38,7 @@ ODD is the default workflow on every request. It's installed in `~/.claude/CLAUD
 
 **How it maps to this repo:**
 
-- Each README roadmap stage (MVP, Daily driver, Parity, ...) or large checklist item becomes one `odd/tasks/<feature>.md`, e.g. `odd/tasks/git-graph-mvp.md`. Commit these files. They're the spec and progress record.
+- Each roadmap stage in `docs/features.md` (MVP, Daily driver, Parity, ...) or large checklist item becomes one `odd/tasks/<feature>.md`, e.g. `odd/tasks/git-graph-mvp.md`. Commit these files. They're the spec and progress record.
 - Test runner for ODD's test-first step: **`cargo nextest run`**, with `insta` snapshots and fixture repos. See `AGENTS.md` §6.
 - Delivery skills used by ODD: `chained-pr` (split changes over 400 lines into stacked PRs) and `work-unit-commits`.
 
