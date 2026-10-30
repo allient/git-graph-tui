@@ -21,7 +21,7 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 - **Mouse and keyboard.** Click to select, right-click for context menus, scroll with the wheel. Everything also works from the keyboard. Inside herdr, git-graph-tui routes plain right-click to itself while it runs (`herdr pane input --right-click pane`) and gives it back on exit; set `GIT_GRAPH_TUI_HERDR_RIGHT_CLICK=off` to keep herdr's menu.
 - **Fast** on real repositories (tens of thousands of commits, many branches): incremental loading, background git calls, a UI that never blocks.
 - **Safe.** Every destructive action (reset, delete branch, force push, drop, clean) asks for confirmation and says exactly what will happen.
-- **Works where you work.** Any terminal, tmux, herdr (a [herdr plugin](integrations/herdr/README.md) opens it in a tab; plain right-click works inside herdr) and TTT (via a thin TTT plugin that opens it in a terminal tab).
+- **Works where you work.** Any terminal, tmux, herdr (a [herdr plugin](integrations/herdr/README.md) opens it in a tab; plain right-click works inside herdr) and TTT (run it in a terminal tab).
 - **Maintainable.** A pure, well-tested core (parsing, layout, actions) with a thin UI layer.
 
 ### Non-goals (for now)
@@ -146,7 +146,6 @@ Cargo.toml              # workspace: members, shared package metadata, dependenc
 rust-toolchain.toml     # pinned toolchain (rustfmt, clippy)
 crates/<crate>/         # one package per crate (see table)
 integrations/herdr/     # herdr plugin: opens git-graph-tui in a herdr tab
-integrations/ttt/       # tiny TTT plugin that runs git-graph-tui in a terminal tab (planned)
 tests/fixtures/         # scripts/data for fixture repos
 odd/tasks/              # ODD feature documents
 ```
@@ -313,7 +312,7 @@ Steps 1 to 3 and step 5 are done; step 4 is in progress (the herdr plugin and th
 1. **MVP:** colored graph with badges, uncommitted row, selection, scrolling, mouse + keyboard, branch and commit context menus with checkout / switch branch, create branch, tag, cherry-pick, revert, merge, reset, copy; commit details with file diffs.
 2. **Daily driver:** branch filter, remote toggle, search, repository "..." menu, pull / push / fetch, tags and stashes, config file.
 3. **Parity:** compare commits, archive, remotes management, issue linking, PR creation.
-4. **Integrations and release:** herdr plugin (done), GitHub Releases and Homebrew tap (done, from v0.1.0), TTT plugin.
+4. **Integrations and release:** herdr plugin (done), GitHub Releases and Homebrew tap (done, from v0.1.0).
 5. **Beyond:** interactive rebase, conflict handling, worktrees, reflog.
 
 ## Licensing
@@ -330,4 +329,4 @@ This project is MIT licensed. It is **inspired by** Git Graph for VS Code but co
 | [git-bahn/git-igitt](https://github.com/git-bahn/git-igitt) | Interactive TUI based on git-graph (MIT). Reference for browsing history and diffs in a terminal. |
 | [the0807/git-graph-plus](https://github.com/the0807/git-graph-plus) | A modern, from-scratch Git Graph for VS Code (Apache-2.0). Ideas for stretch goals: interactive rebase, drag to merge, conflict prediction, reflog, worktrees. |
 | [stablyai/orca#4521](https://github.com/stablyai/orca/issues/4521) | Feature request in the Orca agent IDE asking for exactly this. Shows real demand from users of terminal and agent-first tools. |
-| [herdr](https://herdr.dev/) · [TTT editor](https://tttedit.dev/) | Host environments we integrate with through thin plugins. |
+| [herdr](https://herdr.dev/) · [TTT editor](https://tttedit.dev/) | Host environments it runs in (herdr through a plugin). |
