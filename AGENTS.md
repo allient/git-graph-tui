@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone terminal Git Graph written in Rust with ratatui. Read `README.md` first for the goals, scope, stack and architecture. This file covers **how** to build it.
+Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone terminal Git Graph written in Rust with ratatui. Read `README.md` first, then `docs/architecture.md` for the goals, stack and architecture. This file covers **how** to build it.
 
 > If a fact here conflicts with the code or with a library's docs, check the source, fix this file, and don't guess.
 
@@ -18,7 +18,7 @@ Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone t
 
 ## 2. Workspace layout
 
-See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `ggt-` except the binary `git-graph-tui`.
+See the crate table in `docs/architecture.md`. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `ggt-` except the binary `git-graph-tui`.
 
 Workspace rules:
 - **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`. **Never use `cargo remove`**: it also deletes the dependency from root `[workspace.dependencies]` when no member uses it anymore, which drops planned catalog entries. Remove a dependency by editing the member's `Cargo.toml` by hand.
@@ -61,7 +61,7 @@ Module rules:
 
 ## 5. UI / UX conventions
 
-- Match the VS Code Git Graph look and behavior described in the README and `odd/tasks/git-graph-mvp.md` (colored lanes, ref badges, muted non-HEAD-ancestors, inline commit details, context menus per target).
+- Match the VS Code Git Graph look and behavior described in `docs/features.md` and `odd/tasks/git-graph-mvp.md` (colored lanes, ref badges, muted non-HEAD-ancestors, inline commit details, context menus per target).
 - **Mouse and keyboard parity:** click selects, double-click or Enter expands details, right-click or the menu key (`m` / Shift+F10) opens the context menu for the selection, the wheel scrolls, Esc closes. j/k or arrows, PgUp/PgDn, g/G, `/` to find.
 - Popup menus open at the cursor (mouse) or next to the selection (keyboard), stay inside the terminal, and support arrows, Enter, Esc and accelerator letters.
 - Graph glyphs use box-drawing characters (`│ ─ ╭ ╮ ╰ ╯ ┼`) and `●` / `○` for commits, with an ASCII fallback (config).
@@ -78,7 +78,7 @@ Module rules:
 - **Integration (core + git):** build fixture repos with the scripts in `tests/fixtures/` (branches, merges, tags, stash, a local bare repo as `origin`) in a temp dir, run actions, and assert the resulting repo state with git.
 - **UI:** render `AppState`s into ratatui's `TestBackend` and snapshot the buffer with `insta`. Drive key and mouse `Event`s through `update` and assert state, including hit-testing for right-click menus.
 - Run with `cargo nextest run`. Review snapshot changes with `cargo insta review`.
-- **Definition of done for a feature:** core unit tests, an integration test against a fixture repo for each mutating action, a UI snapshot for each new visual, destructive paths confirmed, the README checklist item ticked.
+- **Definition of done for a feature:** core unit tests, an integration test against a fixture repo for each mutating action, a UI snapshot for each new visual, destructive paths confirmed, the `docs/features.md` checklist item ticked.
 
 ---
 
@@ -96,7 +96,7 @@ Module rules:
 
 This repo is developed with **[Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)** (ODD workflow, RDD review, Engram memory) and a few skills.sh skills. Setup and details are in [`docs/ai-tooling.md`](docs/ai-tooling.md). Repo-specific ODD rules:
 
-- Substantial work gets one feature document in `odd/tasks/<feature-name>.md`, one per README roadmap stage or large checklist item. Commit it.
+- Substantial work gets one feature document in `odd/tasks/<feature-name>.md`, one per roadmap stage (`docs/features.md`) or large checklist item. Commit it.
 - ODD's test-first step uses **`cargo nextest`** (+ `insta`) with fixture repos. Never invent another runner.
 - Commit in about 400-line work units on a feature branch with Conventional Commits. Use the `chained-pr` skill for larger changes.
 - Before saying a change is done, run `cargo fmt --all --check`, `cargo lint`, `cargo t` and `cargo machete` (and `cargo deny check` when dependencies change).
