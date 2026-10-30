@@ -1,7 +1,7 @@
 //! `git stash list`: stash entries, newest first. They are read in the log
 //! format, so each stash is also a commit the graph can show.
 
-use tgg_model::{Commit, Stash};
+use ggt_model::{Commit, Stash};
 
 use crate::{ParseError, log};
 

@@ -1,9 +1,9 @@
+use ggt_actions::GraphColumn;
+use ggt_graph::Row;
+use ggt_model::{Commit, Oid, Ref};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use tgg_actions::GraphColumn;
-use tgg_graph::Row;
-use tgg_model::{Commit, Oid, Ref};
 
 use crate::badges::{Badge, BadgeKind, badges_for};
 use crate::glyphs::{GlyphCell, connector_glyphs, lane_glyphs};
@@ -191,7 +191,7 @@ impl HitMap {
 #[derive(Debug, Clone)]
 pub struct GraphView<'a> {
     pub commits: &'a [Commit],
-    /// Layout rows, one per commit (see `tgg_graph::Graph`).
+    /// Layout rows, one per commit (see `ggt_graph::Graph`).
     pub rows: &'a [Row],
     pub refs: &'a [Ref],
     /// The commit HEAD points at, for placing the uncommitted row.

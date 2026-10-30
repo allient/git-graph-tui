@@ -1,12 +1,12 @@
 //! Renders the commit details panel for a real commit into a buffer.
 
+use ggt_git::GitCommand;
+use ggt_git::show;
+use ggt_model::Oid;
+use ggt_testkit::FixtureRepo;
+use ggt_ui::{CommitDetailsView, Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_git::GitCommand;
-use tgg_git::show;
-use tgg_model::Oid;
-use tgg_testkit::FixtureRepo;
-use tgg_ui::{CommitDetailsView, Theme};
 
 fn run(repo: &FixtureRepo, args: Vec<String>) -> String {
     let full = GitCommand::read(repo.path(), args).argv();

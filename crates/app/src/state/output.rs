@@ -4,7 +4,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use tgg_git::{ExecError, GitCommand, Output};
+use ggt_git::{ExecError, GitCommand, Output};
 
 use super::{AppState, Command, SCROLL_LINES};
 

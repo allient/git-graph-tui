@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use tgg_git::GitCommand;
+use ggt_git::GitCommand;
 
 use crate::action::{Confirmation, Plan, ResetMode, UiEffect, strings};
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};

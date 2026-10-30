@@ -133,13 +133,13 @@ A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure cra
 
 | Crate | Path | Role | May depend on |
 | --- | --- | --- | --- |
-| `tgg-model` | `crates/model` | Domain types: commit ids, commits, refs, signatures. Pure data. | — |
-| `tgg-git` | `crates/git` | Safe git argv building, process execution behind a trait, output parsers | model |
-| `tgg-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
-| `tgg-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
-| `tgg-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, git (output types), graph, actions |
+| `ggt-model` | `crates/model` | Domain types: commit ids, commits, refs, signatures. Pure data. | — |
+| `ggt-git` | `crates/git` | Safe git argv building, process execution behind a trait, output parsers | model |
+| `ggt-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
+| `ggt-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
+| `ggt-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, git (output types), graph, actions |
 | `git-graph-tui` | `crates/app` | The binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
-| `tgg-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
+| `ggt-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
 
 ```
 Cargo.toml              # workspace: members, shared package metadata, dependency catalog, lints, profiles

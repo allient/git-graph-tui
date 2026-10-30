@@ -1,5 +1,5 @@
+use ggt_model::{HeadState, Oid, Stash};
 use pretty_assertions::assert_eq;
-use tgg_model::{HeadState, Oid, Stash};
 
 use super::*;
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction, TagAction,
     UiEffect, WorkingTreeAction, WorktreeAction,
 };
-use tgg_git::worktree::Worktree;
+use ggt_git::worktree::Worktree;
 
 fn oid(c: char) -> Oid {
     Oid::parse(&c.to_string().repeat(40)).unwrap()

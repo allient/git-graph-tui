@@ -1,8 +1,8 @@
 //! The Source Control pane beside the graph, against real fixture repositories.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;

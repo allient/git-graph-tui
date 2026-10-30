@@ -2,9 +2,9 @@
 //! dividers (S6).
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{ChangesSort, ChangesView, GraphColumn, column_menu};
+use ggt_ui::{ColumnDivider, ColumnWidths, PopupMenu};
 use ratatui::layout::Position;
-use tgg_actions::{ChangesSort, ChangesView, GraphColumn, column_menu};
-use tgg_ui::{ColumnDivider, ColumnWidths, PopupMenu};
 
 use crate::config::Layout;
 

@@ -4,9 +4,9 @@
 use std::process::Command as Process;
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{Action, Operation, WorkingTreeAction};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_actions::{Action, Operation, WorkingTreeAction};
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;

@@ -1,9 +1,9 @@
 //! Find (`/`): search the loaded commits and step through the matches.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ggt_testkit::FixtureRepo;
+use ggt_ui::Theme;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
-use tgg_ui::Theme;
 
 use crate::state::{Command, Event};
 use crate::testing::Harness;

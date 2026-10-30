@@ -19,8 +19,8 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::Parser;
 use crossterm::event::{self, Event as TermEvent};
+use ggt_ui::{Icons, Theme};
 use ratatui::DefaultTerminal;
-use tgg_ui::{Icons, Theme};
 
 use crate::cli::Cli;
 use crate::external::External;

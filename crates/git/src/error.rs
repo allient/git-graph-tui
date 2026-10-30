@@ -1,4 +1,4 @@
-use tgg_model::OidError;
+use ggt_model::OidError;
 
 /// Git printed something the parser didn't expect.
 ///
@@ -44,8 +44,8 @@ pub(crate) fn oid(
     value: &str,
     record: usize,
     field: &'static str,
-) -> Result<tgg_model::Oid, ParseError> {
-    tgg_model::Oid::parse(value).map_err(|source| ParseError::InvalidOid {
+) -> Result<ggt_model::Oid, ParseError> {
+    ggt_model::Oid::parse(value).map_err(|source| ParseError::InvalidOid {
         record,
         field,
         source,

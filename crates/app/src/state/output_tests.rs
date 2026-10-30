@@ -1,9 +1,9 @@
 //! "Show Git Output": the log of the git commands actions ran.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{Action, UiEffect};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_actions::{Action, UiEffect};
-use tgg_testkit::FixtureRepo;
 
 use super::output::{OUTPUT_CAP, OutputEntry};
 use super::*;

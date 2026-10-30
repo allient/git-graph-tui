@@ -1,12 +1,12 @@
 //! Draws the whole screen from `AppState`.
 
+use ggt_model::HeadState;
+use ggt_ui::{BannerHitMap, Gap, GraphView, SourceControlHitMap, Theme};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
-use tgg_model::HeadState;
-use tgg_ui::{BannerHitMap, Gap, GraphView, SourceControlHitMap, Theme};
 
 use crate::state::{AppState, Dialog, DialogHits, Find, MIN_WIDTH_FOR_PANE};
 
@@ -278,11 +278,11 @@ fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Them
 
 #[cfg(test)]
 mod tests {
+    use ggt_testkit::FixtureRepo;
+    use ggt_ui::HitTarget;
     use pretty_assertions::assert_eq;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
-    use tgg_testkit::FixtureRepo;
-    use tgg_ui::HitTarget;
 
     use super::*;
     use crate::testing::Harness;

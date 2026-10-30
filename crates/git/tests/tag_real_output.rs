@@ -2,10 +2,10 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_git::GitCommand;
+use ggt_git::tag;
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::GitCommand;
-use tgg_git::tag;
-use tgg_testkit::FixtureRepo;
 
 fn details(repo: &FixtureRepo, name: &str) -> Option<tag::TagDetails> {
     let full = GitCommand::read(repo.path(), tag::args(name)).argv();

@@ -4,10 +4,10 @@
 
 use std::path::Path;
 
+use ggt_git::GitCommand;
+use ggt_git::worktree::{self, Worktree};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::GitCommand;
-use tgg_git::worktree::{self, Worktree};
-use tgg_testkit::FixtureRepo;
 
 fn worktrees(repo: &FixtureRepo) -> Vec<Worktree> {
     let full = GitCommand::read(repo.path(), worktree::args()).argv();

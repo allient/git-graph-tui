@@ -3,8 +3,8 @@
 //! loaded yet is looked for in older history, a page at a time.
 
 use crossterm::event::KeyEvent;
-use tgg_model::{Commit, Ref};
-use tgg_ui::{Key, TextField, format_date};
+use ggt_model::{Commit, Ref};
+use ggt_ui::{Key, TextField, format_date};
 
 use super::{AppState, Command, actions::widget_key};
 

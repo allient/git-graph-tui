@@ -1,7 +1,7 @@
 use std::path::Path;
 
+use ggt_model::{Oid, Stash};
 use pretty_assertions::assert_eq;
-use tgg_model::{Oid, Stash};
 
 use super::*;
 use crate::{InputId, InputValue, Plan};

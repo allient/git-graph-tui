@@ -1,5 +1,5 @@
 [package]
-name = "tgg-ui"
+name = "ggt-ui"
 description = "ratatui widgets for git-graph-tui: graph view, badges, menus, dialogs and hit-map."
 version.workspace = true
 edition.workspace = true
@@ -14,14 +14,14 @@ workspace = true
 
 [dependencies]
 ratatui.workspace = true
-tgg-actions.workspace = true
-tgg-git.workspace = true
-tgg-graph.workspace = true
-tgg-model.workspace = true
+ggt-actions.workspace = true
+ggt-git.workspace = true
+ggt-graph.workspace = true
+ggt-model.workspace = true
 unicode-width.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
 pretty_assertions.workspace = true
-tgg-git.workspace = true
-tgg-testkit.workspace = true
+ggt-git.workspace = true
+ggt-testkit.workspace = true

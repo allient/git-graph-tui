@@ -2,13 +2,13 @@
 //! git output view, the reflog view, the worktrees view and the interactive
 //! rebase panel.
 
+use ggt_actions::TodoAction;
+use ggt_ui::{Theme, fit, format_date};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
-use tgg_actions::TodoAction;
-use tgg_ui::{Theme, fit, format_date};
 
 use crate::state::{
     GitOutput, Info, OutputLine, RebaseView, ReflogView, WorktreeEntry, WorktreesView,

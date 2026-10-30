@@ -2,9 +2,9 @@
 //! refresh, against real fixture repositories.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_model::HeadState;
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_model::HeadState;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;
@@ -256,7 +256,7 @@ fn a_second_action_waits_for_the_first() {
     assert!(!first.is_empty());
     // While it runs, starting another action is refused with a message.
     h.state.start_action(
-        tgg_actions::Action::CopyBranchName { name: "x".into() },
+        ggt_actions::Action::CopyBranchName { name: "x".into() },
         "Copy".into(),
     );
     assert!(

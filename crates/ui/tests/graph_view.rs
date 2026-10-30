@@ -3,16 +3,16 @@
 // Test helpers panic on bad fixtures, like the tests themselves.
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_actions::GraphColumn;
+use ggt_git::{log, refs, status};
+use ggt_graph::{Graph, Row};
+use ggt_model::{Commit, Oid, Ref, WorkingTreeStatus};
+use ggt_testkit::FixtureRepo;
+use ggt_ui::{ColumnDivider, ColumnWidths, Gap, GraphView, HitTarget, Icons, Theme};
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
-use tgg_actions::GraphColumn;
-use tgg_git::{log, refs, status};
-use tgg_graph::{Graph, Row};
-use tgg_model::{Commit, Oid, Ref, WorkingTreeStatus};
-use tgg_testkit::FixtureRepo;
-use tgg_ui::{ColumnDivider, ColumnWidths, Gap, GraphView, HitTarget, Icons, Theme};
 
 struct Loaded {
     commits: Vec<Commit>,
@@ -78,7 +78,7 @@ fn text(buf: &Buffer) -> String {
         .join("\n")
 }
 
-fn render(v: &GraphView<'_>, width: u16, height: u16) -> (Buffer, tgg_ui::HitMap) {
+fn render(v: &GraphView<'_>, width: u16, height: u16) -> (Buffer, ggt_ui::HitMap) {
     render_with(v, width, height, &Theme::default())
 }
 
@@ -87,7 +87,7 @@ fn render_with(
     width: u16,
     height: u16,
     theme: &Theme,
-) -> (Buffer, tgg_ui::HitMap) {
+) -> (Buffer, ggt_ui::HitMap) {
     let area = Rect::new(0, 0, width, height);
     let mut buf = Buffer::empty(area);
     let hits = v.render(area, &mut buf, theme);

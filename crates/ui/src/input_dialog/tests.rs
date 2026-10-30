@@ -1,8 +1,8 @@
+use ggt_actions::{Action, InputId, InputValue, ResetMode};
+use ggt_model::Oid;
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{Action, InputId, InputValue, ResetMode};
-use tgg_model::Oid;
 
 use super::*;
 use crate::{Button, DialogStyle, Key, Theme};

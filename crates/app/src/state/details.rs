@@ -1,9 +1,9 @@
 //! The inline commit details panel (S10) and the diff view it opens.
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use tgg_git::show::{self, CommitDetails, FileChange};
-use tgg_model::Oid;
-use tgg_ui::{
+use ggt_git::show::{self, CommitDetails, FileChange};
+use ggt_model::Oid;
+use ggt_ui::{
     CommitDetailsView, DetailsHit, DetailsHitMap, DetailsOutcome, DiffHitMap, DiffOutcome,
     DiffView, Key, SIDE_BY_SIDE_WIDTH,
 };
@@ -242,7 +242,7 @@ impl AppState {
         origin: Option<&str>,
     ) -> Vec<Command> {
         let origin = origin.map(str::trim);
-        if let Some(url) = origin.and_then(|url| tgg_actions::issue_url(url, number)) {
+        if let Some(url) = origin.and_then(|url| ggt_actions::issue_url(url, number)) {
             return self.open_url(url);
         }
         let reference = format!("{}{number}", self.issues.prefix());

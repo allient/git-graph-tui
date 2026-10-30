@@ -1,7 +1,7 @@
 //! Read-only info dialogs: "View Details" on a tag.
 
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
-use tgg_git::tag::{self, TagDetails};
+use ggt_git::tag::{self, TagDetails};
 
 use super::{AppState, Command, Request};
 
@@ -51,7 +51,7 @@ fn tag_info(details: &TagDetails) -> Info {
     if let Some(annotation) = &details.annotation {
         let tagger = &annotation.tagger;
         lines.push(format!("Tagger:  {} <{}>", tagger.name, tagger.email));
-        lines.push(format!("Date:    {}", tgg_ui::format_date(tagger.time)));
+        lines.push(format!("Date:    {}", ggt_ui::format_date(tagger.time)));
         lines.push(String::new());
         lines.extend(annotation.message.lines().map(str::to_owned));
     } else {

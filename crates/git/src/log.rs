@@ -1,6 +1,6 @@
 //! `git log`: commits for the graph, one page at a time.
 
-use tgg_model::{Commit, Signature};
+use ggt_model::{Commit, Signature};
 
 use crate::ParseError;
 use crate::error::{fields, oid};

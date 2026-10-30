@@ -5,7 +5,7 @@
 //! - Runs `git` as a child process behind a trait, so callers and tests can
 //!   substitute the executor.
 //! - Parses machine-readable output (`-z`, `%x1f` separators) into
-//!   `tgg-model` types.
+//!   `ggt-model` types.
 //!
 //! Each command lives in its own module that owns both its arguments and its
 //! parser, so the output format and the code that reads it can't drift apart.

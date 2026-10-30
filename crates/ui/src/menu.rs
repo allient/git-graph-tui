@@ -1,8 +1,8 @@
+use ggt_actions::{Action, MenuEntry, MenuItem};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::Style;
 use ratatui::widgets::{Clear, Widget};
-use tgg_actions::{Action, MenuEntry, MenuItem};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{Key, Theme, fit};

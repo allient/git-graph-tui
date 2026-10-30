@@ -1,7 +1,7 @@
+use ggt_actions::{Action, MenuEntry, MenuItem};
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{Action, MenuEntry, MenuItem};
 
 use super::*;
 use crate::{Key, Theme};

@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use tgg_git::GitCommand;
-pub use tgg_git::in_progress::Operation;
+use ggt_git::GitCommand;
+pub use ggt_git::in_progress::Operation;
 
 use crate::action::{Confirmation, Plan};
 

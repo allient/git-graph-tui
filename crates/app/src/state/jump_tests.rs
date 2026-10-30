@@ -1,10 +1,10 @@
 //! Jumping to a parent commit that isn't loaded yet: history is paged in
 //! until it appears.
 
+use ggt_model::Oid;
+use ggt_testkit::FixtureRepo;
+use ggt_ui::DetailsOutcome;
 use pretty_assertions::assert_eq;
-use tgg_model::Oid;
-use tgg_testkit::FixtureRepo;
-use tgg_ui::DetailsOutcome;
 
 use crate::testing::Harness;
 

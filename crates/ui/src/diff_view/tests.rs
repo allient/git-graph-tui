@@ -1,7 +1,7 @@
+use ggt_git::show::{FileChange, Numstat, parse_diff};
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_git::show::{FileChange, Numstat, parse_diff};
 
 use super::*;
 use crate::{Key, Theme};
@@ -10,7 +10,7 @@ fn file() -> FileChange {
     FileChange {
         path: "src/lib.rs".into(),
         old_path: None,
-        status: tgg_model::Change::Modified,
+        status: ggt_model::Change::Modified,
         stat: Numstat::Lines {
             added: 1,
             deleted: 1,
@@ -142,7 +142,7 @@ fn binary_files_say_so() {
         &FileChange {
             path: "logo.png".into(),
             old_path: None,
-            status: tgg_model::Change::Modified,
+            status: ggt_model::Change::Modified,
             stat: Numstat::Binary,
         },
         parse_diff(

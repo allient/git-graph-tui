@@ -5,10 +5,10 @@
 use std::path::{Path, PathBuf};
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{Action, UiEffect};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
-use tgg_actions::{Action, UiEffect};
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;

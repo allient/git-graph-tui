@@ -2,11 +2,11 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_actions::{Action, ResetMode};
+use ggt_model::Oid;
+use ggt_ui::{InputDialog, Key, Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_actions::{Action, ResetMode};
-use tgg_model::Oid;
-use tgg_ui::{InputDialog, Key, Theme};
 
 fn render(dialog: &InputDialog, width: u16, height: u16) -> String {
     let area = Rect::new(0, 0, width, height);

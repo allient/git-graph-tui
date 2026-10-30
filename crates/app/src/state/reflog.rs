@@ -2,9 +2,9 @@
 //! per entry to get its commit back (a branch, a checkout or a reset).
 
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
-use tgg_actions::reflog_menu;
-use tgg_git::reflog::{self, ReflogEntry};
-use tgg_ui::PopupMenu;
+use ggt_actions::reflog_menu;
+use ggt_git::reflog::{self, ReflogEntry};
+use ggt_ui::PopupMenu;
 
 use super::list::ListPanel;
 use super::{AppState, Command, Request};

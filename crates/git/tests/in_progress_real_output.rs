@@ -4,9 +4,9 @@
 
 use std::process::Command;
 
+use ggt_git::in_progress::{self, Operation};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::in_progress::{self, Operation};
-use tgg_testkit::FixtureRepo;
 
 /// Runs a git command that is expected to stop on a conflict (and so fail).
 fn git_conflicting(repo: &FixtureRepo, args: &[&str]) {

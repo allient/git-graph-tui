@@ -1,7 +1,7 @@
+use ggt_actions::{Action, InputId, InputKind, InputValue};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Modifier, Style};
-use tgg_actions::{Action, InputId, InputKind, InputValue};
 use unicode_width::UnicodeWidthChar;
 
 use crate::confirm::{MAX_WIDTH, centered, draw_buttons, draw_frame, text_width};

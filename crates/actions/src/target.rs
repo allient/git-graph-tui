@@ -1,4 +1,4 @@
-use tgg_model::{HeadState, Oid, Ref, RefKind, Stash, split_remote};
+use ggt_model::{HeadState, Oid, Ref, RefKind, Stash, split_remote};
 
 use crate::Operation;
 

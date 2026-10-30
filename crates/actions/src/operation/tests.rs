@@ -1,7 +1,7 @@
 use std::path::Path;
 
+use ggt_git::CommandKind;
 use pretty_assertions::assert_eq;
-use tgg_git::CommandKind;
 
 use super::*;
 use crate::Action;

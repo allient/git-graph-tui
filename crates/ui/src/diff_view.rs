@@ -1,10 +1,10 @@
 use std::cell::Cell;
 
+use ggt_git::show::{Diff, DiffLine, FileChange, LineKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Clear, Widget};
-use tgg_git::show::{Diff, DiffLine, FileChange, LineKind};
 
 use crate::details::file_label;
 use crate::{Key, Theme, fit};

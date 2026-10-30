@@ -1,4 +1,4 @@
-use tgg_graph::{Edge, Row};
+use ggt_graph::{Edge, Row};
 
 /// One terminal cell of the graph column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -207,8 +207,8 @@ fn box_char(j: &Joints) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ggt_graph::{Edge, Row};
     use pretty_assertions::assert_eq;
-    use tgg_graph::{Edge, Row};
 
     fn e(from: usize, to: usize, color: usize) -> Edge {
         Edge { from, to, color }

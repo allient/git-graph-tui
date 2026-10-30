@@ -4,9 +4,9 @@
 use std::path::Path;
 
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
-use tgg_actions::{Action, WorktreeAction, worktree_menu};
-use tgg_git::worktree::{self, Worktree};
-use tgg_ui::PopupMenu;
+use ggt_actions::{Action, WorktreeAction, worktree_menu};
+use ggt_git::worktree::{self, Worktree};
+use ggt_ui::PopupMenu;
 
 use super::list::ListPanel;
 use super::{AppState, Command, Request};

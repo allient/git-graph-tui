@@ -1,7 +1,7 @@
 //! `git for-each-ref` on one tag: what it points at and, for annotated
 //! tags, the tagger and message (for "View Details" on a tag badge).
 
-use tgg_model::{Oid, Signature};
+use ggt_model::{Oid, Signature};
 
 use crate::ParseError;
 use crate::error::{fields, oid};

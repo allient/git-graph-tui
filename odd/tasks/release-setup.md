@@ -21,7 +21,7 @@ Branch: build/release-setup, PR against main. Delivery: ask-on-risk. Tests: `car
 | T2 | S5 | inline | done | docs: install section |
 | T3 | S6 | delegated (verifier) | done | ci: type-check release targets |
 | T5 | S7 | delegated (3 QA testers in parallel: graph/views, context menus, Source Control + repo menu), fixes inline | in progress | |
-| T6 | L9 | inline, after T5 | todo | |
+| T6 | L9 | inline, after T5 | done | refactor: ggt-* crates |
 | T4 | S4 | user (tap repo + token), then first tag (after T5, T6) | todo | |
 
 Route evidence: one feature; the release config and docs are small and sequential, so the parent writes inline; T3 delegates because the Risk line names item 5.
@@ -37,3 +37,4 @@ Route evidence: one feature; the release config and docs are small and sequentia
 - **L7** (2026-10-29) User created `allient/homebrew-tap` (public) and the `HOMEBREW_TAP_TOKEN` secret (confirmed present via `gh secret list`, value not readable). The tap was empty, which would break the release's tap checkout; user: "do this The fix is to give the tap one first commit (a short README) on main". Added README.md on `main` (commit ab0ba07). T4 prerequisites done; the first tag waits for T5 (QA).
 - **L8** (2026-10-29) "before release I wan tto rename project to git-graph-tui" and "including repo name"; scope chosen: all user-facing (GitHub repo, command and crate, env vars `GIT_GRAPH_TUI_*`, config folder `~/.config/git-graph-tui`, herdr plugin id, Homebrew formula, docs); internal `tgg-*` crates unchanged; `odd/` history notes keep the old name. QA F2 (README graph line) fixed in the same commit.
 - **L9** (2026-10-29) "aftr test rename to ggt The internal crates (tgg-model, tgg-ui and so on) ... betetr". After QA: rename the internal crates `tgg-*` to `ggt-*` (T6). Local checkout folder rename stays for later (user: "ok keep thsi for later").
+- **L10** (2026-10-29) T5 (QA) done: recheck 9/9 PASS plus smoke (see odd/tasks/qa-fixes.md). T6 done: internal crates renamed `tgg-*` to `ggt-*` (117 files; Cargo.lock only reorders). Gate green: 811 tests, clippy, fmt, MSRV 1.88, deny, machete, herdr script tests, `dist plan`.

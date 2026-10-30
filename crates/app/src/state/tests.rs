@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ggt_git::GitCommand;
+use ggt_model::Oid;
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::GitCommand;
-use tgg_model::Oid;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::git::JobResult;

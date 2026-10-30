@@ -1,8 +1,8 @@
+use ggt_actions::{Action, Confirmation};
+use ggt_model::Oid;
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_actions::{Action, Confirmation};
-use tgg_model::Oid;
 
 use super::*;
 use crate::{Key, Theme};

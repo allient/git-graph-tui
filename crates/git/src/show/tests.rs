@@ -1,5 +1,5 @@
+use ggt_model::{Change, Oid};
 use pretty_assertions::assert_eq;
-use tgg_model::{Change, Oid};
 
 use super::*;
 

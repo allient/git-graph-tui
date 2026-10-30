@@ -1,5 +1,5 @@
-use tgg_git::worktree::Worktree;
-use tgg_model::{Oid, Stash};
+use ggt_git::worktree::Worktree;
+use ggt_model::{Oid, Stash};
 
 use crate::{
     Action, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget, GraphColumn,

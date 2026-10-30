@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use tgg_git::GitCommand;
-use tgg_model::Oid;
+use ggt_git::GitCommand;
+use ggt_model::Oid;
 
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{

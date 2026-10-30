@@ -3,7 +3,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use tgg_git::{CancelToken, ExecError, Executor, GitCommand, Output};
+use ggt_git::{CancelToken, ExecError, Executor, GitCommand, Output};
 
 /// How often a running command is checked for exit, timeout and cancellation.
 const POLL: Duration = Duration::from_millis(10);
@@ -134,8 +134,8 @@ fn kill(child: &mut Child) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tgg_git::{CancelToken, ExecError, Executor, Failure, GitCommand};
-    use tgg_testkit::FixtureRepo;
+    use ggt_git::{CancelToken, ExecError, Executor, Failure, GitCommand};
+    use ggt_testkit::FixtureRepo;
 
     #[test]
     fn runs_git_and_captures_stdout() {

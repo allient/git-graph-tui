@@ -29,8 +29,8 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use ggt_actions::{ChangesSort, ChangesView, GraphColumn};
 use serde::{Deserialize, Serialize};
-use tgg_actions::{ChangesSort, ChangesView, GraphColumn};
 
 use crate::cli::IconStyle;
 

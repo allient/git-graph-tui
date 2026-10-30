@@ -1,11 +1,11 @@
+use ggt_model::{Change, ChangedFile};
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use tgg_model::{Change, ChangedFile};
 
 use super::*;
 use crate::{Icons, Key, Theme};
-use tgg_actions::{ChangesSort, ChangesView};
+use ggt_actions::{ChangesSort, ChangesView};
 
 const W: u16 = 36;
 

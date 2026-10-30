@@ -6,7 +6,7 @@
 //! `git show` diffs them against the empty tree, which also keeps this
 //! independent of the object format (SHA-1 or SHA-256 empty-tree ids).
 
-use tgg_model::{Change, Commit, Oid, Signature};
+use ggt_model::{Change, Commit, Oid, Signature};
 
 use crate::ParseError;
 use crate::error::{fields, oid};

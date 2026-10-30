@@ -2,11 +2,11 @@
 //! buttons, a multi-line commit message, a Commit button, and the changed
 //! files split into "Staged Changes" and "Changes", like VS Code.
 
+use ggt_actions::{ChangesLayout, ChangesSort, ChangesView};
+use ggt_model::{Change, ChangedFile};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Modifier, Style};
-use tgg_actions::{ChangesLayout, ChangesSort, ChangesView};
-use tgg_model::{Change, ChangedFile};
 use unicode_width::UnicodeWidthChar;
 
 use crate::text::fit;

@@ -1,6 +1,6 @@
 //! `git for-each-ref`: branches, remote branches, tags and the stash ref.
 
-use tgg_model::{Ref, RefKind};
+use ggt_model::{Ref, RefKind};
 
 use crate::ParseError;
 use crate::error::{fields, oid};
@@ -54,8 +54,8 @@ fn parse_record(record: &str, index: usize) -> Result<Ref, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ggt_model::RefKind;
     use pretty_assertions::assert_eq;
-    use tgg_model::RefKind;
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const T: &str = "tttttttttttttttttttttttttttttttttttttttt";

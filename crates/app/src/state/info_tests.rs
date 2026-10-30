@@ -1,8 +1,8 @@
 //! "View Details" on a tag badge: the read-only tag info dialog.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;
@@ -53,7 +53,7 @@ fn annotated_tags_show_the_tagger_and_message() {
         "--format=%(taggerdate:unix)",
         "refs/tags/v0.2.0",
     ]);
-    let date = tgg_ui::format_date(tag_time.parse().unwrap());
+    let date = ggt_ui::format_date(tag_time.parse().unwrap());
     assert_eq!(
         info.lines,
         [

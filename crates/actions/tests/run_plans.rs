@@ -10,14 +10,14 @@
 
 use std::process::Command;
 
-use pretty_assertions::assert_eq;
-use tgg_actions::{
+use ggt_actions::{
     Action, CommitTarget, InputId, InputValue, MenuContext, MenuItem, Plan, RepoAction, ResetMode,
     Rev, Target, menu_for, validate_ref_name,
 };
-use tgg_git::{Failure, GitCommand};
-use tgg_model::{HeadState, Oid};
-use tgg_testkit::FixtureRepo;
+use ggt_git::{Failure, GitCommand};
+use ggt_model::{HeadState, Oid};
+use ggt_testkit::FixtureRepo;
+use pretty_assertions::assert_eq;
 
 /// Runs every command of `action`'s plan, stopping at the first failure.
 fn run(repo: &FixtureRepo, action: &Action) -> Result<(), Failure> {
@@ -497,7 +497,7 @@ fn every_git_entry_of_the_sample_menus_plans_valid_git() {
         branch_filter: Vec::new(),
         compare_base: None,
         operation: None,
-        changes: tgg_actions::ChangesLayout::default(),
+        changes: ggt_actions::ChangesLayout::default(),
     };
     let login = repo.git(&["rev-parse", "feature/login"]);
     let targets = [

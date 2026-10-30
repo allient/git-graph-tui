@@ -1,6 +1,6 @@
 //! `git status --porcelain=v2`: HEAD state and uncommitted changes.
 
-use tgg_model::{Change, ChangedFile, HeadState, WorkingTreeStatus};
+use ggt_model::{Change, ChangedFile, HeadState, WorkingTreeStatus};
 
 use crate::ParseError;
 
@@ -148,8 +148,8 @@ fn count_xy(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ggt_model::{Change, ChangedFile, HeadState};
     use pretty_assertions::assert_eq;
-    use tgg_model::{Change, ChangedFile, HeadState};
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

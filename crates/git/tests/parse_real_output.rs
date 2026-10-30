@@ -2,10 +2,10 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_git::{log, refs, stash, status};
+use ggt_model::{HeadState, RefKind};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::{log, refs, stash, status};
-use tgg_model::{HeadState, RefKind};
-use tgg_testkit::FixtureRepo;
 
 fn run(repo: &FixtureRepo, args: &[String]) -> String {
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
