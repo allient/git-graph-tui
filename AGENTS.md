@@ -99,6 +99,7 @@ This repo is developed with **[Gentle AI](https://github.com/Gentleman-Programmi
 - Substantial work gets one feature document in `odd/tasks/<feature-name>.md`, one per roadmap stage (`docs/features.md`) or large checklist item. Commit it.
 - ODD's test-first step uses **`cargo nextest`** (+ `insta`) with fixture repos. Never invent another runner.
 - Commit in about 400-line work units on a feature branch with Conventional Commits. Use the `chained-pr` skill for larger changes.
+- **Merge pull requests with a merge commit** (`gh pr merge --merge`), never squash or rebase. A merge commit records where each branch joins `main`, so the graph (ours, or VS Code's) shows it; squash and rebase copy the commits and leave the branch looking unmerged. `git log --first-parent main` still gives one line per PR. Delete the branch after merging (`--delete-branch`).
 - Before saying a change is done, run `cargo fmt --all --check`, `cargo lint`, `cargo t` and `cargo machete` (and `cargo deny check` when dependencies change).
 
 ---
