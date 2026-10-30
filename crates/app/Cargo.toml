@@ -13,8 +13,9 @@ readme = "../../README.md"
 keywords = ["git", "tui", "graph", "terminal", "ratatui"]
 categories = ["command-line-utilities", "development-tools"]
 
+# Short to type; the project, package and Homebrew formula stay git-graph-tui.
 [[bin]]
-name = "git-graph-tui"
+name = "ggt"
 path = "src/main.rs"
 
 # Not published to crates.io (`publish = false`), but released as binaries.

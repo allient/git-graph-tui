@@ -6,8 +6,8 @@ description: Open a repository and learn the basics in a minute.
 Run it inside a git repository, or pass the path to one (any folder inside it works):
 
 ```sh
-git-graph-tui
-git-graph-tui ~/code/my-project
+ggt
+ggt ~/code/my-project
 ```
 
 Outside a git repository it exits with an error.

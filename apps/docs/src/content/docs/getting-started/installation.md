@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/allient/git-graph-
 
 ## Manual download
 
-Download the archive for your platform from the [release page](https://github.com/allient/git-graph-tui/releases/latest), check it against its `.sha256` file, and put `git-graph-tui` on your `PATH`.
+Download the archive for your platform from the [release page](https://github.com/allient/git-graph-tui/releases/latest), check it against its `.sha256` file, and put `ggt` on your `PATH`.
 
 ## From source
 
@@ -42,5 +42,7 @@ cargo install --path crates/app
 ## Check it works
 
 ```sh
-git-graph-tui --version
+ggt --version
 ```
+
+The command is `ggt`. Before 0.3.0 it was called `git-graph-tui`.

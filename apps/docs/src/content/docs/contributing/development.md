@@ -44,7 +44,7 @@ Tools: `cargo install cargo-nextest cargo-insta cargo-deny cargo-machete`.
 | `ggt-graph` | `crates/graph` | Lane layout: commits to rows of lanes and edges |
 | `ggt-actions` | `crates/actions` | Actions as data and the context menus per target |
 | `ggt-ui` | `crates/ui` | ratatui widgets and the per-frame hit-map |
-| `git-graph-tui` | `crates/app` | The binary: CLI, config, event loop, git runner |
+| `git-graph-tui` | `crates/app` | The `ggt` binary: CLI, config, event loop, git runner |
 | `ggt-testkit` | `crates/testkit` | Throwaway fixture repositories for tests |
 
 Data flows one way: input becomes an event, `update(state, event)` changes the state and returns commands, git runs on a worker thread, and `render(state)` draws. Each frame records a hit-map of what was drawn where, so clicks resolve exactly.

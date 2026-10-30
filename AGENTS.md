@@ -18,7 +18,7 @@ Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone t
 
 ## 2. Workspace layout
 
-See the crate table in `docs/architecture.md`. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `ggt-` except the binary `git-graph-tui`.
+See the crate table in `docs/architecture.md`. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `ggt-` except the app package `git-graph-tui`, whose binary (the command users type) is `ggt`.
 
 Workspace rules:
 - **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`. **Never use `cargo remove`**: it also deletes the dependency from root `[workspace.dependencies]` when no member uses it anymore, which drops planned catalog entries. Remove a dependency by editing the member's `Cargo.toml` by hand.

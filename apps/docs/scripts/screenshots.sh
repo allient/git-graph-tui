@@ -17,7 +17,7 @@ command -v "$tt" >/dev/null 2>&1 || {
 }
 
 cargo build --quiet --manifest-path "$root/Cargo.toml" -p git-graph-tui
-bin="$root/target/debug/git-graph-tui"
+bin="$root/target/debug/ggt"
 
 work=$(mktemp -d)
 export TUI_TEST_SESSION="ggt-docs-$$"

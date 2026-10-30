@@ -20,7 +20,7 @@ Everything after `--` goes to the app. The first build takes a minute or two; la
 To have the command on your `PATH` (installs to `~/.cargo/bin`):
 
 ```sh
-cargo install --path crates/app    # then: git-graph-tui ~/code/my-project
+cargo install --path crates/app    # then: ggt ~/code/my-project
 ```
 
 ## Development
