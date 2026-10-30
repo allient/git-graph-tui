@@ -1,7 +1,7 @@
 //! `git reflog`: where HEAD has been, newest first, for the reflog view
 //! and the recovery of commits no branch points at any more.
 
-use tgg_model::Oid;
+use ggt_model::Oid;
 
 use crate::ParseError;
 use crate::error::{fields, oid};

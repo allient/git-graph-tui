@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
-use tgg_ui::Icons;
+use ggt_ui::Icons;
 
 /// Environment variable that picks the icons when `--icons` isn't given.
 pub const ICONS_ENV: &str = "GIT_GRAPH_TUI_ICONS";
@@ -80,9 +80,9 @@ fn ships_nerd_font_symbols(env: &dyn Fn(&str) -> Option<String>) -> bool {
 mod tests {
     use super::*;
     use clap::CommandFactory;
+    use ggt_ui::Icons;
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
-    use tgg_ui::Icons;
 
     #[test]
     fn cli_definition_is_valid() {

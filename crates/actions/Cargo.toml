@@ -1,5 +1,5 @@
 [package]
-name = "tgg-actions"
+name = "ggt-actions"
 description = "Git actions for git-graph-tui: argv planning, confirmations and context menus."
 version.workspace = true
 edition.workspace = true
@@ -13,10 +13,10 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-tgg-git.workspace = true
-tgg-model.workspace = true
+ggt-git.workspace = true
+ggt-model.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true
-tgg-testkit.workspace = true
+ggt-testkit.workspace = true

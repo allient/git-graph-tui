@@ -9,7 +9,7 @@ Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone t
 ## 1. Ground rules
 
 - **The only runtime dependency is the `git` CLI.** No libgit2, no editor or multiplexer APIs. herdr and TTT are integrations that launch the binary (`integrations/`). They must never become dependencies of the core or app crates.
-- **Pure core, thin shell.** The library crates (`tgg-model`, `tgg-git`, `tgg-graph`, `tgg-actions`) have no terminal and no threads; `tgg-git` runs git only through a trait. Everything that can be a pure function (parsing, lane layout, filtering, search, menu building, action planning) lives in those crates and is unit-tested.
+- **Pure core, thin shell.** The library crates (`ggt-model`, `ggt-git`, `ggt-graph`, `ggt-actions`) have no terminal and no threads; `ggt-git` runs git only through a trait. Everything that can be a pure function (parsing, lane layout, filtering, search, menu building, action planning) lives in those crates and is unit-tested.
 - **One source of truth.** `AppState` in the binary crate (`crates/app`) is the only mutable UI state. Input becomes an `Event`, `update(state, event)` changes state and returns `Command`s, and `render(&state)` draws. No widget owns hidden state that affects behavior.
 - **Never block the UI thread.** Every git call runs on a worker thread through the runner, with a timeout and cancellation. Results come back as `Event::GitResult` tagged with a generation id; stale results are dropped.
 - **Ask before** adding a dependency that pulls a large tree (async runtimes, libgit2, web stacks), changing the CLI surface, or touching release/distribution config.
@@ -18,7 +18,7 @@ Guidance for AI agents (and humans) working on **git-graph-tui**, a standalone t
 
 ## 2. Workspace layout
 
-See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `tgg-` except the binary `git-graph-tui`.
+See the crate table in `README.md` → Architecture. Paths: `crates/{model,git,graph,actions,ui,app,testkit}`; packages are prefixed `ggt-` except the binary `git-graph-tui`.
 
 Workspace rules:
 - **One version per dependency.** Versions live only in root `[workspace.dependencies]`. Members use `dep.workspace = true` and list only what they use (`cargo machete` fails CI otherwise). Add with `cargo add -p <crate> <dep>`. **Never use `cargo remove`**: it also deletes the dependency from root `[workspace.dependencies]` when no member uses it anymore, which drops planned catalog entries. Remove a dependency by editing the member's `Cargo.toml` by hand.
@@ -28,7 +28,7 @@ Workspace rules:
 - MSRV is 1.88 (`rust-version`), checked in CI. Raising it is a deliberate change.
 
 Module rules:
-- `tgg-model`, `tgg-git`, `tgg-graph` and `tgg-actions` never depend on ratatui or crossterm.
+- `ggt-model`, `ggt-git`, `ggt-graph` and `ggt-actions` never depend on ratatui or crossterm.
 - `app/ui` only reads state and produces frames plus a **hit-map** (cell → target). It never runs git.
 - `app/input` turns crossterm events into `Event`s using the last frame's hit-map. Mouse coordinates are terminal-absolute, and we own the layout, so hit-testing is exact.
 

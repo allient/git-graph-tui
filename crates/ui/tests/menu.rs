@@ -2,11 +2,11 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_actions::{CommitTarget, MenuContext, Target, menu_for};
+use ggt_model::{HeadState, Oid};
+use ggt_ui::{PopupMenu, Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{CommitTarget, MenuContext, Target, menu_for};
-use tgg_model::{HeadState, Oid};
-use tgg_ui::{PopupMenu, Theme};
 
 fn oid(c: char) -> Oid {
     Oid::parse(&c.to_string().repeat(40)).unwrap()
@@ -20,7 +20,7 @@ fn ctx() -> MenuContext {
         branch_filter: Vec::new(),
         compare_base: None,
         operation: None,
-        changes: tgg_actions::ChangesLayout::default(),
+        changes: ggt_actions::ChangesLayout::default(),
     }
 }
 
@@ -82,8 +82,8 @@ fn repository_menu_with_the_branch_submenu_open() {
     // Down past View as Tree, View & Sort, Pull, Push, Clone, Checkout to,
     // Fetch, Commit, Changes and Pull, Push.
     for _ in 0..10 {
-        menu.handle_key(tgg_ui::Key::Down);
+        menu.handle_key(ggt_ui::Key::Down);
     }
-    menu.handle_key(tgg_ui::Key::Right);
+    menu.handle_key(ggt_ui::Key::Right);
     insta::assert_snapshot!(render(&menu, 60, 25));
 }

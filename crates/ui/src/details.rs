@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
+use ggt_git::show::{CommitDetails, FileChange, Numstat};
+use ggt_model::{Change, Oid};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Clear, Widget};
-use tgg_git::show::{CommitDetails, FileChange, Numstat};
-use tgg_model::{Change, Oid};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{Glyph, Key, Theme, fit, format_date};
@@ -553,7 +553,7 @@ impl CommitDetailsView {
             buf.set_string(x, y, fit(name, LABEL.min(width)), label);
             buf.set_string(x + to_u16(LABEL), y, fit(value, value_width), style);
         };
-        let signature = |s: &tgg_model::Signature| format!("{} <{}>", s.name, s.email);
+        let signature = |s: &ggt_model::Signature| format!("{} <{}>", s.name, s.email);
         let mut lines: Vec<(&str, String, Style)> = vec![
             ("Commit:", commit.id.to_string(), text),
             ("Parents:", String::new(), text),
@@ -640,7 +640,7 @@ impl CommitDetailsView {
             } else {
                 width.saturating_sub(1)
             };
-            for issue in tgg_actions::issue_refs(&line, &self.issue_prefix) {
+            for issue in ggt_actions::issue_refs(&line, &self.issue_prefix) {
                 let start = line[..issue.range.start].width();
                 let end = line[..issue.range.end].width();
                 if end > room {

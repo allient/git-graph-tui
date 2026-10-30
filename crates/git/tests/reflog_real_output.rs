@@ -2,10 +2,10 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_git::GitCommand;
+use ggt_git::reflog::{self, ReflogEntry};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::GitCommand;
-use tgg_git::reflog::{self, ReflogEntry};
-use tgg_testkit::FixtureRepo;
 
 fn entries(repo: &FixtureRepo, max_count: usize) -> Vec<ReflogEntry> {
     let full = GitCommand::read(repo.path(), reflog::args(max_count)).argv();

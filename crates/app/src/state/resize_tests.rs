@@ -2,8 +2,8 @@
 //! dividers (S6).
 
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;
@@ -240,7 +240,7 @@ fn hidden_columns_are_saved_and_applied() {
 #[test]
 fn source_control_view_and_sort_are_saved_and_applied() {
     use crate::config::{ChangesSortName, ChangesViewName, Layout};
-    use tgg_actions::{ChangesSort, ChangesView};
+    use ggt_actions::{ChangesSort, ChangesView};
     let repo = FixtureRepo::sample();
     let mut h = Harness::open(&repo);
     // The defaults (list, by path) aren't written.

@@ -1,8 +1,8 @@
+use ggt_git::show::{CommitDetails, FileChange, Numstat};
+use ggt_model::{Change, Commit, Oid, Signature};
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_git::show::{CommitDetails, FileChange, Numstat};
-use tgg_model::{Change, Commit, Oid, Signature};
 
 use super::*;
 use crate::{Key, Theme};

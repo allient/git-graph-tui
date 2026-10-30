@@ -3,9 +3,9 @@
 //! dropping commits, cancelling, and the conflict banner taking over.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{Operation, TodoAction};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_actions::{Operation, TodoAction};
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;

@@ -2,10 +2,10 @@
 //! resolve against the hit-maps of what was drawn.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::MenuItem;
+use ggt_testkit::FixtureRepo;
+use ggt_ui::HitTarget;
 use pretty_assertions::assert_eq;
-use tgg_actions::MenuItem;
-use tgg_testkit::FixtureRepo;
-use tgg_ui::HitTarget;
 
 use super::*;
 use crate::testing::Harness;

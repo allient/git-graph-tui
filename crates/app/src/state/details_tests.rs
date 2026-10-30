@@ -2,8 +2,8 @@
 //! fixture repositories.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
 
 use super::*;
 use crate::testing::Harness;
@@ -295,7 +295,7 @@ fn an_issue_in_a_repository_without_origin_explains_too() {
 
 // ---- side buttons, filter and internal scroll (S24, S26) ----
 
-fn button(h: &Harness, which: tgg_ui::DetailsButton) -> (u16, u16) {
+fn button(h: &Harness, which: ggt_ui::DetailsButton) -> (u16, u16) {
     let hits = h.state.details.as_ref().and_then(|d| d.hits.as_ref());
     let rect = hits
         .and_then(|hits| hits.button(which))
@@ -311,10 +311,10 @@ fn the_side_buttons_switch_to_the_list_and_close_the_panel() {
     press(&mut h, KeyCode::Enter);
     assert!(h.find_on_screen("src/lib.rs").is_none(), "tree: name only");
 
-    let (x, y) = button(&h, tgg_ui::DetailsButton::List);
+    let (x, y) = button(&h, ggt_ui::DetailsButton::List);
     click(&mut h, x, y);
     assert!(h.find_on_screen("src/lib.rs").is_some(), "list: full path");
-    let (x, y) = button(&h, tgg_ui::DetailsButton::Tree);
+    let (x, y) = button(&h, ggt_ui::DetailsButton::Tree);
     click(&mut h, x, y);
     assert!(h.find_on_screen("src/lib.rs").is_none());
 
@@ -322,7 +322,7 @@ fn the_side_buttons_switch_to_the_list_and_close_the_panel() {
     press(&mut h, KeyCode::Char('l'));
     assert!(h.find_on_screen("src/lib.rs").is_some());
 
-    let (x, y) = button(&h, tgg_ui::DetailsButton::Close);
+    let (x, y) = button(&h, ggt_ui::DetailsButton::Close);
     click(&mut h, x, y);
     assert!(h.state.details.is_none());
     assert!(h.find_on_screen("Commit:").is_none());
@@ -358,7 +358,7 @@ fn the_find_button_starts_the_filter() {
     let mut h = open(&repo);
     select(&mut h, "Add lib");
     press(&mut h, KeyCode::Enter);
-    let (x, y) = button(&h, tgg_ui::DetailsButton::Find);
+    let (x, y) = button(&h, ggt_ui::DetailsButton::Find);
     click(&mut h, x, y);
     press(&mut h, KeyCode::Char('x'));
     assert!(

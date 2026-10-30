@@ -1,7 +1,7 @@
 //! `git worktree list`: the repository's working trees, for the worktrees
 //! view (S20 4).
 
-use tgg_model::Oid;
+use ggt_model::Oid;
 
 use crate::ParseError;
 use crate::error::oid;

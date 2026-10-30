@@ -1,12 +1,12 @@
 //! Renders a real file diff into a buffer.
 
+use ggt_git::GitCommand;
+use ggt_git::show;
+use ggt_model::Oid;
+use ggt_testkit::FixtureRepo;
+use ggt_ui::{DiffView, Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use tgg_git::GitCommand;
-use tgg_git::show;
-use tgg_model::Oid;
-use tgg_testkit::FixtureRepo;
-use tgg_ui::{DiffView, Theme};
 
 fn run(repo: &FixtureRepo, args: Vec<String>) -> String {
     let full = GitCommand::read(repo.path(), args).argv();

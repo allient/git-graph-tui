@@ -3,9 +3,9 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use tgg_actions::{Action, InputId, InputValue, Plan, RepoAction, UiEffect, WorkingTreeAction};
-use tgg_git::{ExecError, Failure, GitCommand, Output};
-use tgg_ui::{
+use ggt_actions::{Action, InputId, InputValue, Plan, RepoAction, UiEffect, WorkingTreeAction};
+use ggt_git::{ExecError, Failure, GitCommand, Output};
+use ggt_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
 };
 
@@ -403,7 +403,7 @@ impl AppState {
     /// Opens the pull request page once the remote's URL is known.
     pub(super) fn on_remote_url(&mut self, remote: &str, branch: &str, url: &str) -> Vec<Command> {
         let url = url.trim();
-        if let Some(page) = tgg_actions::pull_request_url(url, branch) {
+        if let Some(page) = ggt_actions::pull_request_url(url, branch) {
             self.message = Some(format!("Opening {page}"));
             return vec![Command::OpenUrl(page)];
         }

@@ -2,9 +2,9 @@
 //! in the middle of, its Continue and Abort buttons, and the actions that
 //! must wait until it is finished (AGENTS.md safety rules).
 
-use tgg_actions::{Action, Operation, OperationAction};
-use tgg_git::in_progress;
-use tgg_ui::{Banner, BannerButton};
+use ggt_actions::{Action, Operation, OperationAction};
+use ggt_git::in_progress;
+use ggt_ui::{Banner, BannerButton};
 
 use super::{AppState, Command};
 

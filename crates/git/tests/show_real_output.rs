@@ -2,11 +2,11 @@
 
 #![expect(clippy::unwrap_used, reason = "test helpers")]
 
+use ggt_git::GitCommand;
+use ggt_git::show::{self, FileChange, LineKind, Numstat};
+use ggt_model::{Change, Oid};
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_git::GitCommand;
-use tgg_git::show::{self, FileChange, LineKind, Numstat};
-use tgg_model::{Change, Oid};
-use tgg_testkit::FixtureRepo;
 
 /// Runs `args` the way the app does (`-C`, `core.quotepath=off`, ...).
 fn run(repo: &FixtureRepo, args: Vec<String>) -> String {

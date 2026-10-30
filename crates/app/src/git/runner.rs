@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use tgg_git::{CancelToken, ExecError, Executor, GitCommand, Output};
+use ggt_git::{CancelToken, ExecError, Executor, GitCommand, Output};
 
 /// Identifies a submitted job. Ids only grow, so the app can drop results
 /// from jobs it has since superseded.
@@ -70,9 +70,9 @@ impl<E: Executor + 'static> Runner<E> {
 mod tests {
     use super::*;
     use crate::git::ProcessExecutor;
+    use ggt_git::GitCommand;
+    use ggt_testkit::FixtureRepo;
     use std::time::Duration;
-    use tgg_git::GitCommand;
-    use tgg_testkit::FixtureRepo;
 
     #[test]
     fn delivers_results_tagged_with_their_job_id() {

@@ -2,9 +2,9 @@
 //! file (Enter), a whole section ("Open Changes"), and "Open File" in the
 //! user's editor.
 
-use tgg_git::show::{self, Diff};
-use tgg_model::{Change, Stash};
-use tgg_ui::{DiffView, PaneFile};
+use ggt_git::show::{self, Diff};
+use ggt_model::{Change, Stash};
+use ggt_ui::{DiffView, PaneFile};
 
 use super::{AppState, Command, Request};
 use crate::external;
@@ -62,7 +62,7 @@ fn diff_args(request: &Request) -> Vec<String> {
     match request {
         Request::UntrackedDiff(path) => show::untracked_diff_args(path),
         Request::WorkingDiff { staged, paths } => show::working_diff_args(*staged, paths),
-        Request::StashDiff(selector) => tgg_git::stash::show_args(selector),
+        Request::StashDiff(selector) => ggt_git::stash::show_args(selector),
         _ => Vec::new(),
     }
 }

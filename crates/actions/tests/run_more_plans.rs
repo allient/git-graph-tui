@@ -7,13 +7,13 @@
 
 use std::process::Command;
 
-use pretty_assertions::assert_eq;
-use tgg_actions::{
+use ggt_actions::{
     Action, InputId, InputValue, Plan, ResetMode, StashAction, TagAction, WorkingTreeAction,
 };
-use tgg_git::{Failure, GitCommand};
-use tgg_model::{Oid, Stash};
-use tgg_testkit::FixtureRepo;
+use ggt_git::{Failure, GitCommand};
+use ggt_model::{Oid, Stash};
+use ggt_testkit::FixtureRepo;
+use pretty_assertions::assert_eq;
 
 fn run(repo: &FixtureRepo, action: &Action) -> Result<(), Failure> {
     let Plan::Git(commands) = action.plan(repo.path()) else {

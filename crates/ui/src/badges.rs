@@ -1,4 +1,4 @@
-use tgg_model::{Oid, Ref, RefKind, split_remote};
+use ggt_model::{Oid, Ref, RefKind, split_remote};
 
 /// What a badge stands for; decides its style and order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -85,8 +85,8 @@ fn remotes_with_branch(refs: &[&Ref], branch: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ggt_model::{Oid, Ref, RefKind};
     use pretty_assertions::assert_eq;
-    use tgg_model::{Oid, Ref, RefKind};
 
     fn oid(c: char) -> Oid {
         Oid::parse(&c.to_string().repeat(40)).unwrap()

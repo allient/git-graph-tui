@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use tgg_git::GitCommand;
-use tgg_model::Stash;
+use ggt_git::GitCommand;
+use ggt_model::Stash;
 
 use crate::action::{Confirmation, Plan, strings};
 use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};

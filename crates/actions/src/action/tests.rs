@@ -1,8 +1,8 @@
 use std::path::Path;
 
+use ggt_git::{CommandKind, GitCommand};
+use ggt_model::Oid;
 use pretty_assertions::assert_eq;
-use tgg_git::{CommandKind, GitCommand};
-use tgg_model::Oid;
 
 use super::*;
 use crate::{InputError, InputId, InputKind, InputSpec, InputValue, RefNameError};
@@ -730,7 +730,7 @@ fn checkouts_wait_for_the_operation() {
             subject: "s".into(),
         },
         Action::Stash(StashAction::CreateBranch {
-            stash: tgg_model::Stash {
+            stash: ggt_model::Stash {
                 id: oid(),
                 index: 0,
                 subject: "WIP".into(),
@@ -742,7 +742,7 @@ fn checkouts_wait_for_the_operation() {
 
 #[test]
 fn merges_wait_for_the_operation() {
-    let stash = tgg_model::Stash {
+    let stash = ggt_model::Stash {
         id: oid(),
         index: 0,
         subject: "WIP".into(),

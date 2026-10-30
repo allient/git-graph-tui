@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crossbeam_channel::Receiver;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tgg_testkit::FixtureRepo;
+use ggt_testkit::FixtureRepo;
 
 use crate::external::External;
 use crate::git::{JobResult, ProcessExecutor, Runner};
@@ -92,7 +92,7 @@ impl Harness {
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
         terminal
-            .draw(|f| crate::view::draw(f, &mut self.state, &tgg_ui::Theme::default()))
+            .draw(|f| crate::view::draw(f, &mut self.state, &ggt_ui::Theme::default()))
             .unwrap();
         self.screen = terminal.backend().buffer().clone();
     }

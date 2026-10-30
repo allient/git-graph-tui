@@ -9,16 +9,16 @@ use std::time::{Duration, Instant};
 use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-use ratatui::layout::{Position, Rect};
-use tgg_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Operation, Target, menu_for};
-use tgg_git::show::{self, FileChange};
-use tgg_git::{CancelToken, ExecError, GitCommand, in_progress, log, refs, status};
-use tgg_graph::Graph;
-use tgg_model::{Commit, Oid, Ref, RefKind, Stash, WorkingTreeStatus, split_remote};
-use tgg_ui::{
+use ggt_actions::{CommitTarget, GraphColumn, MenuContext, MenuItem, Operation, Target, menu_for};
+use ggt_git::show::{self, FileChange};
+use ggt_git::{CancelToken, ExecError, GitCommand, in_progress, log, refs, status};
+use ggt_graph::Graph;
+use ggt_model::{Commit, Oid, Ref, RefKind, Stash, WorkingTreeStatus, split_remote};
+use ggt_ui::{
     BadgeKind, BannerHitMap, ColumnWidths, HitMap, HitTarget, Key, MenuHitMap, MenuOutcome,
     PopupMenu, badges_for,
 };
+use ratatui::layout::{Position, Rect};
 
 use crate::external::External;
 use crate::git::{JobHandle, JobId, JobResult};
@@ -56,7 +56,7 @@ pub use worktrees::{WorktreeEntry, WorktreesView};
 pub const DEFAULT_PAGE_SIZE: usize = 500;
 
 /// Reflog entries the reflog view loads.
-pub const REFLOG_ENTRIES: usize = tgg_git::reflog::DEFAULT_MAX_COUNT;
+pub const REFLOG_ENTRIES: usize = ggt_git::reflog::DEFAULT_MAX_COUNT;
 
 /// Lines scrolled per mouse-wheel step.
 pub const SCROLL_LINES: usize = 3;
@@ -179,19 +179,19 @@ impl Request {
             Self::FileAt(id, path) => GitCommand::read(repo, show::file_at_args(id, path)),
             Self::CompareFiles(c) => GitCommand::read(repo, c.files_args()),
             Self::CompareDiff(c, file) => GitCommand::read(repo, c.diff_args(file)),
-            Self::Tag(name) => GitCommand::read(repo, tgg_git::tag::args(name)),
+            Self::Tag(name) => GitCommand::read(repo, ggt_git::tag::args(name)),
             Self::RemoteUrl { remote, .. } => {
                 GitCommand::read(repo, ["remote", "get-url", remote.as_str()])
             }
             Self::IssueUrl { .. } => GitCommand::read(repo, ["remote", "get-url", "origin"]),
-            Self::Reflog => GitCommand::read(repo, tgg_git::reflog::args(REFLOG_ENTRIES)),
-            Self::Worktrees => GitCommand::read(repo, tgg_git::worktree::args()),
+            Self::Reflog => GitCommand::read(repo, ggt_git::reflog::args(REFLOG_ENTRIES)),
+            Self::Worktrees => GitCommand::read(repo, ggt_git::worktree::args()),
             Self::WorkingDiff { staged, paths } => {
                 GitCommand::read(repo, show::working_diff_args(*staged, paths))
             }
-            Self::Stashes => GitCommand::read(repo, tgg_git::stash::args()),
+            Self::Stashes => GitCommand::read(repo, ggt_git::stash::args()),
             Self::StashDiff(selector) => {
-                GitCommand::read(repo, tgg_git::stash::show_args(selector))
+                GitCommand::read(repo, ggt_git::stash::show_args(selector))
             }
             // `diff --no-index` exits 1 when the file has content.
             Self::UntrackedDiff(path) => {
@@ -885,7 +885,7 @@ impl AppState {
             }
             (Request::Stashes, Ok(out)) => {
                 self.parsed(
-                    tgg_git::stash::parse_commits(&out.stdout),
+                    ggt_git::stash::parse_commits(&out.stdout),
                     Self::apply_stashes,
                 );
                 Vec::new()
@@ -1069,7 +1069,7 @@ impl AppState {
 
     fn parsed<T>(
         &mut self,
-        parsed: Result<T, tgg_git::ParseError>,
+        parsed: Result<T, ggt_git::ParseError>,
         apply: impl FnOnce(&mut Self, T),
     ) {
         match parsed {

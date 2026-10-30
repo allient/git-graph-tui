@@ -1,8 +1,8 @@
+use ggt_actions::{Action, Confirmation};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{Clear, Widget};
-use tgg_actions::{Action, Confirmation};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{Key, Theme, fit};

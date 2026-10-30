@@ -6,9 +6,9 @@
 use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::{Action, Direction, InteractiveRebase, TodoAction};
+use ggt_model::{Commit, Oid};
 use ratatui::layout::{Position, Rect};
-use tgg_actions::{Action, Direction, InteractiveRebase, TodoAction};
-use tgg_model::{Commit, Oid};
 
 use super::{AppState, Command, SCROLL_LINES};
 

@@ -1,5 +1,5 @@
+use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
-use tgg_testkit::FixtureRepo;
 
 #[test]
 fn new_repo_starts_on_main_with_no_commits() {

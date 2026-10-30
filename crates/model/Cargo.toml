@@ -1,5 +1,5 @@
 [package]
-name = "tgg-model"
+name = "ggt-model"
 description = "Domain types for git-graph-tui: commits, refs, signatures."
 version.workspace = true
 edition.workspace = true

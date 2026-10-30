@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tgg_model::{Commit, Oid};
+use ggt_model::{Commit, Oid};
 
 /// A line segment in one half of a row, between two lane columns.
 ///

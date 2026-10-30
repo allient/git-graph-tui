@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tgg_git::{CancelToken, ExecError, Executor, GitCommand};
+use ggt_git::{CancelToken, ExecError, Executor, GitCommand};
 
 /// Finds the top-level directory of the repository containing `path`.
 pub fn discover_repo(executor: &impl Executor, path: &Path) -> Result<PathBuf, ExecError> {
@@ -13,8 +13,8 @@ pub fn discover_repo(executor: &impl Executor, path: &Path) -> Result<PathBuf, E
 mod tests {
     use super::*;
     use crate::git::ProcessExecutor;
-    use tgg_git::{ExecError, Failure};
-    use tgg_testkit::FixtureRepo;
+    use ggt_git::{ExecError, Failure};
+    use ggt_testkit::FixtureRepo;
 
     #[test]
     fn finds_the_top_level_from_a_subdirectory() {

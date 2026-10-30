@@ -1,5 +1,5 @@
 [package]
-name = "tgg-graph"
+name = "ggt-graph"
 description = "Commit graph lane layout for git-graph-tui."
 version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-tgg-model.workspace = true
+ggt-model.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

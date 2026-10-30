@@ -1,8 +1,8 @@
 //! Renders the toolbar and the ref picker into a buffer.
 
+use ggt_ui::{Key, Picker, PickerItem, Theme, Toolbar};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use tgg_ui::{Key, Picker, PickerItem, Theme, Toolbar};
 
 fn item(value: &str, kind: &str) -> PickerItem {
     PickerItem {
@@ -55,7 +55,7 @@ fn branch_filter_with_a_typed_pattern_below_the_toolbar() {
     let toolbar = Toolbar::new(&["develop".to_owned()], true);
     let hits = toolbar.render(Rect::new(0, 0, 80, 1), &mut buf, &Theme::default());
     let below = hits
-        .button(tgg_ui::ToolbarButton::BranchFilter)
+        .button(ggt_ui::ToolbarButton::BranchFilter)
         .map(|r| Position::new(r.x, r.y + 1))
         .unwrap_or_default();
     let mut picker = Picker::multi("Branches", refs(), &["develop".to_owned()]).with_anchor(below);

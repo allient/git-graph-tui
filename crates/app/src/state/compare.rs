@@ -1,9 +1,9 @@
 //! Comparing two commits, or a commit with the working tree (S12), in the
 //! inline details panel.
 
-use tgg_git::show::{self, FileChange};
-use tgg_model::Oid;
-use tgg_ui::{CommitDetailsView, DiffView};
+use ggt_git::show::{self, FileChange};
+use ggt_model::Oid;
+use ggt_ui::{CommitDetailsView, DiffView};
 
 use super::details::Details;
 use super::{AppState, Command, Request};

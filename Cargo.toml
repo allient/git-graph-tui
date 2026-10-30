@@ -17,12 +17,12 @@ publish = false
 # whole workspace stays on one version of each dependency.
 [workspace.dependencies]
 # Internal crates
-tgg-model = { path = "crates/model" }
-tgg-git = { path = "crates/git" }
-tgg-graph = { path = "crates/graph" }
-tgg-actions = { path = "crates/actions" }
-tgg-ui = { path = "crates/ui" }
-tgg-testkit = { path = "crates/testkit" }
+ggt-model = { path = "crates/model" }
+ggt-git = { path = "crates/git" }
+ggt-graph = { path = "crates/graph" }
+ggt-actions = { path = "crates/actions" }
+ggt-ui = { path = "crates/ui" }
+ggt-testkit = { path = "crates/testkit" }
 
 # TUI
 ratatui = "0.30.2"

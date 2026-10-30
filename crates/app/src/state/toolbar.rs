@@ -2,16 +2,16 @@
 //! repository menu open (S11).
 
 use crossterm::event::KeyEvent;
-use ratatui::layout::Position;
-use tgg_actions::{
+use ggt_actions::{
     Action, MenuItem, PickPurpose, RepoAction, Rev, StashAction, TagAction, Target, menu_for,
 };
-use tgg_git::log::Revisions;
-use tgg_model::{Ref, RefKind, split_remote};
-use tgg_ui::{
+use ggt_git::log::Revisions;
+use ggt_model::{Ref, RefKind, split_remote};
+use ggt_ui::{
     Picker, PickerHitMap, PickerItem, PickerOutcome, PopupMenu, Toolbar, ToolbarButton,
     ToolbarHitMap, ToolbarOutcome, glob_match,
 };
+use ratatui::layout::Position;
 
 use super::{AppState, Command, actions::widget_key};
 
@@ -112,7 +112,7 @@ impl AppState {
     }
 
     /// The stash a stash badge (`refs/stash@{n}`) stands for.
-    pub(super) fn stash_named(&self, full_name: &str) -> Option<&tgg_model::Stash> {
+    pub(super) fn stash_named(&self, full_name: &str) -> Option<&ggt_model::Stash> {
         self.stashes
             .iter()
             .find(|stash| stash_ref(stash).full_name == full_name)
@@ -221,7 +221,7 @@ impl AppState {
             search_kind: false,
         };
         let current = match &self.status.head {
-            tgg_model::HeadState::Branch(name) => Some(name.as_str()),
+            ggt_model::HeadState::Branch(name) => Some(name.as_str()),
             _ => None,
         };
         let kind = |r: &Ref| match r.kind {
@@ -481,7 +481,7 @@ fn picker_title(purpose: PickPurpose) -> &'static str {
 }
 
 /// A badge for `stash`: `stash@{n}` on the stash's row.
-fn stash_ref(stash: &tgg_model::Stash) -> Ref {
+fn stash_ref(stash: &ggt_model::Stash) -> Ref {
     Ref {
         full_name: format!("refs/{}", stash.selector()),
         kind: RefKind::Stash,

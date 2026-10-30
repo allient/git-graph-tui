@@ -1,5 +1,5 @@
 [package]
-name = "tgg-testkit"
+name = "ggt-testkit"
 description = "Test fixtures for git-graph-tui: throwaway git repositories built in temp dirs."
 version.workspace = true
 edition.workspace = true

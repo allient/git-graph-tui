@@ -9,9 +9,9 @@
 
 use std::collections::HashMap;
 
+use ggt_graph::{Edge, Graph, Row};
+use ggt_model::{Commit, Oid, Signature};
 use pretty_assertions::assert_eq;
-use tgg_graph::{Edge, Graph, Row};
-use tgg_model::{Commit, Oid, Signature};
 
 /// Builds commits from `(name, parents)` pairs; names are single hex digits.
 fn commits(spec: &[(&str, &[&str])]) -> Vec<Commit> {

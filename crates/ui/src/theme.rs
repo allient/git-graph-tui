@@ -1,5 +1,5 @@
+use ggt_model::Change;
 use ratatui::style::Color;
-use tgg_model::Change;
 
 use crate::Icons;
 
@@ -126,9 +126,9 @@ impl Default for Theme {
 
 #[cfg(test)]
 mod tests {
+    use ggt_model::Change;
     use pretty_assertions::assert_eq;
     use ratatui::style::Color;
-    use tgg_model::Change;
 
     use super::Theme;
 

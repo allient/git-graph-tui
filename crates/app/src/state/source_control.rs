@@ -1,9 +1,9 @@
 //! The Source Control pane (S3): focus, keys, clicks and the git actions it runs.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tgg_actions::{Action, CommitScope, WorkingTreeAction};
-use tgg_model::HeadState;
-use tgg_ui::{Key, SourceControl, SourceControlHitMap, SourceControlOutcome};
+use ggt_actions::{Action, CommitScope, WorkingTreeAction};
+use ggt_model::HeadState;
+use ggt_ui::{Key, SourceControl, SourceControlHitMap, SourceControlOutcome};
 
 use super::{AppState, Command, actions::widget_key};
 
