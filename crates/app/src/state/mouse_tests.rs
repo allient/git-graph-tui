@@ -241,6 +241,10 @@ fn double_clicking_a_branch_checks_it_out() {
     let (x, y) = find(&h, "develop");
     double_click(&mut h, x + 1, y);
     assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
+    assert!(
+        h.state.details.is_none(),
+        "a double-click only checks out, it leaves the details closed"
+    );
     let message = h.state.message.clone().unwrap_or_default();
     assert!(message.contains('✓'), "{message}");
 }
@@ -282,6 +286,22 @@ fn double_clicking_a_commit_row_checks_out_its_branch() {
     let (x, y) = find(&h, "Return a value");
     double_click(&mut h, x + 1, y);
     assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
+    assert!(h.state.details.is_none());
+}
+
+#[test]
+fn double_clicking_a_branch_keeps_the_details_that_were_open() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.double_click = Duration::from_secs(60);
+    let (x, y) = find(&h, "Add lib");
+    click(&mut h, MouseButton::Left, x + 1, y);
+    let shown = h.state.details.as_ref().map(|d| d.commit.clone());
+    assert!(shown.is_some());
+    let (x, y) = find(&h, "develop");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
+    assert_eq!(h.state.details.as_ref().map(|d| d.commit.clone()), shown);
 }
 
 #[test]

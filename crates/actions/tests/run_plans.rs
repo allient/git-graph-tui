@@ -185,6 +185,53 @@ fn delete_merged_branch_without_force() {
     assert_eq!(repo.git(&["branch", "--list", "merged"]), "");
 }
 
+fn merge_topic(squash: bool, no_commit: bool) -> Action {
+    Action::MergeIntoCurrent {
+        source: Rev::Local("topic".into()),
+        current: Some("main".into()),
+        no_ff: true,
+        squash,
+        no_commit,
+    }
+}
+
+#[test]
+fn squash_merge_creates_a_single_parent_commit() {
+    let (repo, _) = diverged();
+    let main = repo.git(&["rev-parse", "HEAD"]);
+    ok(&repo, &merge_topic(true, false));
+    assert_eq!(repo.git(&["rev-parse", "HEAD^"]), main);
+    let parents = repo.git(&["rev-list", "--parents", "-n1", "HEAD"]);
+    assert_eq!(
+        parents.split_whitespace().count(),
+        2,
+        "one parent: {parents}"
+    );
+    assert_eq!(
+        repo.git(&["show", "--format=", "--name-only", "HEAD"]),
+        "t.txt"
+    );
+    assert_eq!(repo.git(&["status", "--porcelain"]), "");
+}
+
+#[test]
+fn merge_without_commit_leaves_the_merge_in_progress() {
+    let (repo, _) = diverged();
+    let main = repo.git(&["rev-parse", "HEAD"]);
+    ok(&repo, &merge_topic(false, true));
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]), main);
+    assert!(repo.path().join(".git/MERGE_HEAD").exists());
+}
+
+#[test]
+fn squash_merge_without_commit_only_stages_the_changes() {
+    let (repo, _) = diverged();
+    let main = repo.git(&["rev-parse", "HEAD"]);
+    ok(&repo, &merge_topic(true, true));
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]), main);
+    assert_eq!(repo.git(&["diff", "--cached", "--name-only"]), "t.txt");
+}
+
 #[test]
 fn merge_into_current_creates_a_merge_commit() {
     let (repo, topic) = diverged();
@@ -194,6 +241,8 @@ fn merge_into_current_creates_a_merge_commit() {
             source: Rev::Local("topic".into()),
             current: Some("main".into()),
             no_ff: true,
+            squash: false,
+            no_commit: false,
         },
     );
     assert_eq!(

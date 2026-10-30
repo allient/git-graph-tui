@@ -44,6 +44,7 @@ mod worktrees;
 use actions::Running;
 pub use actions::{Dialog, DialogHits};
 pub use compare::Comparison;
+use details::PreviousDetails;
 pub use details::{Details, DiffPanel};
 pub use info::Info;
 pub use output::{GitOutput, OutputLine, OutputView};
@@ -279,6 +280,9 @@ pub struct AppState {
     pub double_click: Duration,
     /// The last left click on the graph, to spot a double-click.
     last_click: Option<(Instant, HitTarget)>,
+    /// The details panel the last single click closed or replaced, so the
+    /// double-click it starts can put it back: a double-click only checks out.
+    details_before_click: Option<PreviousDetails>,
     /// The graph's column widths, set by dragging the header dividers.
     pub columns: ColumnWidths,
     /// Columns hidden from the header's right-click menu, in column order.
@@ -349,6 +353,7 @@ impl AppState {
             find: None,
             double_click: DOUBLE_CLICK,
             last_click: None,
+            details_before_click: None,
             columns: ColumnWidths::default(),
             hidden_columns: Vec::new(),
             compare_base: None,
@@ -609,15 +614,7 @@ impl AppState {
                     self.open_menu(&target, Position { x, y });
                     return Vec::new();
                 }
-                // Double-clicking a branch, or a commit a branch points at,
-                // checks it out, like VS Code.
-                if let Some(branch) = self.double_clicked_branch(&target) {
-                    return self.checkout_ref(&branch);
-                }
-                if target == HitTarget::Uncommitted {
-                    return Vec::new();
-                }
-                self.toggle_details()
+                self.on_graph_left_click(&target)
             }
             MouseEventKind::ScrollDown => {
                 let max = self.display_len().saturating_sub(self.viewport_height);
@@ -630,6 +627,25 @@ impl AppState {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// Double-clicking a branch, or a commit a branch points at, checks it
+    /// out, like VS Code; a single click toggles the commit's details.
+    fn on_graph_left_click(&mut self, target: &HitTarget) -> Vec<Command> {
+        if let Some(branch) = self.double_clicked_branch(target) {
+            // Undo the first click: a double-click only checks out.
+            if let Some(PreviousDetails(previous)) = self.details_before_click.take() {
+                self.details = previous;
+            }
+            return self.checkout_ref(&branch);
+        }
+        if *target == HitTarget::Uncommitted {
+            self.details_before_click = None;
+            return Vec::new();
+        }
+        let (commands, previous) = self.toggle_details_keeping_previous();
+        self.details_before_click = previous;
+        commands
     }
 
     /// The branch badge to check out when this left click on `target`

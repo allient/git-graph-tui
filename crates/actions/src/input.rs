@@ -17,6 +17,10 @@ pub enum InputId {
     /// Check out the branch after creating it.
     Checkout,
     NoFastForward,
+    /// Merge with `--squash`.
+    Squash,
+    /// Merge with `--no-commit`.
+    NoCommit,
     SetUpstream,
     ForceWithLease,
     /// Force delete (`branch -D`).

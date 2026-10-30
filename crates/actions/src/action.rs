@@ -112,10 +112,13 @@ pub enum Action {
         name: String,
         force: bool,
     },
+    /// `squash` wins over `no_ff`: git refuses to combine them.
     MergeIntoCurrent {
         source: Rev,
         current: Option<String>,
         no_ff: bool,
+        squash: bool,
+        no_commit: bool,
     },
     RebaseCurrentOnto {
         onto: Rev,
@@ -398,9 +401,47 @@ impl Action {
             Self::Worktree(action) => action.plan(repo),
             Self::Operation(action) => action.plan(repo),
             Self::InteractiveRebase(rebase) => rebase.plan(repo),
+            // `merge --squash` only stages the result; commit it with the
+            // message git prepared, unless the user asked for no commit.
+            Self::MergeIntoCurrent {
+                squash: true,
+                no_commit: false,
+                ..
+            } => Plan::Git(vec![
+                GitCommand::write(repo, self.git_args()),
+                GitCommand::write(repo, strings(&["commit", "--no-edit"])),
+            ]),
             Self::Ui(effect) => Plan::Ui(effect.clone()),
             _ => Plan::Git(vec![GitCommand::write(repo, self.git_args())]),
         }
+    }
+
+    /// `merge --squash`, or `merge --no-edit [--no-ff] [--no-commit]`.
+    fn merge_args(&self) -> Vec<String> {
+        let Self::MergeIntoCurrent {
+            source,
+            no_ff,
+            squash,
+            no_commit,
+            ..
+        } = self
+        else {
+            return Vec::new();
+        };
+        let mut argv = strings(&["merge"]);
+        if *squash {
+            argv.push("--squash".into());
+        } else {
+            argv.push("--no-edit".into());
+            if *no_ff {
+                argv.push("--no-ff".into());
+            }
+            if *no_commit {
+                argv.push("--no-commit".into());
+            }
+        }
+        argv.extend(["--".into(), source.arg()]);
+        argv
     }
 
     /// `push [--set-upstream] [--force-with-lease] -- <remote> <refspec>`.
@@ -480,14 +521,7 @@ impl Action {
                 argv.extend(strings(&["--", name]));
                 argv
             }
-            Self::MergeIntoCurrent { source, no_ff, .. } => {
-                let mut argv = strings(&["merge", "--no-edit"]);
-                if *no_ff {
-                    argv.push("--no-ff".into());
-                }
-                argv.extend(["--".into(), source.arg()]);
-                argv
-            }
+            Self::MergeIntoCurrent { .. } => self.merge_args(),
             Self::RebaseCurrentOnto { onto, .. } => strings(&["rebase", "--", &onto.arg()]),
             Self::PushBranch { .. } => self.push_args(),
             Self::FetchIntoLocal { .. } => self.fetch_into_args(),
@@ -740,6 +774,39 @@ impl Action {
         inputs
     }
 
+    /// The question an input dialog asks above its fields, if any.
+    #[must_use]
+    pub fn question(&self) -> Option<String> {
+        match self {
+            Self::CheckoutRemoteBranch { remote, branch, .. } => Some(format!(
+                "Enter the name of the new branch you would like to create when checking out '{remote}/{branch}':"
+            )),
+            Self::MergeIntoCurrent {
+                source, current, ..
+            } => Some(match current {
+                Some(branch) => format!(
+                    "Are you sure you want to merge {} into '{branch}' (the current branch)?",
+                    source.describe()
+                ),
+                None => format!(
+                    "Are you sure you want to merge {} into HEAD?",
+                    source.describe()
+                ),
+            }),
+            _ => None,
+        }
+    }
+
+    /// The input dialog's confirm button, when it differs from the dialog title.
+    #[must_use]
+    pub fn confirm_label(&self) -> Option<&'static str> {
+        match self {
+            Self::CheckoutRemoteBranch { .. } => Some("Checkout Branch"),
+            Self::MergeIntoCurrent { .. } => Some("Yes, merge"),
+            _ => None,
+        }
+    }
+
     /// The fields its dialog asks for, prefilled with the current values.
     #[must_use]
     pub fn inputs(&self) -> Vec<InputSpec> {
@@ -774,11 +841,20 @@ impl Action {
                 "Force delete, even if not fully merged",
                 *force,
             )],
-            Self::MergeIntoCurrent { no_ff, .. } => vec![InputSpec::toggle(
-                InputId::NoFastForward,
-                "Create a merge commit even if fast-forward is possible",
-                *no_ff,
-            )],
+            Self::MergeIntoCurrent {
+                no_ff,
+                squash,
+                no_commit,
+                ..
+            } => vec![
+                InputSpec::toggle(
+                    InputId::NoFastForward,
+                    "Create a new commit even if fast-forward is possible",
+                    *no_ff,
+                ),
+                InputSpec::toggle(InputId::Squash, "Squash Commits", *squash),
+                InputSpec::toggle(InputId::NoCommit, "No Commit", *no_commit),
+            ],
             Self::PushBranch {
                 remote,
                 set_upstream,
@@ -865,6 +941,13 @@ impl Action {
                 InputId::Force,
             )
             | (Self::MergeIntoCurrent { no_ff: field, .. }, InputId::NoFastForward)
+            | (Self::MergeIntoCurrent { squash: field, .. }, InputId::Squash)
+            | (
+                Self::MergeIntoCurrent {
+                    no_commit: field, ..
+                },
+                InputId::NoCommit,
+            )
             | (
                 Self::PushBranch {
                     set_upstream: field,
