@@ -1,0 +1,14 @@
+[package]
+name = "ggt-e2e"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Local end-to-end tests: drive the real git-graph-tui binary in a terminal with tui-test-rs."
+
+# Not a member of the root workspace: tui-test-rs needs Rust 1.90 (the
+# workspace's MSRV is 1.88) and these tests run only locally, not in CI.
+[workspace]
+
+[dev-dependencies]
+tempfile = "3"
+tui-test-rs = "=0.1.1"
