@@ -1,0 +1,16 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 14)"
+---
+
+  ┌ Merge into current branch ───────────────────────────────┐
+  │                                                          │
+  │ Are you sure you want to merge branch 'library-overhaul' │
+  │         into 'development' (the current branch)?         │
+  │                                                          │
+  │ [x] Create a new commit even if fast-forward is possible │
+  │ [ ] Squash Commits                                       │
+  │ [ ] No Commit                                            │
+  │                                                          │
+  │                                [ Yes, merge ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘

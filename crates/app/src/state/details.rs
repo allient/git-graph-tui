@@ -12,6 +12,10 @@ use super::compare::Comparison;
 use super::{AppState, Command, Request, SCROLL_LINES, actions::widget_key};
 use crate::external;
 
+/// The details panel (or none) a click closed or replaced.
+#[derive(Debug)]
+pub(super) struct PreviousDetails(pub(super) Option<Details>);
+
 /// The details of one commit, filled in as its two reads arrive; or a
 /// comparison (S12), shown in the same place.
 #[derive(Debug)]
@@ -61,6 +65,21 @@ impl AppState {
             return Vec::new();
         }
         self.open_details(id)
+    }
+
+    /// Like `toggle_details`, but hands back the panel it closed or
+    /// replaced (`None` when nothing changed), so a double-click can undo it.
+    pub(super) fn toggle_details_keeping_previous(
+        &mut self,
+    ) -> (Vec<Command>, Option<PreviousDetails>) {
+        let Some(id) = self.selected_commit().map(|c| c.id.clone()) else {
+            return (Vec::new(), None);
+        };
+        let previous = self.details.take();
+        if previous.as_ref().is_some_and(|d| d.commit == id) {
+            return (Vec::new(), Some(PreviousDetails(previous)));
+        }
+        (self.open_details(id), Some(PreviousDetails(previous)))
     }
 
     fn open_details(&mut self, commit: Oid) -> Vec<Command> {

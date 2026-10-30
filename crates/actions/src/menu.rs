@@ -125,6 +125,8 @@ fn local_branch_menu(name: &str, ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                 source: rev(),
                 current: current.clone(),
                 no_ff: true,
+                squash: false,
+                no_commit: false,
             }
         }),
         entry_if(
@@ -197,6 +199,8 @@ fn remote_branch_menu(remote: &str, branch: &str, ctx: &MenuContext) -> Vec<Opti
                 source: rev(),
                 current: current.clone(),
                 no_ff: true,
+                squash: false,
+                no_commit: false,
             }
         }),
         entry_if(current.is_some(), "Pull into current branch...", || {
@@ -344,6 +348,8 @@ fn current_branch_entries(commit: &CommitTarget, ctx: &MenuContext) -> Vec<Optio
                 source: Rev::Commit(id.clone()),
                 current: current.clone(),
                 no_ff: true,
+                squash: false,
+                no_commit: false,
             },
         )),
         Some(entry_unless(

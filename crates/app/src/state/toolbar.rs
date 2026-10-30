@@ -418,6 +418,8 @@ impl AppState {
                 source,
                 current,
                 no_ff: false,
+                squash: false,
+                no_commit: false,
             },
             (PickPurpose::Rebase, onto) => Action::RebaseCurrentOnto { onto, current },
             (PickPurpose::CreateBranchFrom, _) => Action::CreateBranch {

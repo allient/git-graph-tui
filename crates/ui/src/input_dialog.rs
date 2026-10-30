@@ -2,9 +2,9 @@ use ggt_actions::{Action, InputId, InputKind, InputValue};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Modifier, Style};
-use unicode_width::UnicodeWidthChar;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::confirm::{MAX_WIDTH, centered, draw_buttons, draw_frame, text_width};
+use crate::confirm::{MAX_WIDTH, centered, draw_buttons, draw_frame, text_width, wrap};
 use crate::{Button, DialogStyle, Key, Theme, fit};
 
 /// A single-line text input. The cursor is a char index, so editing never
@@ -194,6 +194,8 @@ enum Value {
 struct Field {
     id: InputId,
     label: &'static str,
+    /// The dialog's question already says what this field is for.
+    hide_label: bool,
     value: Value,
 }
 
@@ -202,8 +204,12 @@ impl Field {
     fn rows(&self) -> u16 {
         match self.value {
             Value::Toggle(_) => 1,
-            Value::Text(_) | Value::Choice { .. } => 3,
+            Value::Text(_) | Value::Choice { .. } => 2 + self.label_rows(),
         }
+    }
+
+    fn label_rows(&self) -> u16 {
+        u16::from(!self.hide_label)
     }
 
     fn input_value(&self) -> InputValue {
@@ -222,6 +228,9 @@ impl Field {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InputDialog {
     title: String,
+    /// Asked above the fields, like VS Code's dialogs.
+    question: Option<String>,
+    confirm: String,
     action: Action,
     fields: Vec<Field>,
     focus: Focus,
@@ -235,7 +244,7 @@ impl InputDialog {
     /// (e.g. the menu label without `...`).
     #[must_use]
     pub fn for_action(title: &str, action: &Action) -> Option<Self> {
-        let fields: Vec<Field> = action
+        let mut fields: Vec<Field> = action
             .inputs()
             .into_iter()
             .map(|spec| {
@@ -253,12 +262,23 @@ impl InputDialog {
                 Field {
                     id: spec.id,
                     label: spec.label,
+                    hide_label: false,
                     value,
                 }
             })
             .collect();
+        let question = action.question();
+        // A lone text field needs no label under a question that names it.
+        if let [field] = fields.as_mut_slice()
+            && question.is_some()
+            && matches!(field.value, Value::Text(_))
+        {
+            field.hide_label = true;
+        }
         (!fields.is_empty()).then(|| Self {
             title: title.to_owned(),
+            question,
+            confirm: action.confirm_label().unwrap_or(title).to_owned(),
             action: action.clone(),
             fields,
             focus: Focus::Field(0),
@@ -431,10 +451,44 @@ impl InputDialog {
     /// Centered on `screen`, tall enough for every field.
     #[must_use]
     pub fn area(&self, screen: Rect) -> Rect {
+        let width = MAX_WIDTH.min(screen.width);
         let rows: u16 = self.fields.iter().map(Field::rows).sum();
-        // Border, blank, fields, blank, buttons, border.
-        let height = rows.saturating_add(5).min(screen.height);
-        centered(screen, MAX_WIDTH.min(screen.width), height)
+        // Border, blank, question and a blank, fields, blank, buttons, border.
+        let question = self.question_lines(width).len();
+        let question = u16::try_from(question).map_or(u16::MAX, |q| q + u16::from(q > 0));
+        let height = rows
+            .saturating_add(question)
+            .saturating_add(5)
+            .min(screen.height);
+        centered(screen, width, height)
+    }
+
+    fn question_lines(&self, width: u16) -> Vec<String> {
+        self.question
+            .as_deref()
+            .map(|q| wrap(q, text_width(width)))
+            .unwrap_or_default()
+    }
+
+    /// Draws the question centered from row `y`; returns the first row after
+    /// it and its blank line.
+    fn draw_question(&self, buf: &mut Buffer, area: Rect, mut y: u16, style: Style) -> u16 {
+        let inner = text_width(area.width);
+        let question = self.question_lines(area.width);
+        for line in &question {
+            if y > area.bottom().saturating_sub(3) {
+                break;
+            }
+            let pad = inner.saturating_sub(line.width()) / 2;
+            buf.set_string(
+                area.x + 2 + u16::try_from(pad).unwrap_or(0),
+                y,
+                fit(line, inner - pad),
+                style,
+            );
+            y += 1;
+        }
+        if question.is_empty() { y } else { y + 1 }
     }
 
     pub fn render(&self, screen: Rect, buf: &mut Buffer, theme: &Theme) -> InputHitMap {
@@ -453,6 +507,8 @@ impl InputDialog {
         let text = Style::default().fg(theme.text);
         let boxed = text.bg(theme.selected_bg);
         let mut y = area.y + 2;
+
+        y = self.draw_question(buf, area, y, text);
 
         for (index, field) in self.fields.iter().enumerate() {
             if y + field.rows() - 1 > last_row {
@@ -479,11 +535,15 @@ impl InputDialog {
                     y += 1;
                     continue;
                 }
-                Value::Text(_) | Value::Choice { .. } => {
+                Value::Text(_) | Value::Choice { .. } if !field.hide_label => {
                     buf.set_string(x, y, fit(field.label, inner), label_style);
                 }
+                Value::Text(_) | Value::Choice { .. } => {}
             }
-            let value_row = Rect { y: y + 1, ..row };
+            let value_row = Rect {
+                y: y + field.label_rows(),
+                ..row
+            };
             match &field.value {
                 Value::Text(field) => {
                     let (visible, cursor_col) = window(field, inner);
@@ -512,16 +572,16 @@ impl InputDialog {
             if let Some((_, message)) = self.error.as_ref().filter(|(i, _)| *i == index) {
                 buf.set_string(
                     x,
-                    y + 2,
+                    value_row.y + 1,
                     fit(message, inner),
                     Style::default().fg(self.style.warning),
                 );
             }
-            y += 3;
+            y += field.rows();
         }
 
         let buttons = [
-            (Button::Confirm, self.title.as_str(), text),
+            (Button::Confirm, self.confirm.as_str(), text),
             (Button::Cancel, "Cancel", text),
         ];
         let focus = match self.focus {

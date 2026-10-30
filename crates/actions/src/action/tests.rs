@@ -126,6 +126,8 @@ fn merge_creates_a_merge_commit_unless_fast_forward_is_allowed() {
         source: local("develop"),
         current: Some("main".into()),
         no_ff: true,
+        squash: false,
+        no_commit: false,
     };
     assert_eq!(
         single(&action),
@@ -138,6 +140,95 @@ fn merge_creates_a_merge_commit_unless_fast_forward_is_allowed() {
         single(&action),
         write(&["merge", "--no-edit", "--", "develop"])
     );
+}
+
+fn merge(no_ff: bool, squash: bool, no_commit: bool) -> Action {
+    Action::MergeIntoCurrent {
+        source: local("develop"),
+        current: Some("main".into()),
+        no_ff,
+        squash,
+        no_commit,
+    }
+}
+
+#[test]
+fn merge_without_commit_stops_before_committing() {
+    assert_eq!(
+        single(&merge(true, false, true)),
+        write(&[
+            "merge",
+            "--no-edit",
+            "--no-ff",
+            "--no-commit",
+            "--",
+            "develop"
+        ])
+    );
+}
+
+#[test]
+fn squash_merge_commits_the_staged_result_and_ignores_no_ff() {
+    let Plan::Git(commands) = merge(true, true, false).plan(repo()) else {
+        panic!("expected git commands");
+    };
+    let argvs: Vec<Vec<String>> = commands.iter().map(|c| c.argv()[6..].to_vec()).collect();
+    assert_eq!(
+        argvs,
+        vec![
+            strings(&["merge", "--squash", "--", "develop"]),
+            strings(&["commit", "--no-edit"]),
+        ]
+    );
+    assert_eq!(
+        single(&merge(true, true, true)),
+        write(&["merge", "--squash", "--", "develop"])
+    );
+}
+
+#[test]
+fn merge_dialog_asks_like_vs_code() {
+    let mut action = merge(true, false, false);
+    assert_eq!(
+        action.question().as_deref(),
+        Some("Are you sure you want to merge branch 'develop' into 'main' (the current branch)?")
+    );
+    assert_eq!(action.confirm_label(), Some("Yes, merge"));
+    let labels: Vec<(InputId, &str)> = action.inputs().iter().map(|i| (i.id, i.label)).collect();
+    assert_eq!(
+        labels,
+        vec![
+            (
+                InputId::NoFastForward,
+                "Create a new commit even if fast-forward is possible"
+            ),
+            (InputId::Squash, "Squash Commits"),
+            (InputId::NoCommit, "No Commit"),
+        ]
+    );
+    action
+        .set_input(InputId::Squash, InputValue::Bool(true))
+        .unwrap();
+    action
+        .set_input(InputId::NoCommit, InputValue::Bool(true))
+        .unwrap();
+    assert_eq!(action, merge(true, true, true));
+}
+
+#[test]
+fn remote_checkout_dialog_asks_for_the_new_branch_like_vs_code() {
+    let action = Action::CheckoutRemoteBranch {
+        remote: "origin".into(),
+        branch: "development".into(),
+        local_name: "development".into(),
+    };
+    assert_eq!(
+        action.question().as_deref(),
+        Some(
+            "Enter the name of the new branch you would like to create when checking out 'origin/development':"
+        )
+    );
+    assert_eq!(action.confirm_label(), Some("Checkout Branch"));
 }
 
 #[test]
@@ -752,6 +843,8 @@ fn merges_wait_for_the_operation() {
             source: local("develop"),
             current: Some("main".into()),
             no_ff: false,
+            squash: false,
+            no_commit: false,
         },
         Action::Stash(StashAction::Apply {
             stash: stash.clone(),

@@ -15,7 +15,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
 - [x] Toggle remote branches on/off
-- [x] Double-click a branch, or a commit a branch points at, to check it out
+- [x] Double-click a branch, or a commit a branch points at, to check it out (the details panel stays as it was)
 - [x] Resize the panes and columns by dragging their dividers (remembered in the config file)
 - [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
@@ -30,7 +30,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ### Actions on branches (right-click a branch badge)
 - [x] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
-- [x] Merge into current branch, rebase current branch onto it, reset
+- [x] Merge into current branch (asks like VS Code: new commit even if fast-forward is possible, Squash Commits, No Commit), rebase current branch onto it, reset
 - [x] Pull, push, fetch into local branch
 - [x] Create archive, copy branch name
 - [x] Create a pull request (GitHub / GitLab / Bitbucket, opens the browser)

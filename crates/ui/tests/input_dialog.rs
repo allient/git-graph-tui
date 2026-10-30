@@ -82,3 +82,27 @@ fn push_with_remote_choice_and_toggles() {
         .with_remotes(&["origin".to_owned(), "upstream".to_owned()]);
     insta::assert_snapshot!(render(&dialog, 64, 12));
 }
+
+#[test]
+fn merge_asks_like_vs_code() {
+    let action = Action::MergeIntoCurrent {
+        source: ggt_actions::Rev::Local("library-overhaul".into()),
+        current: Some("development".into()),
+        no_ff: true,
+        squash: false,
+        no_commit: false,
+    };
+    let dialog = InputDialog::for_action("Merge into current branch", &action).unwrap();
+    insta::assert_snapshot!(render(&dialog, 64, 14));
+}
+
+#[test]
+fn remote_checkout_asks_for_the_new_branch_name() {
+    let action = Action::CheckoutRemoteBranch {
+        remote: "origin".into(),
+        branch: "development".into(),
+        local_name: "development".into(),
+    };
+    let dialog = InputDialog::for_action("Checkout origin/development", &action).unwrap();
+    insta::assert_snapshot!(render(&dialog, 64, 12));
+}

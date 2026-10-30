@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 12)"
+---
+
+  ┌ Checkout origin/development ─────────────────────────────┐
+  │                                                          │
+  │    Enter the name of the new branch you would like to    │
+  │      create when checking out 'origin/development':      │
+  │                                                          │
+  │ development                                              │
+  │                                                          │
+  │                                                          │
+  │                           [ Checkout Branch ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘

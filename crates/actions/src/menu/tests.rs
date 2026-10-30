@@ -202,7 +202,9 @@ fn branch_actions_are_prefilled() {
         &Action::MergeIntoCurrent {
             source: Rev::Local("feature/login".into()),
             current: Some("main".into()),
-            no_ff: true
+            no_ff: true,
+            squash: false,
+            no_commit: false,
         }
     );
     assert_eq!(
