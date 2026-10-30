@@ -362,7 +362,7 @@ fn a_conflicting_reorder_shows_the_banner_and_abort_restores_the_branch() {
     start_and_confirm(&mut h);
     assert_eq!(h.state.operation, Some(Operation::Rebase));
     assert!(
-        message(&h).starts_with("Interactive Rebase failed:"),
+        message(&h).starts_with("Interactive Rebase stopped on conflicts:"),
         "{}",
         message(&h)
     );
