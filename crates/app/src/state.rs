@@ -22,6 +22,7 @@ use ratatui::layout::{Position, Rect};
 
 use crate::external::External;
 use crate::git::{JobHandle, JobId, JobResult};
+use crate::watch::Change;
 
 mod actions;
 mod compare;
@@ -73,6 +74,27 @@ pub enum Event {
     Git(JobResult),
     /// Reload refs, status and history from the start.
     Refresh,
+    /// Something outside the app changed the repository, starting at `since`.
+    RepoChanged {
+        change: Change,
+        since: Instant,
+    },
+    /// Time to look for edited files (`git status`).
+    StatusTick,
+}
+
+/// Bookkeeping for `git status` reads.
+#[derive(Debug, Default)]
+struct StatusPoll {
+    /// When the last read was asked for: an index change seen before then is
+    /// already in it.
+    read_at: Option<Instant>,
+    /// How long the last read took, to space out the polling on
+    /// repositories where it is slow.
+    cost: Duration,
+    /// An index change arrived while a read was already running, which may
+    /// have read the index before it changed: read again.
+    again: bool,
 }
 
 /// Something for the outside world to do.
@@ -309,10 +331,17 @@ pub struct AppState {
     pending: HashMap<JobId, (Job, CancelToken)>,
     /// HEAD from the refresh in progress; applied together with its first log page.
     refreshing_head: Option<Oid>,
+    /// When the last full refresh and the last status read were asked for:
+    /// a change seen before then is already in what they read.
+    refreshed_at: Option<Instant>,
+    status_poll: StatusPoll,
     /// Commit to keep selected across a refresh (None keeps the uncommitted row).
     keep_selected: Option<Oid>,
     /// A commit to select once history paging reaches it (a parent jump).
     jump_target: Option<Oid>,
+    /// The selected commit a reload pushed out of the loaded history (new
+    /// commits came in above it): paging continues until it is back.
+    reselect: Option<Oid>,
 }
 
 impl AppState {
@@ -368,8 +397,11 @@ impl AppState {
             running: None,
             pending: HashMap::new(),
             refreshing_head: None,
+            refreshed_at: None,
+            status_poll: StatusPoll::default(),
             keep_selected: None,
             jump_target: None,
+            reselect: None,
         }
     }
 
@@ -412,6 +444,8 @@ impl AppState {
     pub fn update(&mut self, event: Event) -> Vec<Command> {
         match event {
             Event::Refresh => self.refresh(),
+            Event::RepoChanged { change, since } => self.on_repo_changed(change, since),
+            Event::StatusTick => self.on_status_tick(),
             Event::Key(key) => self.on_key(key),
             Event::Mouse(mouse) => self.on_mouse(mouse),
             Event::Git(result) => self.on_git(result),
@@ -431,7 +465,11 @@ impl AppState {
             !read
         });
         self.keep_selected = self.selected_commit().map(|c| c.id.clone());
+        self.reselect = None;
         self.refreshing_head = None;
+        let now = Instant::now();
+        self.refreshed_at = Some(now);
+        self.status_poll.read_at = Some(now);
         // An open reflog view reloads too: actions add entries to it.
         let reflog = self.reflog.is_some().then_some(Request::Reflog);
         // So does an open worktrees view: worktree actions change it.
@@ -448,6 +486,52 @@ impl AppState {
         .chain(worktrees)
         .map(Command::Git)
         .collect()
+    }
+
+    /// A change made outside the app: a commit in another terminal, an
+    /// editor staging a file. Refs reload everything, the index only the status.
+    fn on_repo_changed(&mut self, change: Change, since: Instant) -> Vec<Command> {
+        // The running action's own writes: its result reloads everything.
+        if self.running.is_some() {
+            return Vec::new();
+        }
+        let covered = |at: Option<Instant>| at.is_some_and(|at| at >= since);
+        match change {
+            Change::Refs if !covered(self.refreshed_at) => self.refresh(),
+            Change::Index if !covered(self.status_poll.read_at) => {
+                let commands = self.read_status();
+                // A read already running may predate the change.
+                self.status_poll.again |= commands.is_empty();
+                commands
+            }
+            Change::Refs | Change::Index => Vec::new(),
+        }
+    }
+
+    fn on_status_tick(&mut self) -> Vec<Command> {
+        if self.running.is_some() {
+            return Vec::new();
+        }
+        self.read_status()
+    }
+
+    /// Reads the working-tree status, unless a read is already on its way.
+    fn read_status(&mut self) -> Vec<Command> {
+        let reading = self
+            .pending
+            .values()
+            .any(|(job, _)| matches!(job, Job::Read(Request::Status)));
+        if reading {
+            return Vec::new();
+        }
+        self.status_poll.read_at = Some(Instant::now());
+        vec![Command::Git(Request::Status)]
+    }
+
+    /// Time between `git status` polls: `base`, or longer where `git status`
+    /// is slow, so polling never takes more than a tenth of the time.
+    pub fn status_poll_interval(&self, base: Duration) -> Duration {
+        base.max(self.status_poll.cost * 10)
     }
 
     fn on_key(&mut self, key: KeyEvent) -> Vec<Command> {
@@ -907,24 +991,25 @@ impl AppState {
                 Vec::new()
             }
             (Request::Status, Ok(out)) => {
+                if let Some(at) = self.status_poll.read_at {
+                    self.status_poll.cost = at.elapsed();
+                }
                 self.parsed(status::parse(&out.stdout), Self::apply_status);
+                if std::mem::take(&mut self.status_poll.again) {
+                    return self.read_status();
+                }
                 Vec::new()
             }
             (Request::InProgress, Ok(out)) => {
                 self.on_in_progress(&out.stdout);
                 Vec::new()
             }
-            (Request::Log { skip, .. }, Ok(out)) => {
-                match log::parse(&out.stdout) {
-                    Ok(page) => self.on_log_page(skip, page),
-                    Err(err) => self.message = Some(format!("Could not read git log: {err}")),
-                }
-                // A pending parent jump, or a find in older history, does
-                // its own paging.
-                self.continue_jump()
-                    .or_else(|| self.continue_find())
-                    .unwrap_or_else(|| self.load_more_if_needed())
-            }
+            (
+                Request::Log {
+                    skip, max_count, ..
+                },
+                Ok(out),
+            ) => self.on_log_read(skip, max_count, &out.stdout),
             (Request::Reflog, Ok(out)) => {
                 self.on_reflog_read(&out.stdout);
                 Vec::new()
@@ -1005,18 +1090,57 @@ impl AppState {
     fn on_head(&mut self, head: Option<Oid>) -> Vec<Command> {
         let has_commits = head.is_some();
         self.refreshing_head = head;
-        match self.log_request(0) {
+        // Reload as much as was loaded (at least a page), so a refresh (often
+        // one nobody asked for, from the watcher) keeps the place in history.
+        // Never more: a reload must not grow the history each time.
+        let reload = self.log_request(0).map(|command| match command {
+            Command::Git(Request::Log {
+                skip,
+                max_count,
+                revisions,
+            }) => Command::Git(Request::Log {
+                skip,
+                max_count: max_count.max(self.log_loaded),
+                revisions,
+            }),
+            other => other,
+        });
+        match reload {
             Some(request) if has_commits => vec![request],
             // No commits yet, or a branch filter that matches nothing: nothing to load.
             _ => {
-                self.on_log_page(0, Vec::new());
+                self.on_log_page(0, Vec::new(), self.page_size);
                 Vec::new()
             }
         }
     }
 
-    fn on_log_page(&mut self, skip: usize, page: Vec<Commit>) {
-        let complete = page.len() < self.page_size;
+    fn on_log_read(&mut self, skip: usize, max_count: usize, stdout: &str) -> Vec<Command> {
+        match log::parse(stdout) {
+            Ok(page) => self.on_log_page(skip, page, max_count),
+            Err(err) => self.message = Some(format!("Could not read git log: {err}")),
+        }
+        // A pending parent jump, or a find in older history, does
+        // its own paging.
+        self.continue_jump()
+            .or_else(|| self.continue_find())
+            .or_else(|| self.continue_reselect())
+            .unwrap_or_else(|| self.load_more_if_needed())
+    }
+
+    /// Pages on while the selected commit a reload pushed out isn't back.
+    fn continue_reselect(&mut self) -> Option<Vec<Command>> {
+        self.reselect.as_ref()?;
+        if self.history_complete {
+            self.reselect = None;
+            return None;
+        }
+        Some(self.next_log_page())
+    }
+
+    /// A page of `max_count` commits or fewer, `skip` from the newest.
+    fn on_log_page(&mut self, skip: usize, page: Vec<Commit>, max_count: usize) {
+        let complete = page.len() < max_count;
         if skip == 0 {
             let head = self.refreshing_head.take();
             self.graph = Graph::new(head.clone());
@@ -1026,12 +1150,20 @@ impl AppState {
             self.graph.extend(&self.commits);
             let keep = self.keep_selected.take();
             self.restore_selection(keep.as_ref());
+            self.reselect =
+                keep.filter(|id| !complete && !self.commits.iter().any(|c| &c.id == id));
             self.drop_details_if_gone();
         } else if skip == self.log_loaded {
             self.log_loaded += page.len();
             let page = self.with_stash_rows(page);
             self.graph.extend(&page);
             self.commits.extend(page);
+            if let Some(id) = self.reselect.clone()
+                && self.commits.iter().any(|c| c.id == id)
+            {
+                self.reselect = None;
+                self.restore_selection(Some(&id));
+            }
         } else {
             return; // A page for a history that has since been reloaded.
         }
@@ -1191,6 +1323,8 @@ mod pager_tests;
 mod rebase_tests;
 #[cfg(test)]
 mod reflog_tests;
+#[cfg(test)]
+mod refresh_tests;
 #[cfg(test)]
 mod resize_tests;
 #[cfg(test)]

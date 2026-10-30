@@ -19,6 +19,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Resize the panes and columns by dragging their dividers (remembered in the config file)
 - [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
+- [x] Live refresh: changes made in another terminal or editor show up on their own (watches git's files, polls `git status` while focused; `[refresh]` in the config)
 
 ### Source Control pane (left of the graph)
 - [x] Staged Changes and Changes sections with status letters (M, A, D, R, C, T, U, !)
