@@ -8,7 +8,8 @@ const repo = 'https://github.com/allient/git-graph-tui';
 export default defineConfig({
 	// Set SITE_URL when deploying (for example https://git-graph-tui-docs.<subdomain>.workers.dev)
 	// so the sitemap and canonical links use the real address.
-	site: process.env.SITE_URL,
+	// An unset repository variable reaches the build as "", which is not a URL.
+	site: process.env.SITE_URL || undefined,
 	integrations: [
 		starlight({
 			title: 'git-graph-tui',
