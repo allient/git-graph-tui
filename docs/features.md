@@ -46,7 +46,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 
 ### Repository menu ("..." in the Source Control header, or the toolbar when the pane is hidden)
 - [x] Pull, push, fetch, "Checkout to..." (pick any branch or tag). Pull, Push and Fetch run right away and follow your git config (`pull.rebase`, `pull.ff`, `push.default`); a diverged pull stops unless git is configured to merge or rebase
-- [x] Clone: asks for a repository URL and a parent folder (the one holding this repository by default), clones into a folder named after the repository and says where it went; open that one with `git-graph-tui <folder>`
+- [x] Clone: asks for a repository URL and a parent folder (the one holding this repository by default), clones into a folder named after the repository and says where it went; open that one with `ggt <folder>`
 - [x] Pull, Push submenu, as in VS Code: Sync (pull, then push); Pull, Pull (Rebase), Pull from... (a remote and branch); Push, Push to... (remote, set upstream, force with lease); Fetch, Fetch (Prune), Fetch From All Remotes
 - [x] Branch, remote, stash and tag submenus; show the git command log
 - [x] Stash submenu, as in VS Code: Stash, Stash (Include Untracked), Stash Staged (git 2.35 or newer); Apply Latest Stash, Apply Stash...; Pop Latest Stash, Pop Stash...; Drop Stash..., Drop All Stashes... (asks first); View Stash... (its diff). The "..." entries pick a stash from a list

@@ -13,7 +13,7 @@ A Git Graph for your terminal: see every branch, tag and stash as a colored grap
 
 ## About
 
-git-graph-tui brings the [Git Graph extension for VS Code](https://github.com/mhutchie/vscode-git-graph) to the terminal. It is one native binary that works in any terminal, over SSH, in tmux, and in [herdr](https://herdr.dev/) panes.
+git-graph-tui brings the [Git Graph extension for VS Code](https://github.com/mhutchie/vscode-git-graph) to the terminal. It is one native binary, `ggt`, that works in any terminal, over SSH, in tmux, and in [herdr](https://herdr.dev/) panes.
 
 ### Why?
 
@@ -53,7 +53,7 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allient/git-graph-tui/r
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/allient/git-graph-tui/releases/latest/download/git-graph-tui-installer.ps1 | iex"
 ```
 
-It needs `git` on your `PATH`. To build it yourself, see [Build from source](#build-from-source).
+The command is `ggt`. It needs `git` on your `PATH`. To build it yourself, see [Build from source](#build-from-source).
 
 ## Usage
 
@@ -61,13 +61,13 @@ Run it inside a git repository, or give it a path:
 
 ```sh
 cd <your git repository>
-git-graph-tui
+ggt
 
-git-graph-tui ~/code/my-project
+ggt ~/code/my-project
 ```
 
 ```
-Usage: git-graph-tui [OPTIONS] [PATH]
+Usage: ggt [OPTIONS] [PATH]
 
 Arguments:
   [PATH]  Path inside the repository to open [default: .]
@@ -115,7 +115,7 @@ Requires Rust (`rustup` installs the pinned toolchain automatically) and `git`.
 git clone https://github.com/allient/git-graph-tui.git
 cd git-graph-tui
 cargo run -- ~/code/my-project       # run it
-cargo install --path crates/app      # or put git-graph-tui on your PATH
+cargo install --path crates/app      # or put ggt on your PATH
 ```
 
 Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for tests, linting, the docs site and releasing.

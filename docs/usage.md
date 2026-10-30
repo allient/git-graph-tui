@@ -51,7 +51,7 @@ The toolbar, the Source Control pane and the details panel's file tree show VS C
 3. Turn the icons on (not needed in Ghostty, WezTerm or Kitty), for one run or for every run:
 
    ```sh
-   git-graph-tui --icons nerd                      # one run
+   ggt --icons nerd                                # one run
    export GIT_GRAPH_TUI_ICONS=nerd                 # every run (add it to ~/.zshrc or ~/.bashrc)
    ```
 

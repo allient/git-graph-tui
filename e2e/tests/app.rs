@@ -1,4 +1,4 @@
-//! Drives the real `git-graph-tui` binary in a terminal with tui-test-rs:
+//! Drives the real `ggt` binary in a terminal with tui-test-rs:
 //! real keys and mouse events in, the drawn screen and the repository's git
 //! state out. Run with `sh e2e/run.sh` (it builds the binary first).
 
@@ -228,7 +228,7 @@ impl Drop for App {
 /// `GIT_GRAPH_TUI_BIN`, or the workspace's debug build.
 fn binary() -> PathBuf {
     std::env::var_os("GIT_GRAPH_TUI_BIN").map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/debug/git-graph-tui"),
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/debug/ggt"),
         PathBuf::from,
     )
 }

@@ -39,7 +39,7 @@ In the terminal, this combination doesn't exist today. Existing tools either dra
 | TUI | **[ratatui](https://ratatui.rs/)** + **crossterm** | De facto Rust TUI stack. Full mouse support (click, right-click, wheel), colors, cross-platform. |
 | Git access | **The `git` CLI** (`std::process::Command`, `-z` / `%x1f` machine-readable formats) | Exactly the same behavior as the user's terminal: config, hooks, credential helpers, SSH, signing. No libgit2 differences. |
 | Concurrency | Worker threads + channels (no async runtime) | Git calls run off the UI thread and can be cancelled. Simple and enough for a process-driven app. |
-| CLI | `clap` | `git-graph-tui [PATH]`, flags for branch filter, all/remote branches. |
+| CLI | `clap` | `ggt [PATH]`, flags for branch filter, all/remote branches. |
 | Config | TOML at `~/.config/git-graph-tui/config.toml` (`serde`, `toml`) | Columns, date format, colors, keybindings, default filters. |
 | Clipboard | OSC 52 (works over SSH, tmux, herdr), `arboard` fallback | Copy hash, subject, branch name. |
 | Errors | `thiserror` in the core, `anyhow` in the binary | Typed errors where we match on them, context where we report them. |
@@ -58,7 +58,7 @@ A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure cra
 | `ggt-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
 | `ggt-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
 | `ggt-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, git (output types), graph, actions |
-| `git-graph-tui` | `crates/app` | The binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
+| `git-graph-tui` | `crates/app` | The `ggt` binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
 | `ggt-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
 
 ```

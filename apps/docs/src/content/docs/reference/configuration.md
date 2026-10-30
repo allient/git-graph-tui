@@ -50,7 +50,7 @@ A mistake in the file (an unknown setting or value) stops the app with a message
 ## Command line
 
 ```sh
-git-graph-tui [PATH] [--icons auto|nerd|unicode]
+ggt [PATH] [--icons auto|nerd|unicode]
 ```
 
 `PATH` is any folder inside the repository (the current folder by default). `--icons` wins over the variable and the config file.

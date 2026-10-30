@@ -51,7 +51,7 @@ git-graph-tui opens in a new tab, in the first of these that herdr knows:
 
 Quit git-graph-tui (`q`) to close the tab.
 
-If herdr can't find the `git-graph-tui` binary, the tab says so and waits for Enter. The plugin looks for it on the herdr server's `PATH`, then in `~/.cargo/bin`.
+If herdr can't find the app, the tab says so and waits for Enter. The plugin looks for `ggt` (or `git-graph-tui`, its name before 0.3.0) on the herdr server's `PATH`, then in `~/.cargo/bin`.
 
 ## Right-click
 
@@ -76,5 +76,5 @@ If right-click still opens herdr's menu (for example on an older herdr), there a
 
 - `herdr-plugin.toml`: the manifest. An `open` action and a `graph` pane.
 - `scripts/open.sh`: the action. Actions run without a terminal, so it picks the directory from herdr's context and opens the `graph` pane, passing the directory as `TGG_TARGET_DIR`.
-- `scripts/run.sh`: the pane. Routes right-click to the pane, changes to `TGG_TARGET_DIR` and starts `git-graph-tui` (or `$TGG_BIN`).
-- `tests/run.sh`: tests for both scripts, with herdr and git-graph-tui stubbed. Run `sh integrations/herdr/tests/run.sh`.
+- `scripts/run.sh`: the pane. Routes right-click to the pane, changes to `TGG_TARGET_DIR` and starts `ggt` (or `git-graph-tui` from older releases, or `$TGG_BIN`).
+- `tests/run.sh`: tests for both scripts, with herdr and the app stubbed. Run `sh integrations/herdr/tests/run.sh`.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Tests for the herdr plugin scripts, with herdr and git-graph-tui stubbed.
+# Tests for the herdr plugin scripts, with herdr and the app (`ggt`) stubbed.
 # Run from anywhere: sh integrations/herdr/tests/run.sh
 set -u
 SH=${SH:-sh}
@@ -17,13 +17,21 @@ cat > "$scratch/bin/herdr" <<'STUB'
 printf '%s\n' "$*" >> "$STUB_LOG"
 exit "${STUB_EXIT:-0}"
 STUB
-# A git-graph-tui stub that records where it ran and with what.
-cat > "$scratch/bin/git-graph-tui" <<'STUB'
+# git-graph-tui stubs that record where they ran and with what. `ggt` is the
+# command since 0.3.0, `git-graph-tui` the one before; each lives in its own
+# folder so a test can put either, or both, on PATH.
+stub_app() { # dir name
+  mkdir -p "$1"
+  cat > "$1/$2" <<'STUB'
 #!/bin/sh
-printf 'cwd=%s args=%s\n' "$(pwd)" "$*" >> "$STUB_LOG"
+printf '%s cwd=%s args=%s\n' "$(basename "$0")" "$(pwd)" "$*" >> "$STUB_LOG"
 exit "${STUB_APP_EXIT:-0}"
 STUB
-chmod +x "$scratch/bin/herdr" "$scratch/bin/git-graph-tui"
+  chmod +x "$1/$2"
+}
+stub_app "$scratch/bin" ggt
+stub_app "$scratch/old" git-graph-tui
+chmod +x "$scratch/bin/herdr"
 export STUB_LOG="$scratch/log"
 mkdir -p "$scratch/repo"
 repo=$(cd "$scratch/repo" && pwd -P)
@@ -64,7 +72,7 @@ check "open: paths with spaces" "$opens=/my repo/x" \
 run_with() { # entrypoint-id herdr-exit [binary]
   reset
   HERDR_BIN_PATH="$scratch/bin/herdr" HERDR_PLUGIN_ENTRYPOINT_ID="$1" STUB_EXIT="$2" \
-    TGG_TARGET_DIR="$repo" TGG_BIN="${3:-$scratch/bin/git-graph-tui}" \
+    TGG_TARGET_DIR="$repo" TGG_BIN="${3:-$scratch/bin/ggt}" \
     $SH "$scripts/run.sh" </dev/null >"$scratch/out" 2>&1
   echo "exit=$?"
   cat "$STUB_LOG"
@@ -73,19 +81,39 @@ run_with() { # entrypoint-id herdr-exit [binary]
 nl='
 '
 check "run: routes right-click, then starts the app in the target" \
-  "exit=0${nl}pane input --current --right-click pane${nl}cwd=$repo args=." \
+  "exit=0${nl}pane input --current --right-click pane${nl}ggt cwd=$repo args=." \
   "$(run_with graph 0)"
 check "run: a failing herdr doesn't stop the app" \
-  "exit=0${nl}pane input --current --right-click pane${nl}cwd=$repo args=." \
+  "exit=0${nl}pane input --current --right-click pane${nl}ggt cwd=$repo args=." \
   "$(run_with graph 1)"
 check "run: outside a plugin pane, no routing" \
-  "exit=0${nl}cwd=$repo args=." "$(run_with '' 0)"
+  "exit=0${nl}ggt cwd=$repo args=." "$(run_with '' 0)"
 check "run: the app's failure is kept on screen and passed on" "exit=3 Press Enter to close." \
   "$(STUB_APP_EXIT=3 run_with graph 0 | head -1) $(tail -1 "$scratch/out")"
 check "run: a missing binary exits 1" "exit=1" \
-  "$(run_with '' 0 "$scratch/missing/git-graph-tui" | head -1)"
+  "$(run_with '' 0 "$scratch/missing/ggt" | head -1)"
 check "run: a missing binary shows the install hint" "yes" \
-  "$(grep -q 'cargo install' "$scratch/out" && echo yes || echo no)"
+  "$(grep -q 'brew install allient/tap/git-graph-tui' "$scratch/out" && echo yes || echo no)"
+
+run_on_path() { # extra-PATH-dirs
+  reset
+  PATH="$1:/usr/bin:/bin" CARGO_HOME="$scratch/no-cargo" TGG_BIN= \
+    TGG_TARGET_DIR="$repo" $SH "$scripts/run.sh" </dev/null >"$scratch/out" 2>&1
+  echo "exit=$?"
+  cat "$STUB_LOG"
+}
+
+check "run: finds ggt on PATH" "exit=0${nl}ggt cwd=$repo args=." \
+  "$(run_on_path "$scratch/bin")"
+check "run: falls back to git-graph-tui from older releases" \
+  "exit=0${nl}git-graph-tui cwd=$repo args=." "$(run_on_path "$scratch/old")"
+check "run: prefers ggt when both are installed" "exit=0${nl}ggt cwd=$repo args=." \
+  "$(run_on_path "$scratch/old:$scratch/bin")"
+mkdir -p "$scratch/cargo/bin"
+stub_app "$scratch/cargo/bin" ggt
+check "run: then cargo's install directory" "exit=0${nl}ggt cwd=$repo args=." \
+  "$(reset; PATH=/usr/bin:/bin CARGO_HOME="$scratch/cargo" TGG_BIN= TGG_TARGET_DIR="$repo" \
+    $SH "$scripts/run.sh" </dev/null >/dev/null 2>&1; echo "exit=$?"; cat "$STUB_LOG")"
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures failed"

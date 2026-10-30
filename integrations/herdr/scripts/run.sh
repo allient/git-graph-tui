@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pane entrypoint: runs git-graph-tui in $TGG_TARGET_DIR.
+# Pane entrypoint: runs git-graph-tui (`ggt`) in $TGG_TARGET_DIR.
 set -u
 
 # herdr sends plain right-click to its own pane menu by default, which hides
@@ -14,16 +14,25 @@ if [ -d "$target" ]; then
   cd "$target" || exit 1
 fi
 
-# $TGG_BIN, else git-graph-tui on PATH, else cargo's install directory (the
-# herdr server's PATH may not include it).
-bin=${TGG_BIN:-git-graph-tui}
-if ! command -v "$bin" >/dev/null 2>&1 && [ -z "${TGG_BIN:-}" ] \
-  && [ -x "${CARGO_HOME:-$HOME/.cargo}/bin/git-graph-tui" ]; then
-  bin="${CARGO_HOME:-$HOME/.cargo}/bin/git-graph-tui"
+# $TGG_BIN, else the first of `ggt` (the command since 0.3.0) and
+# `git-graph-tui` (older releases) on PATH, then in cargo's install directory
+# (the herdr server's PATH may not include it).
+bin=${TGG_BIN:-}
+if [ -z "$bin" ]; then
+  cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
+  for candidate in ggt git-graph-tui "$cargo_bin/ggt" "$cargo_bin/git-graph-tui"; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      bin=$candidate
+      break
+    fi
+  done
+  bin=${bin:-ggt}
 fi
 if ! command -v "$bin" >/dev/null 2>&1; then
   echo "git-graph-tui is not installed (looked for: $bin)."
-  echo "Install it from a checkout of https://github.com/allient/git-graph-tui:"
+  echo "Install it with Homebrew:"
+  echo "  brew install allient/tap/git-graph-tui"
+  echo "or from a checkout of https://github.com/allient/git-graph-tui:"
   echo "  cargo install --path crates/app"
   echo
   echo "Press Enter to close."

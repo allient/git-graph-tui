@@ -4,5 +4,5 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 cargo build --manifest-path "$root/Cargo.toml" -p git-graph-tui
-GIT_GRAPH_TUI_BIN="$root/target/debug/git-graph-tui" \
+GIT_GRAPH_TUI_BIN="$root/target/debug/ggt" \
     cargo test --manifest-path "$root/e2e/Cargo.toml" "$@"
