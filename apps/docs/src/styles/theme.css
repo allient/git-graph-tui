@@ -1,0 +1,11 @@
+/* Accent colors from the graph's first lane color (VS Code Git Graph blue). */
+:root {
+	--sl-color-accent-low: #00233a;
+	--sl-color-accent: #0085d9;
+	--sl-color-accent-high: #a8dcff;
+}
+:root[data-theme='light'] {
+	--sl-color-accent-low: #c9e8ff;
+	--sl-color-accent: #006bb0;
+	--sl-color-accent-high: #00375c;
+}

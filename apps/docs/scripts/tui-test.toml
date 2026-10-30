@@ -1,0 +1,15 @@
+# Style of the documentation screenshots taken by screenshots.sh.
+[recording.style]
+font_size = 16
+canvas_background = "#17181c"
+canvas_padding = 20
+
+[recording.style.window]
+title_bar = true
+traffic_lights = true
+background = "#2b2d33"
+foreground = "#c9ccd3"
+divider = "#000000"
+
+[recording.style.shadow]
+enabled = false
