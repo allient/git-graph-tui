@@ -14,18 +14,24 @@ Set `SITE_URL` to the final address when building (for example `SITE_URL=https:/
 
 ## Cloudflare (recommended)
 
-Free, fast worldwide, and unlimited bandwidth for static sites.
+The site is deployed to [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) as static files only, with no Worker script. Requests to static assets are free and unlimited, bandwidth is free, and Cloudflare's DDoS protection is included on every plan.
 
-In the Cloudflare dashboard, create an application from the GitHub repository (Workers & Pages) with:
+The `Deploy docs` GitHub Actions workflow (`.github/workflows/deploy-docs.yml`) builds the site and runs `wrangler deploy` (configured in `apps/docs/wrangler.jsonc`):
 
-| Setting | Value |
-| --- | --- |
-| Build command | `bun install && bun run build:docs` |
-| Output directory | `apps/docs/dist` |
-| Root directory | `/` (the repository root) |
-| Environment variable | `SITE_URL` = your site's address |
+- after every successful release (a `v*` tag push), from the released commit;
+- or by hand: **Actions → Deploy docs → Run workflow**.
 
-Every push to `main` deploys, and pull requests get preview URLs.
+It needs these settings in the GitHub repository (**Settings → Secrets and variables → Actions**):
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Secret | An API token made from the **Edit Cloudflare Workers** template |
+| `CLOUDFLARE_ACCOUNT_ID` | Secret | Your account ID (Cloudflare dashboard → Workers & Pages, right side) |
+| `SITE_URL` | Variable (optional) | The site's address, for example `https://git-graph-tui-docs.<your-subdomain>.workers.dev` or your own domain |
+
+The first deploy creates the `git-graph-tui-docs` Worker. To use your own domain, add it under the Worker's **Settings → Domains & Routes** and set `SITE_URL` to it.
+
+To deploy from your machine instead: `bun run deploy:docs` (it asks you to log in to Cloudflare the first time).
 
 ## Other free hosts
 

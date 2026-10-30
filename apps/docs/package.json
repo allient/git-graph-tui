@@ -7,11 +7,15 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@astrojs/starlight": "catalog:",
     "astro": "catalog:",
     "sharp": "catalog:"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
   }
 }

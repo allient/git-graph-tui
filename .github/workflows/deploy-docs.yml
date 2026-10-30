@@ -1,0 +1,54 @@
+name: Deploy docs
+
+# Publishes the documentation site (apps/docs) to Cloudflare Workers as static
+# assets, after every successful release, or by hand from the Actions tab.
+#
+# A release made by a workflow doesn't trigger other workflows (`release:
+# published` never fires for it), so this follows the Release workflow
+# instead, and only for tag pushes, not its plan-only pull request runs.
+#
+# Needs the repository secrets CLOUDFLARE_API_TOKEN (template "Edit Cloudflare
+# Workers") and CLOUDFLARE_ACCOUNT_ID, and optionally the repository variable
+# SITE_URL (the site's address, for the sitemap and canonical links).
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy docs to Cloudflare
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      # The released commit, not whatever main points at now.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run build:docs
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/docs
+          packageManager: bun
+          command: deploy
