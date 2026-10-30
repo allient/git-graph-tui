@@ -23,3 +23,8 @@ tap = "allient/homebrew-tap"
 publish-jobs = ["homebrew"]
 # Build and check the release plan on pull requests, without publishing
 pr-run-mode = "plan"
+
+# macos-14 (dist's default for Apple Silicon) is retired on 2026-11-02 and
+# browned out before that, which cancels the build.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
