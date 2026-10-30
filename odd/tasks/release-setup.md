@@ -22,7 +22,7 @@ Branch: build/release-setup, PR against main. Delivery: ask-on-risk. Tests: `car
 | T3 | S6 | delegated (verifier) | done | ci: type-check release targets |
 | T5 | S7 | delegated (3 QA testers in parallel: graph/views, context menus, Source Control + repo menu), fixes inline | in progress | |
 | T6 | L9 | inline, after T5 | done | refactor: ggt-* crates |
-| T4 | S4 | user (tap repo + token), then first tag (after T5, T6) | todo | |
+| T4 | S4 | user (tap repo + token), then first tag (after T5, T6) | done | v0.1.0 released |
 
 Route evidence: one feature; the release config and docs are small and sequential, so the parent writes inline; T3 delegates because the Risk line names item 5.
 
@@ -38,3 +38,5 @@ Route evidence: one feature; the release config and docs are small and sequentia
 - **L8** (2026-10-29) "before release I wan tto rename project to git-graph-tui" and "including repo name"; scope chosen: all user-facing (GitHub repo, command and crate, env vars `GIT_GRAPH_TUI_*`, config folder `~/.config/git-graph-tui`, herdr plugin id, Homebrew formula, docs); internal `tgg-*` crates unchanged; `odd/` history notes keep the old name. QA F2 (README graph line) fixed in the same commit.
 - **L9** (2026-10-29) "aftr test rename to ggt The internal crates (tgg-model, tgg-ui and so on) ... betetr". After QA: rename the internal crates `tgg-*` to `ggt-*` (T6). Local checkout folder rename stays for later (user: "ok keep thsi for later").
 - **L10** (2026-10-29) T5 (QA) done: recheck 9/9 PASS plus smoke (see odd/tasks/qa-fixes.md). T6 done: internal crates renamed `tgg-*` to `ggt-*` (117 files; Cargo.lock only reorders). Gate green: 811 tests, clippy, fmt, MSRV 1.88, deny, machete, herdr script tests, `dist plan`.
+- **L11** (2026-10-30) PR #47 merged (b5d738e); CI on main green (7 jobs). User: "yes do it by yourslef". Tagged `v0.1.0` (annotated) on b5d738e and pushed. Release run 40980645944: all 11 jobs success (5 builds, host, publish-homebrew-formula). GitHub Release v0.1.0 published with 5 archives + checksums, installers, `git-graph-tui.rb`; `allient/homebrew-tap` has `Formula/git-graph-tui.rb`. Verified: the shell installer from `releases/latest` installs `git-graph-tui 0.1.0` into a scratch CARGO_HOME; the aarch64 archive's sha256 matches its checksum file and the formula.
+- **L12** (2026-10-30) User: "myes do 1-3. no need ttt plugin remove from todos". GitHub repo description, homepage (latest release) and topics set; merged branch `build/release-setup` deleted locally and on GitHub; the planned TTT plugin removed from the README (roadmap step 4, layout, integrations); TTT stays a host where it runs in a terminal tab.
