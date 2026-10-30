@@ -21,3 +21,9 @@ Thumbs.db
 *~
 .idea/
 .vscode/
+
+# JavaScript workspace (documentation site)
+node_modules/
+.turbo/
+apps/docs/dist/
+apps/docs/.astro/
