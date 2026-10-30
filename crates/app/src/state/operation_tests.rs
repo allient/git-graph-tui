@@ -264,7 +264,8 @@ fn a_merge_that_stops_on_conflicts_says_so() {
     }
     assert!(merge_head(&repo), "git stopped mid-merge");
     assert!(
-        message(&h).contains("Conflicts found. Resolve them, then continue or abort."),
+        message(&h)
+            == "Merge into current branch stopped on conflicts: resolve them, then Continue or Abort.",
         "{:?}",
         message(&h)
     );

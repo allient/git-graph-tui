@@ -242,6 +242,17 @@ impl AppState {
                     }
                 }
                 self.message = Some(rebase_raced(&err, &running.action).unwrap_or_else(|| {
+                    // Not a failure: git is waiting for the conflicts to be resolved.
+                    if let ExecError::Failed {
+                        failure: Failure::Conflict,
+                        ..
+                    } = &err
+                    {
+                        return format!(
+                            "{} stopped on conflicts: resolve them, then Continue or Abort.",
+                            running.label
+                        );
+                    }
                     let why =
                         fetch_rejected(&err, &running.action).unwrap_or_else(|| err.user_message());
                     format!("{} failed: {why}", running.label)

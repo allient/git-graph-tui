@@ -23,7 +23,7 @@ Branch: build/release-setup (same PR as the release setup). Delivery: ask-on-ris
 | T2 | S3 | inline | done | fix(app): keyboard badge menus |
 | T3 | S4, S5 | inline | done | fix(ui): focus and checkboxes |
 | T4 | S6, S7, S8, S9 | inline | done | fix: conflict message, HEAD marker, empty hint, picker |
-| T5 | S1 | QA rerun on a new release binary | todo | |
+| T5 | S1 | QA rerun on a new release binary | done | recheck PASS (9/9 + smoke) |
 
 Route evidence: the fixes share crates/app/src/state.rs, so they run inline one after another.
 
@@ -40,3 +40,4 @@ Route evidence: the fixes share crates/app/src/state.rs, so they run inline one 
   - S8: pickers search a stash's message (`PickerItem::search_kind`), but not a ref's kind label.
   - S9: not reproduced. An empty-message Create Tag is annotated; the QA run likely pressed Left on the Type choice. Kept as a regression test.
   - 811 tests pass.
+- **L7** (2026-10-29) T5 recheck on the release build of f45c842: all 9 items PASS plus the regression smoke (stash rows, paging on 1500 commits, keyboard submenus, focus, checkboxes, conflict message, detached HEAD, empty repo, picker filters, annotated tag). Wording follow-up: a stop on conflicts now reads "<action> stopped on conflicts: resolve them, then Continue or Abort." instead of "... failed: ...". Not changed: after a Source Control commit the message box keeps focus (as in VS Code; Esc leaves it).
