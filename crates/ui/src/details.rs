@@ -559,7 +559,11 @@ impl CommitDetailsView {
             ("Parents:", String::new(), text),
             ("Author:", signature(&commit.author), text),
             ("Committer:", signature(&commit.committer), text),
-            ("Date:", format_date(commit.author.time), text),
+            (
+                "Date:",
+                format_date(commit.author.time, &theme.time_zone),
+                text,
+            ),
         ];
         if commit.parents.is_empty() {
             lines[1].1 = "(none)".into();

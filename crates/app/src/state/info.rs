@@ -24,7 +24,7 @@ impl AppState {
         match tag::parse(stdout, name) {
             Ok(Some(details)) => {
                 self.message = None;
-                self.info = Some(tag_info(&details));
+                self.info = Some(tag_info(&details, &self.time_zone));
             }
             Ok(None) => self.message = Some(format!("Tag {name} not found.")),
             Err(err) => self.message = Some(format!("Could not read tag {name}: {err}")),
@@ -46,12 +46,12 @@ impl AppState {
     }
 }
 
-fn tag_info(details: &TagDetails) -> Info {
+fn tag_info(details: &TagDetails, tz: &ggt_ui::TimeZone) -> Info {
     let mut lines = vec![format!("Commit:  {}", details.commit)];
     if let Some(annotation) = &details.annotation {
         let tagger = &annotation.tagger;
         lines.push(format!("Tagger:  {} <{}>", tagger.name, tagger.email));
-        lines.push(format!("Date:    {}", ggt_ui::format_date(tagger.time)));
+        lines.push(format!("Date:    {}", ggt_ui::format_date(tagger.time, tz)));
         lines.push(String::new());
         lines.extend(annotation.message.lines().map(str::to_owned));
     } else {

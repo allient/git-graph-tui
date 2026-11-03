@@ -427,7 +427,7 @@ impl GraphView<'_> {
 
         let muted_or = |color| Style::new().fg(if muted { theme.muted } else { color });
         if let Some(area) = cols.date {
-            let date = format_date(commit.author.time);
+            let date = format_date(commit.author.time, &theme.time_zone);
             put(buf, area.x, y, area.right(), &date, muted_or(theme.date));
         }
         if let Some(area) = cols.author {

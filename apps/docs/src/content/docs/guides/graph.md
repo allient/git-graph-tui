@@ -5,7 +5,7 @@ description: Read the commit graph, its badges and colors, and find commits.
 
 ![The graph with branches, a remote branch, tags, a stash and uncommitted changes](../../../assets/screenshots/graph.png)
 
-Each row is a commit, newest first. The **Graph** column draws the branches as colored lanes, so merges and forks are easy to follow. On the right are the **Date**, **Author** and **Commit** (short hash) columns.
+Each row is a commit, newest first. The **Graph** column draws the branches as colored lanes, so merges and forks are easy to follow. On the right are the **Date** (in your local time, like `git log`), **Author** and **Commit** (short hash) columns.
 
 ## Badges
 

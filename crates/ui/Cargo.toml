@@ -19,6 +19,7 @@ ggt-git.workspace = true
 ggt-graph.workspace = true
 ggt-model.workspace = true
 unicode-width.workspace = true
+jiff.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
