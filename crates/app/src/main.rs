@@ -115,11 +115,16 @@ fn run(
     let env = |name: &str| std::env::var(name).ok();
     let _right_click = herdr::RightClick::enable(&env, herdr::run_quietly);
     let (runner, results) = Runner::new(ProcessExecutor::new());
+    // Dates in the user's local time, like `git log`. jiff reads `TZ`, then
+    // the system setting, and falls back to UTC when neither can be read.
+    let time_zone = ggt_ui::TimeZone::system();
     let theme = Theme {
         icons,
+        time_zone: time_zone.clone(),
         ..Theme::default()
     };
     let mut state = AppState::new(repo);
+    state.time_zone = time_zone;
     state.pager = programs.pager;
     state.editor = programs.editor;
     state.issues = settings.issues;

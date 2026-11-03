@@ -591,3 +591,18 @@ fn a_detached_head_is_marked_on_its_commit() {
     // The marker is not a ref: clicking it targets the commit.
     assert!(matches!(hits.hit(x + 2, y), Some(HitTarget::Commit(_))));
 }
+
+#[test]
+fn dates_are_shown_in_the_theme_time_zone() {
+    let repo = FixtureRepo::sample();
+    let loaded = load(&repo);
+    let theme = Theme {
+        time_zone: ggt_ui::TimeZone::fixed(jiff::tz::offset(-5)),
+        ..Theme::default()
+    };
+    let (buf, _) = render_with(&view(&loaded), 110, 16, &theme);
+    let screen = text(&buf);
+    // The fixture commits at 2026-01-01 00:07 UTC: the evening before at UTC-5.
+    assert!(screen.contains("2025-12-31 19:07"), "{screen}");
+    assert!(!screen.contains("2026-01-01 00:07"), "{screen}");
+}

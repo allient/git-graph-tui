@@ -104,7 +104,7 @@ impl AppState {
             Vec::new()
         } else {
             (0..self.commits.len())
-                .filter(|&i| matches(&self.commits[i], &self.refs, &query))
+                .filter(|&i| matches(&self.commits[i], &self.refs, &query, &self.time_zone))
                 .collect()
         };
         if !keep_current || find.current >= find.matches.len() {
@@ -145,12 +145,12 @@ impl AppState {
 
 /// Whether `commit` matches a lowercase `query`: its subject, author, date,
 /// hash prefix, or the name of a branch or tag on it.
-fn matches(commit: &Commit, refs: &[Ref], query: &str) -> bool {
+fn matches(commit: &Commit, refs: &[Ref], query: &str, tz: &ggt_ui::TimeZone) -> bool {
     let contains = |text: &str| text.to_lowercase().contains(query);
     contains(&commit.subject)
         || contains(&commit.author.name)
         || contains(&commit.author.email)
-        || contains(&format_date(commit.author.time))
+        || contains(&format_date(commit.author.time, tz))
         || commit.id.as_str().starts_with(query)
         || refs
             .iter()

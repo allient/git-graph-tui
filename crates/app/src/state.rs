@@ -322,6 +322,9 @@ pub struct AppState {
     working_diff: Option<working_diff::WorkingDiffLoad>,
     /// Where issue references in commit messages link to (S20).
     pub issues: crate::config::Issues,
+    /// Where dates are shown (and searched): the user's local time zone in
+    /// the app, UTC by default so tests don't depend on the machine.
+    pub time_zone: ggt_ui::TimeZone,
     /// The merge, rebase, cherry-pick or revert git stopped in the middle of.
     pub operation: Option<Operation>,
     /// The conflict banner's buttons as last drawn.
@@ -391,6 +394,7 @@ impl AppState {
             side_by_side: false,
             working_diff: None,
             issues: crate::config::Issues::default(),
+            time_zone: ggt_ui::TimeZone::UTC,
             operation: None,
             banner_hits: BannerHitMap::default(),
             drag: None,

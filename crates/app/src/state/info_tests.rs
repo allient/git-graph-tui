@@ -53,7 +53,7 @@ fn annotated_tags_show_the_tagger_and_message() {
         "--format=%(taggerdate:unix)",
         "refs/tags/v0.2.0",
     ]);
-    let date = ggt_ui::format_date(tag_time.parse().unwrap());
+    let date = ggt_ui::format_date(tag_time.parse().unwrap(), &ggt_ui::TimeZone::UTC);
     assert_eq!(
         info.lines,
         [

@@ -121,7 +121,7 @@ pub fn draw_reflog(frame: &mut Frame<'_>, area: Rect, view: &ReflogView, theme: 
         .map(|(index, entry)| {
             let hash = format!("{} ", entry.id.short(SHORT_HASH));
             let selector = format!("{:<11} ", entry.selector());
-            let date = format!(" {}", format_date(entry.time));
+            let date = format!(" {}", format_date(entry.time, &theme.time_zone));
             // The subject takes what's left, so the dates line up on the right.
             let used = hash.len() + selector.len() + date.len();
             let subject = fit(
