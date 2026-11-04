@@ -1087,7 +1087,7 @@ impl AppState {
         if keep.is_some() {
             self.restore_selection(keep.as_ref());
         } else {
-            self.select(0);
+            self.reselect_keeping_view(0);
         }
     }
 
@@ -1279,7 +1279,25 @@ impl AppState {
             Some(index) => index + usize::from(!self.status.is_clean()),
             None => self.selected,
         };
-        self.select(display);
+        self.reselect_keeping_view(display);
+    }
+
+    /// Like [`Self::select`] for reloads (refresh, status, stashes): a
+    /// selection on screen is scrolled to, but a view the wheel moved away
+    /// from the selection stays put. Rows that appear above shift it along,
+    /// so it keeps showing the same commits.
+    fn reselect_keeping_view(&mut self, display: usize) {
+        let height = self.viewport_height.max(1);
+        let on_screen = (self.offset..self.offset + height).contains(&self.selected);
+        if on_screen {
+            self.select(display);
+            return;
+        }
+        let len = self.display_len();
+        let selected = display.min(len.saturating_sub(1));
+        let offset = (self.offset + selected).saturating_sub(self.selected);
+        self.selected = selected;
+        self.offset = offset.min(len.saturating_sub(height));
     }
 
     /// Selects a display row (clamped) and scrolls it into view.
