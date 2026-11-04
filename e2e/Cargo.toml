@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 description = "Local end-to-end tests: drive the real git-graph-tui binary in a terminal with tui-test-rs."
 
-# Not a member of the root workspace: tui-test-rs needs Rust 1.90 (the
-# workspace's MSRV is 1.89) and these tests run only locally, not in CI.
+# Not a member of the root workspace: these tests run only locally, not in
+# CI, so `cargo` in the workspace never builds tui-test-rs.
 [workspace]
 
 [dev-dependencies]

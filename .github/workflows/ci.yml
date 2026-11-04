@@ -71,16 +71,6 @@ jobs:
       # Ubuntu's sh is dash, the strictest POSIX shell the scripts target.
       - run: sh integrations/herdr/tests/run.sh
 
-  msrv:
-    name: MSRV (1.89)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install Rust 1.89
-        run: rustup toolchain install 1.89 --profile minimal
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo +1.89 check --workspace --all-targets --locked
-
   deny:
     name: cargo-deny (licenses, advisories, sources)
     runs-on: ubuntu-latest
