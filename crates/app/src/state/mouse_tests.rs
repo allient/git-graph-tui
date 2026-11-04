@@ -100,6 +100,35 @@ fn wheel_scrolls_the_view_and_loads_more_history() {
     assert_eq!(h.state.offset, offset.saturating_sub(SCROLL_LINES));
 }
 
+/// The wheel moves the view, not the selection. A background refresh (the
+/// watcher or the status poll, which fire when scrolling pauses) must not
+/// jump the view back to the selection at the top.
+#[test]
+fn a_refresh_keeps_a_view_scrolled_away_from_the_selection() {
+    let repo = FixtureRepo::sample();
+    let mut h = Harness::with_page_size(&repo, 3);
+    h.draw(W, 4);
+    let commands = h.state.update(mouse(MouseEventKind::ScrollDown, 50, 1));
+    h.settle(commands);
+    let offset = h.state.offset;
+    assert!(offset > 0);
+    assert_eq!(h.state.selected, 0, "the wheel leaves the selection alone");
+
+    let commands = h.state.update(Event::Refresh);
+    h.settle(commands);
+    assert_eq!(
+        h.state.offset, offset,
+        "the view stays where it was scrolled"
+    );
+    assert_eq!(h.state.selected, 0);
+
+    // A selection still on screen is scrolled to as before.
+    h.key(KeyCode::Char('g'));
+    let commands = h.state.update(Event::Refresh);
+    h.settle(commands);
+    assert_eq!(h.state.offset, 0);
+}
+
 #[test]
 fn right_click_on_a_branch_badge_opens_the_branch_menu() {
     let repo = FixtureRepo::sample();
