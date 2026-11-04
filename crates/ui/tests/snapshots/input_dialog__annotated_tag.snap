@@ -1,5 +1,6 @@
 ---
 source: crates/ui/tests/input_dialog.rs
+assertion_line: 57
 expression: "render(&dialog, 64, 17)"
 ---
 
@@ -9,7 +10,7 @@ expression: "render(&dialog, 64, 17)"
   │ v1.0.0                                                   │
   │                                                          │
   │ Type                                                     │
-  │ < Annotated >                                            │
+  │  Annotated   ▾   With a message, tagger and date         │
   │                                                          │
   │ Message (optional, annotated tags only)                  │
   │ First release                                            │

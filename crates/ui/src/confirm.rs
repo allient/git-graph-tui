@@ -237,7 +237,12 @@ pub(crate) fn centered(screen: Rect, width: u16, height: u16) -> Rect {
 pub(crate) fn draw_frame(buf: &mut Buffer, area: Rect, title: &str, style: Style) {
     Clear.render(area, buf);
     let inner = usize::from(area.width - 2);
-    let title = fit(&format!(" {title} "), inner.min(title.width() + 2));
+    // A frame without a title (a dropdown list) has an unbroken top line.
+    let title = if title.is_empty() {
+        String::new()
+    } else {
+        fit(&format!(" {title} "), inner.min(title.width() + 2))
+    };
     let top = format!(
         "┌{title}{}┐",
         "─".repeat(inner.saturating_sub(title.width()))

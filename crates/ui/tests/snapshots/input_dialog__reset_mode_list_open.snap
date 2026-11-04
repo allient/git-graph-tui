@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/input_dialog.rs
+assertion_line: 120
+expression: "render(&dialog, 64, 14)"
+---
+
+
+
+  ┌ Reset ───────────────────────────────────────────────────┐
+  │                                                          │
+  │ Mode                                                     │
+  │  mixed ▴   Keep working tree, but reset index            │
+  │┌──────────────────────────────────────────────┐          │
+  ││   soft      Keep all changes, but reset HEAD │          │
+  ││ ✓ mixed   Keep working tree, but reset index │ Cancel ] │
+  └│   hard                   Discard all changes │──────────┘
+   └──────────────────────────────────────────────┘

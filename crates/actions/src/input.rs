@@ -54,7 +54,35 @@ pub enum InputKind {
     Remote,
     Toggle,
     /// One of a fixed set of values.
-    Choice(&'static [&'static str]),
+    Choice(&'static [Choice]),
+}
+
+/// One option of a choice field: the value git gets, and what the dialog's
+/// dropdown says about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Choice {
+    pub value: &'static str,
+    pub description: &'static str,
+    /// Loses work (a hard reset): drawn in the warning color.
+    pub destructive: bool,
+}
+
+impl Choice {
+    pub(crate) const fn new(value: &'static str, description: &'static str) -> Self {
+        Self {
+            value,
+            description,
+            destructive: false,
+        }
+    }
+
+    pub(crate) const fn destructive(value: &'static str, description: &'static str) -> Self {
+        Self {
+            value,
+            description,
+            destructive: true,
+        }
+    }
 }
 
 /// A field value: text for names, paths and choices, bool for toggles.

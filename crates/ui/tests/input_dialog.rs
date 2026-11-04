@@ -106,3 +106,16 @@ fn remote_checkout_asks_for_the_new_branch_name() {
     let dialog = InputDialog::for_action("Checkout origin/development", &action).unwrap();
     insta::assert_snapshot!(render(&dialog, 64, 12));
 }
+
+#[test]
+fn reset_mode_list_open() {
+    let action = Action::ResetCurrentTo {
+        commit: commit(),
+        subject: "Add lib".into(),
+        current: "main".into(),
+        mode: ResetMode::Mixed,
+    };
+    let mut dialog = InputDialog::for_action("Reset", &action).unwrap();
+    dialog.handle_key(Key::Char(' '));
+    insta::assert_snapshot!(render(&dialog, 64, 14));
+}

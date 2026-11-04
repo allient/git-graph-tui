@@ -380,3 +380,22 @@ fn a_file_edited_elsewhere_shows_up_as_uncommitted() {
     std::fs::write(repo.path().join("a.txt"), "edited in an editor\n").expect("write");
     app.wait_for("Uncommitted Changes (1)");
 }
+
+#[test]
+fn reset_mode_is_picked_from_a_dropdown_list() {
+    let repo = Repo::new();
+    let app = App::launch(&repo);
+    app.click("first commit", MouseButton::Right);
+    app.click("Reset current branch to this Commit...", MouseButton::Left);
+    app.wait_for("mixed ▾");
+    app.press("Space");
+    app.wait_for("Discard all changes");
+    app.wait_for("✓ mixed");
+    app.press("Down");
+    app.press("Enter");
+    // The button is as wide as the longest option ("mixed").
+    app.wait_for("hard  ▾");
+    app.press("Escape");
+    app.wait_gone("hard  ▾");
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "second commit", "nothing reset");
+}

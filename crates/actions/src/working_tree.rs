@@ -3,10 +3,13 @@ use std::path::Path;
 use ggt_git::GitCommand;
 
 use crate::action::{Confirmation, Plan, ResetMode, UiEffect, strings};
-use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
+use crate::input::{self, Choice, InputError, InputId, InputKind, InputSpec, InputValue};
 
 /// Reset modes that make sense for uncommitted changes (soft would do nothing).
-const RESET_CHOICES: &[&str] = &["mixed", "hard"];
+const RESET_CHOICES: &[Choice] = &[
+    Choice::new("mixed", "Unstage everything, keep the changes"),
+    Choice::destructive("hard", "Discard all uncommitted changes"),
+];
 
 /// What the Source Control menu's commit entries commit (VS Code's
 /// Commit, Commit Staged and Commit All).

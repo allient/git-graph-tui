@@ -20,6 +20,7 @@ description: Every keyboard shortcut and mouse action.
 | Drag `│` | Resize the Source Control pane or a graph column |
 | Right click the column header | Show or hide the Date, Author and Commit columns |
 | `Esc` | Close the open menu, dialog, diff or details; on the graph, quit |
+| `Space` or click on a `▾` selector (in a dialog) | Open its list of options; `↑`/`↓` move, `Enter` picks, `Esc` closes the list |
 | `q` | Quit |
 
 ## Commit details
