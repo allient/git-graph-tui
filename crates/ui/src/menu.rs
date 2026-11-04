@@ -1,11 +1,10 @@
 use ggt_actions::{Action, MenuEntry, MenuItem};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use ratatui::style::Style;
-use ratatui::widgets::{Clear, Widget};
 use unicode_width::UnicodeWidthStr;
 
-use crate::{Key, Theme, fit};
+use crate::menu_list::{ListItem, ListRow, draw_list};
+use crate::{Key, Theme};
 
 /// Columns of padding on each side of a label.
 const PADDING: u16 = 1;
@@ -342,64 +341,29 @@ impl PopupMenu {
         if area.width < 2 || area.height < 2 {
             return hits;
         }
-        Clear.render(area, buf);
-        let frame = Style::default().fg(theme.muted);
-        let inner_width = usize::from(area.width - 2);
         let rows = usize::from(area.height - 2);
-        let (left, right) = (area.x, area.right() - 1);
-
-        buf.set_string(left, area.y, border('┌', '─', '┐', inner_width), frame);
-        buf.set_string(
-            left,
-            area.bottom() - 1,
-            border('└', '─', '┘', inner_width),
-            frame,
-        );
-
         // Scroll so the selection stays on screen when the menu is taller
         // than the terminal.
         let offset = self
             .selected
             .map_or(0, |s| s.saturating_sub(rows.saturating_sub(1)))
             .min(self.items.len().saturating_sub(rows));
-        for (row, (index, item)) in self
+        let list: Vec<ListRow<'_>> = self
             .items
             .iter()
             .enumerate()
-            .skip(offset)
-            .take(rows)
-            .enumerate()
-        {
-            let y = area.y + 1 + u16::try_from(row).unwrap_or(u16::MAX);
-            match item {
-                MenuItem::Separator => {
-                    buf.set_string(left, y, border('├', '─', '┤', inner_width), frame);
-                }
-                MenuItem::Entry(_) | MenuItem::Submenu { .. } => {
-                    let disabled = self.disabled_reason(index).is_some();
-                    let style = if disabled {
-                        Style::default().fg(theme.muted)
-                    } else if self.selected == Some(index) {
-                        Style::default().fg(theme.text).bg(theme.selected_bg)
-                    } else {
-                        Style::default().fg(theme.text)
-                    };
-                    let pad = " ".repeat(usize::from(PADDING));
-                    let room = inner_width.saturating_sub(2 * usize::from(PADDING));
-                    let text = match item {
-                        MenuItem::Submenu { label, .. } => {
-                            format!("{}▸", fit(label, room.saturating_sub(1)))
-                        }
-                        _ => fit(self.label(index).unwrap_or_default(), room),
-                    };
-                    buf.set_string(left, y, "│", frame);
-                    buf.set_string(left + 1, y, format!("{pad}{text}{pad}"), style);
-                    buf.set_string(right, y, "│", frame);
-                    hits.items
-                        .push((Rect::new(left + 1, y, area.width - 2, 1), index));
-                }
-            }
-        }
+            .map(|(index, item)| match item {
+                MenuItem::Separator => ListRow::Separator,
+                MenuItem::Entry(_) | MenuItem::Submenu { .. } => ListRow::Item(ListItem {
+                    label: self.label(index).unwrap_or_default(),
+                    detail: if self.is_submenu(index) { "▸" } else { "" },
+                    highlighted: self.selected == Some(index),
+                    disabled: self.disabled_reason(index).is_some(),
+                    warning: false,
+                }),
+            })
+            .collect();
+        hits.items = draw_list(buf, area, &list, offset, theme, theme.muted);
         if let Some(child) = &self.child {
             // Beside the submenu row; if it was scrolled away, beside the top.
             let row_y = self
@@ -463,14 +427,6 @@ fn place(anchor: u16, size: u16, low: u16, high: u16) -> u16 {
         (anchor + 1).saturating_sub(size)
     };
     start.clamp(low, high.saturating_sub(size).max(low))
-}
-
-fn border(left: char, fill: char, right: char, inner_width: usize) -> String {
-    let mut line = String::with_capacity(inner_width + 2);
-    line.push(left);
-    line.extend(std::iter::repeat_n(fill, inner_width));
-    line.push(right);
-    line
 }
 
 #[cfg(test)]

@@ -57,7 +57,7 @@ A Cargo workspace (monorepo) of small crates with one-way dependencies. Pure cra
 | `ggt-git` | `crates/git` | Safe git argv building, process execution behind a trait, output parsers | model |
 | `ggt-graph` | `crates/graph` | Lane layout: commits → rows of lanes/edges (incremental, stable across pages). Pure. | model |
 | `ggt-actions` | `crates/actions` | Actions as data (argv, confirmation, refresh scope) and context menus per target | model, git |
-| `ggt-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs) and the per-frame hit-map | model, git (output types), graph, actions |
+| `ggt-ui` | `crates/ui` | ratatui widgets (graph, badges, details, menus, dialogs, `Select` dropdowns) and the per-frame hit-map. Context menus and dropdown lists share one list drawing (`menu_list`), so they look the same | model, git (output types), graph, actions |
 | `git-graph-tui` | `crates/app` | The `ggt` binary: CLI, config, event loop, worker-thread runner, input → events | all of the above |
 | `ggt-testkit` | `crates/testkit` | Throwaway fixture repos for tests (dev-dependency only) | — |
 

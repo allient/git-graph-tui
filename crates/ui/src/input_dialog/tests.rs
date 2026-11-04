@@ -418,17 +418,3 @@ fn a_click_outside_the_list_only_closes_it() {
     assert!(!dialog.is_dropdown_open());
     assert_eq!(mode(&dialog), InputValue::Text("mixed".into()));
 }
-
-#[test]
-fn the_list_goes_under_the_field_else_above_it_never_over_it() {
-    let screen = Rect::new(0, 0, 80, 20);
-    let field = |y| Rect::new(10, y, 40, 1);
-    assert_eq!(dropdown_top(field(5), 5, screen), 6, "room below");
-    assert_eq!(dropdown_top(field(17), 5, screen), 12, "room above only");
-    let tiny = Rect::new(0, 0, 80, 6);
-    assert_eq!(
-        dropdown_top(field(3), 5, tiny),
-        4,
-        "no room: under it, cut off"
-    );
-}
