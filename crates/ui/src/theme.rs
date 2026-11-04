@@ -52,6 +52,8 @@ pub struct Theme {
     pub deleted: Color,
     pub renamed: Color,
     pub icons: Icons,
+    /// The frame of menus and dropdown lists.
+    pub menu_border: Color,
     /// Where dates are shown: the user's local time zone in the app, UTC by
     /// default so tests and snapshots don't depend on the machine.
     pub time_zone: TimeZone,
@@ -124,6 +126,7 @@ impl Default for Theme {
             deleted: Color::LightRed,
             renamed: Color::LightBlue,
             icons: Icons::Unicode,
+            menu_border: GIT_GRAPH_LANES[0],
             time_zone: TimeZone::UTC,
         }
     }
