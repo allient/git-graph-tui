@@ -194,7 +194,7 @@ fn commit_details_arriving_after_a_comparison_opened_are_ignored() {
     // Open the details of "Add lib" but don't run the reads yet.
     let (x, y) = h.find_on_screen("Add lib").unwrap();
     let late = h.state.update(mouse_down(MouseButton::Left, x + 1, y));
-    assert!(!late.is_empty());
+    assert!(!late.is_empty(), "{late:?}");
     let compare = choose_unsettled(&mut h, "Add lib", "Compare with Working Tree");
     // The details reads finish first: they must not fill the comparison.
     h.settle(late);

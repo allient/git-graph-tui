@@ -208,7 +208,7 @@ fn a_deleted_file_cannot_be_opened() {
     let mut h = open(&repo);
     select_in_pane(&mut h, 3);
     press(&mut h, KeyCode::Char('e'));
-    assert!(h.external.is_empty());
+    assert!(h.external.is_empty(), "{:?}", h.external);
     assert_eq!(
         h.state.message.as_deref(),
         Some("Can't open README.md: it was deleted.")

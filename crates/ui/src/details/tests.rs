@@ -653,7 +653,8 @@ fn a_filter_matching_nothing_leaves_no_selection() {
     let mut view = view();
     view.handle_key(Key::Char('f'));
     view.handle_key(Key::Char('q'));
-    assert!(view.rows().is_empty());
+    let found = view.rows();
+    assert!(found.is_empty(), "{found:?}");
     assert!(view.selected_file().is_none());
     assert_eq!(view.handle_key(Key::Enter), DetailsOutcome::Stay);
     assert_eq!(view.handle_key(Key::Enter), DetailsOutcome::Stay, "no file");

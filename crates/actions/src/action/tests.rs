@@ -733,7 +733,8 @@ fn inputs_describe_what_each_dialog_asks() {
     );
     assert_eq!(ids(reset(ResetMode::Mixed)), [InputId::Mode]);
     assert_eq!(ids(delete(false)), [InputId::Force]);
-    assert!(ids(Action::CheckoutBranch { name: "x".into() }).is_empty());
+    let found = ids(Action::CheckoutBranch { name: "x".into() });
+    assert!(found.is_empty(), "{found:?}");
 }
 
 #[test]

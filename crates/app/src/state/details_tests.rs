@@ -270,7 +270,7 @@ fn an_issue_without_a_page_explains_how_to_configure_one() {
     // The sample's origin is a local folder: no forge to link to.
     let (_repo, mut h) = details_mentioning("#12", None);
     click_text(&mut h, "#12");
-    assert!(h.opened.is_empty());
+    assert!(h.opened.is_empty(), "{:?}", h.opened);
     assert_eq!(
         h.state.message.as_deref(),
         Some(
@@ -284,7 +284,7 @@ fn an_issue_in_a_repository_without_origin_explains_too() {
     let (repo, mut h) = details_mentioning("#12", None);
     repo.git(&["remote", "remove", "origin"]);
     click_text(&mut h, "#12");
-    assert!(h.opened.is_empty());
+    assert!(h.opened.is_empty(), "{:?}", h.opened);
     let message = h.state.message.clone().unwrap_or_default();
     assert!(
         message.starts_with("Can't open #12: this repository has no origin remote."),

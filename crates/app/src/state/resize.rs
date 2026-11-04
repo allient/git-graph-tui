@@ -32,7 +32,8 @@ impl AppState {
             MouseEventKind::Down(MouseButton::Left) => {
                 if self.source_control.divider == Some(x) {
                     self.drag = Some(Drag::Pane);
-                } else if let Some(divider) = self.graph_hits.divider_at(x, y) {
+                } else {
+                    let divider = self.graph_hits.divider_at(x, y)?;
                     let start = ColumnWidths {
                         graph: Some(self.graph_hits.graph_width()),
                         ..self.columns
@@ -42,8 +43,6 @@ impl AppState {
                         start_x: x,
                         start,
                     });
-                } else {
-                    return None;
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => match self.drag? {

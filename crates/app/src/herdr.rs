@@ -168,11 +168,14 @@ mod tests {
             Vec::<String>::new()
         );
         let no_pane = [("HERDR_ENV", "1"), ("HERDR_BIN_PATH", "/opt/herdr")];
-        assert!(calls(&no_pane, |_| {}).is_empty());
+        let found = calls(&no_pane, |_| {});
+        assert!(found.is_empty(), "{found:?}");
         let empty_pane = [("HERDR_ENV", "1"), ("HERDR_PANE_ID", " ")];
-        assert!(calls(&empty_pane, |_| {}).is_empty());
+        let found = calls(&empty_pane, |_| {});
+        assert!(found.is_empty(), "{found:?}");
         let not_one = [("HERDR_ENV", "0"), ("HERDR_PANE_ID", "w1:p2")];
-        assert!(calls(&not_one, |_| {}).is_empty());
+        let found = calls(&not_one, |_| {});
+        assert!(found.is_empty(), "{found:?}");
     }
 
     #[test]

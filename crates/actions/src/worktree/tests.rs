@@ -179,6 +179,7 @@ fn prune_lock_unlock_and_copy() {
     ] {
         let action = Action::Worktree(action);
         assert!(!action.is_destructive() && action.confirmation().is_none());
-        assert!(action.inputs().is_empty());
+        let found = action.inputs();
+        assert!(found.is_empty(), "{found:?}");
     }
 }

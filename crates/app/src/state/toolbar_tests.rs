@@ -110,7 +110,11 @@ fn the_branch_filter_limits_the_graph_to_the_picked_branches() {
     click_text(&mut h, "feature/login ▾");
     press(&mut h, KeyCode::PageUp); // the "Show All" row
     press(&mut h, KeyCode::Enter);
-    assert!(h.state.toolbar.branch_filter.is_empty());
+    assert!(
+        h.state.toolbar.branch_filter.is_empty(),
+        "{:?}",
+        h.state.toolbar.branch_filter
+    );
     assert!(subjects(&h).contains(&"Update docs"));
 }
 
@@ -127,7 +131,11 @@ fn the_branch_menu_adds_and_removes_a_branch_from_the_filter() {
     let (x, y) = find(&h, "develop  Return");
     mouse(&mut h, MouseEventKind::Down(MouseButton::Right), x + 1, y);
     click_text(&mut h, "Unselect in Branches Dropdown");
-    assert!(h.state.toolbar.branch_filter.is_empty());
+    assert!(
+        h.state.toolbar.branch_filter.is_empty(),
+        "{:?}",
+        h.state.toolbar.branch_filter
+    );
     assert!(subjects(&h).contains(&"Add login"));
 }
 
@@ -228,7 +236,7 @@ fn a_filter_that_matches_no_branch_shows_no_commits() {
     let mut h = open(&repo);
     h.state.toolbar.branch_filter = vec!["nope/*".to_owned()];
     press(&mut h, KeyCode::Char('r'));
-    assert!(h.state.commits.is_empty());
+    assert!(h.state.commits.is_empty(), "{:?}", h.state.commits);
     assert!(h.state.history_complete);
 }
 
