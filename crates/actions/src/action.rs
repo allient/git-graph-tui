@@ -3,7 +3,7 @@ use std::path::Path;
 use ggt_git::GitCommand;
 use ggt_model::Oid;
 
-use crate::input::{self, InputError, InputId, InputKind, InputSpec, InputValue};
+use crate::input::{self, Choice, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{
     ChangesSort, ChangesView, CommitScope, InteractiveRebase, OperationAction, PickPurpose,
     RepoAction, StashAction, TagAction, WorkingTreeAction, WorktreeAction,
@@ -57,7 +57,12 @@ pub enum ResetMode {
 }
 
 impl ResetMode {
-    pub const CHOICES: &'static [&'static str] = &["soft", "mixed", "hard"];
+    /// The modes, as VS Code Git Graph describes them.
+    pub const CHOICES: &'static [Choice] = &[
+        Choice::new("soft", "Keep all changes, but reset HEAD"),
+        Choice::new("mixed", "Keep working tree, but reset index"),
+        Choice::destructive("hard", "Discard all changes"),
+    ];
 
     #[must_use]
     pub fn name(self) -> &'static str {
@@ -80,7 +85,10 @@ impl ResetMode {
 }
 
 /// The Add Tag dialog's types; the first is the default, as in VS Code.
-const TAG_TYPES: &[&str] = &["Annotated", "Lightweight"];
+const TAG_TYPES: &[Choice] = &[
+    Choice::new("Annotated", "With a message, tagger and date"),
+    Choice::new("Lightweight", "Just a name for the commit"),
+];
 
 /// Something the app does in response to a menu entry, as data.
 ///
@@ -755,7 +763,7 @@ impl Action {
                 InputId::TagType,
                 "Type",
                 InputKind::Choice(TAG_TYPES),
-                TAG_TYPES[usize::from(!annotated)],
+                TAG_TYPES[usize::from(!annotated)].value,
             ),
             InputSpec::text(
                 InputId::Message,
@@ -914,7 +922,7 @@ impl Action {
             (Self::AddTag { message, .. }, InputId::Message) => *message = input::text(id, value)?,
             (Self::AddTag { annotated, .. }, InputId::TagType) => {
                 let name = input::text(id, value)?;
-                *annotated = match TAG_TYPES.iter().position(|t| *t == name) {
+                *annotated = match TAG_TYPES.iter().position(|t| t.value == name) {
                     Some(index) => index == 0,
                     None => return Err(InputError::NotAChoice(name)),
                 };

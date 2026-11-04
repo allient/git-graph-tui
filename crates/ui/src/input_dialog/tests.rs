@@ -316,3 +316,119 @@ fn errors_are_drawn_in_the_warning_color() {
         DialogStyle::default().warning
     );
 }
+
+// ---- choice dropdown ----
+
+fn reset_dialog() -> InputDialog {
+    InputDialog::for_action(
+        "Reset",
+        &Action::ResetCurrentTo {
+            commit: oid(),
+            subject: "s".into(),
+            current: "main".into(),
+            mode: ResetMode::Mixed,
+        },
+    )
+    .unwrap()
+}
+
+fn mode(dialog: &InputDialog) -> InputValue {
+    dialog.values()[0].1.clone()
+}
+
+#[test]
+fn space_opens_the_list_and_enter_picks_the_highlighted_option() {
+    let mut dialog = reset_dialog();
+    dialog.handle_key(Key::Char(' '));
+    assert!(dialog.is_dropdown_open());
+    dialog.handle_key(Key::Down);
+    assert_eq!(
+        mode(&dialog),
+        InputValue::Text("mixed".into()),
+        "only highlighted"
+    );
+    assert_eq!(
+        dialog.handle_key(Key::Enter),
+        InputOutcome::Pending,
+        "not submitted"
+    );
+    assert!(!dialog.is_dropdown_open());
+    assert_eq!(mode(&dialog), InputValue::Text("hard".into()));
+}
+
+#[test]
+fn up_and_down_stop_at_the_ends_of_the_list() {
+    let mut dialog = reset_dialog();
+    dialog.handle_key(Key::Char(' '));
+    for _ in 0..5 {
+        dialog.handle_key(Key::Down);
+    }
+    dialog.handle_key(Key::Char(' '));
+    assert_eq!(mode(&dialog), InputValue::Text("hard".into()));
+    dialog.handle_key(Key::Char(' '));
+    for _ in 0..5 {
+        dialog.handle_key(Key::Up);
+    }
+    dialog.handle_key(Key::Enter);
+    assert_eq!(mode(&dialog), InputValue::Text("soft".into()));
+}
+
+#[test]
+fn esc_closes_the_list_but_not_the_dialog() {
+    let mut dialog = reset_dialog();
+    dialog.handle_key(Key::Char(' '));
+    dialog.handle_key(Key::Down);
+    assert_eq!(dialog.handle_key(Key::Esc), InputOutcome::Pending);
+    assert!(!dialog.is_dropdown_open());
+    assert_eq!(mode(&dialog), InputValue::Text("mixed".into()), "unchanged");
+    assert_eq!(dialog.handle_key(Key::Esc), InputOutcome::Cancelled);
+}
+
+#[test]
+fn clicking_the_field_opens_the_list_and_clicking_an_option_picks_it() {
+    let mut dialog = reset_dialog();
+    let (_, hits) = render(&dialog);
+    let field = hits.field(0).unwrap();
+    dialog.handle_click(&hits, field.x + 1, field.y);
+    assert!(dialog.is_dropdown_open());
+    let (buf, hits) = render(&dialog);
+    let (x, y) = (0..buf.area.height)
+        .find_map(|y| {
+            let row: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect();
+            row.find("soft").map(|_| (field.x + 1, y))
+        })
+        .expect("the list shows soft");
+    assert_eq!(hits.hit(x, y), InputHit::Option(0));
+    dialog.handle_click(&hits, x, y);
+    assert!(!dialog.is_dropdown_open());
+    assert_eq!(mode(&dialog), InputValue::Text("soft".into()));
+}
+
+#[test]
+fn a_click_outside_the_list_only_closes_it() {
+    let mut dialog = reset_dialog();
+    dialog.handle_key(Key::Char(' '));
+    let (_, hits) = render(&dialog);
+    let cancel = hits.button(Button::Cancel).unwrap();
+    assert_eq!(
+        dialog.handle_click(&hits, cancel.x + 1, cancel.y),
+        InputOutcome::Pending,
+        "the click doesn't reach the Cancel button"
+    );
+    assert!(!dialog.is_dropdown_open());
+    assert_eq!(mode(&dialog), InputValue::Text("mixed".into()));
+}
+
+#[test]
+fn the_list_goes_under_the_field_else_above_it_never_over_it() {
+    let screen = Rect::new(0, 0, 80, 20);
+    let field = |y| Rect::new(10, y, 40, 1);
+    assert_eq!(dropdown_top(field(5), 5, screen), 6, "room below");
+    assert_eq!(dropdown_top(field(17), 5, screen), 12, "room above only");
+    let tiny = Rect::new(0, 0, 80, 6);
+    assert_eq!(
+        dropdown_top(field(3), 5, tiny),
+        4,
+        "no room: under it, cut off"
+    );
+}

@@ -32,6 +32,7 @@ Every key, mouse action, icon setting and config option. The [documentation site
 | Drag `│` | Drag the line between Source Control and the graph to resize the pane, or a divider in the graph's column header (Graph, Description, Date, Author, Commit) to resize the columns |
 | Right click the column header | Show or hide the Date, Author and Commit columns (`✓` marks the shown ones), like VS Code Git Graph; the description takes the room. Narrow terminals still drop columns that don't fit (Commit under 60 columns, Date under 80, Author under 100) |
 | `Esc` | Close the open menu, dialog, picker, diff or details; on the graph itself it quits |
+| `Space` or click on a `▾` selector (in a dialog) | Opens the list of options under it, like a dropdown menu: each option with what it does (the reset modes, the tag type, the remote), `✓` on the current one. `↑`/`↓` move, `Enter`, `Space` or a click picks, `Esc` or a click elsewhere closes the list and keeps the dialog. `←`/`→` on the selector switch options without opening the list |
 | `q` | Quit (closes the diff first when one is open) |
 
 Push, pull and fetch never prompt for a password: use SSH keys or a git credential helper. Without one, the command fails and the status bar shows git's error.
