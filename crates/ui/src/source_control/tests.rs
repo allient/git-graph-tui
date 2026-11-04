@@ -89,8 +89,8 @@ fn lists_staged_and_unstaged_files_like_vs_code() {
         lines,
         [
             " SOURCE CONTROL               ✓ ↻ …",
-            " Message (Enter commits on \"main\")",
-            " Alt+Enter: new line",
+            "  Message (Enter commits on \"main…",
+            "  Alt+Enter: new line",
             "",
             "              ✓ Commit",
             "",
@@ -156,9 +156,9 @@ fn the_message_wraps_and_shows_three_lines() {
     let (lines, hits) = render(&mut pane, 13, true);
     // The cursor's line (the wrapped end) stays visible.
     assert_eq!(lines[1], "");
-    assert_eq!(lines[2], " A body line that is longer than th");
-    assert_eq!(lines[3], " e pane");
-    assert_eq!(hits.cursor(), Some(Position::new(7, 3)));
+    assert_eq!(lines[2], "  A body line that is longer than");
+    assert_eq!(lines[3], "  the pane");
+    assert_eq!(hits.cursor(), Some(Position::new(10, 3)));
 }
 
 #[test]
@@ -363,8 +363,8 @@ fn the_cursor_shows_in_the_focused_message() {
     pane.focus_message();
     type_text(&mut pane, "ab");
     let (lines, hits) = render(&mut pane, 13, true);
-    assert_eq!(lines[1], " ab");
-    assert_eq!(hits.cursor(), Some(Position::new(3, 1)));
+    assert_eq!(lines[1], "  ab");
+    assert_eq!(hits.cursor(), Some(Position::new(4, 1)));
     let (_, unfocused) = render(&mut pane, 13, false);
     assert_eq!(unfocused.cursor(), None);
 }

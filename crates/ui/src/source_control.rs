@@ -685,9 +685,10 @@ impl SourceControl {
         focused: bool,
         hits: &mut SourceControlHitMap,
     ) {
-        let input = Rect::new(area.x, area.y + 1, area.width, MESSAGE_LINES);
-        let text_x = area.x + 1;
-        let room = usize::from(area.width - 2);
+        // As wide as the Commit button under it: the pane but its margins.
+        let input = Rect::new(area.x + 1, area.y + 1, area.width - 2, MESSAGE_LINES);
+        let text_x = input.x + 1;
+        let room = usize::from(input.width - 2);
         self.message_width = room;
         buf.set_style(input, Style::new().bg(theme.selected_bg));
         hits.regions.push((input, Hit::Message));
