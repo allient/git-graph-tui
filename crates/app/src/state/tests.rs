@@ -122,7 +122,8 @@ fn results_from_a_superseded_refresh_are_ignored() {
 
     // The late results of the first refresh change nothing and request nothing.
     for result in stale_results {
-        assert!(h.state.update(Event::Git(result)).is_empty());
+        let found = h.state.update(Event::Git(result));
+        assert!(found.is_empty(), "{found:?}");
     }
     assert_eq!(h.state.commits, before);
     assert!(!h.state.is_loading());
@@ -152,7 +153,7 @@ fn more_commits_load_when_the_selection_nears_the_end() {
 fn empty_repository_has_no_commits_and_no_errors() {
     let repo = FixtureRepo::new();
     let h = Harness::open(&repo);
-    assert!(h.state.commits.is_empty());
+    assert!(h.state.commits.is_empty(), "{:?}", h.state.commits);
     assert_eq!(h.state.head, None);
     assert!(h.state.message.is_none(), "{:?}", h.state.message);
 }

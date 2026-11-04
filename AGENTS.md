@@ -25,7 +25,7 @@ Workspace rules:
 - **Shared metadata and lints** come from `[workspace.package]` and `[workspace.lints]` (`lints.workspace = true` in every member). Don't override lints per crate; use `#[expect(clippy::..., reason = "...")]` locally when justified.
 - **Dependency direction is one-way** (see the table). A new crate needs a clear responsibility and a place in that order; never add a cycle or a dependency from a lower crate to a higher one.
 - `Cargo.lock` is committed (this is an application). CI builds with `--locked`.
-- MSRV is 1.88 (`rust-version`), checked in CI. Raising it is a deliberate change.
+- MSRV is 1.99 (`rust-version`), the same as the pinned toolchain in `rust-toolchain.toml`. Supporting older compilers is not a goal: when the toolchain moves up, raise `rust-version` with it.
 
 Module rules:
 - `ggt-model`, `ggt-git`, `ggt-graph` and `ggt-actions` never depend on ratatui or crossterm.

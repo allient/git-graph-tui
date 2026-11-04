@@ -4,9 +4,9 @@ members = ["crates/*"]
 default-members = ["crates/app"]
 
 [workspace.package]
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.99"
 license = "MIT"
 repository = "https://github.com/allient/git-graph-tui"
 homepage = "https://github.com/allient/git-graph-tui"
@@ -34,7 +34,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 crossbeam-channel = "0.5.17"
 dirs = "7.0.0"
 serde = { version = "1.0.229", features = ["derive"] }
-toml = "1.1.8"
+toml = "1.2.0"
 notify = "8.2.1"
 jiff = "0.2.39"
 

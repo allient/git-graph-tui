@@ -45,7 +45,11 @@ fn parses_details_with_a_multi_line_body() {
 fn root_commit_details_have_no_parents_and_maybe_no_body() {
     let out = format!("{A}\x1f\x1fAnn\x1fa@x\x1f1\x1fAnn\x1fa@x\x1f1\x1fInitial commit\n\0");
     let details = parse_details(&out).unwrap();
-    assert!(details.commit.parents.is_empty());
+    assert!(
+        details.commit.parents.is_empty(),
+        "{:?}",
+        details.commit.parents
+    );
     assert_eq!(details.body(), "");
 }
 
@@ -298,5 +302,6 @@ fn binary_diffs_are_a_header_only() {
 
 #[test]
 fn empty_output_is_an_empty_diff() {
-    assert!(parse_diff("").lines.is_empty());
+    let found = parse_diff("").lines;
+    assert!(found.is_empty(), "{found:?}");
 }

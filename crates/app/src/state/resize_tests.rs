@@ -212,7 +212,8 @@ fn right_clicking_the_header_shows_or_hides_columns() {
     assert_eq!(header_menu_labels(&h), ["✓ Date", "  Author", "✓ Commit"]);
     choose(&mut h, "  Author", 150);
     assert!(h.find_on_screen("│Author").is_some());
-    assert!(h.state.layout().hidden_columns.is_empty());
+    let found = h.state.layout().hidden_columns;
+    assert!(found.is_empty(), "{found:?}");
 }
 
 #[test]

@@ -109,7 +109,11 @@ fn details_of_a_merge_and_a_root_commit() {
 
     let root = root(&repo);
     let details = show::parse_details(&run(&repo, show::details_args(&root))).unwrap();
-    assert!(details.commit.parents.is_empty());
+    assert!(
+        details.commit.parents.is_empty(),
+        "{:?}",
+        details.commit.parents
+    );
     assert_eq!(details.commit.subject, "Initial commit");
     assert_eq!(details.body(), "");
 }

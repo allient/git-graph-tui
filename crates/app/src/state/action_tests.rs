@@ -115,7 +115,8 @@ fn invalid_branch_names_keep_the_dialog_open() {
     type_text(&mut h, "bad name");
     press(&mut h, KeyCode::Enter);
     assert!(matches!(h.state.dialog, Some(Dialog::Input { .. })));
-    assert!(repo.git(&["branch", "--list", "bad*"]).is_empty());
+    let found = repo.git(&["branch", "--list", "bad*"]);
+    assert!(found.is_empty(), "{found:?}");
 }
 
 #[test]
@@ -253,7 +254,7 @@ fn a_second_action_waits_for_the_first() {
     click(&mut h, MouseButton::Right, x + 1, y);
     let (x, y) = h.find_on_screen("Checkout Branch").unwrap();
     let first = h.state.update(mouse_down(MouseButton::Left, x, y));
-    assert!(!first.is_empty());
+    assert!(!first.is_empty(), "{first:?}");
     // While it runs, starting another action is refused with a message.
     h.state.start_action(
         ggt_actions::Action::CopyBranchName { name: "x".into() },
@@ -337,7 +338,7 @@ fn create_pull_request_explains_unsupported_remotes() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
     choose(&mut h, "develop", "Create Pull Request");
-    assert!(h.opened.is_empty());
+    assert!(h.opened.is_empty(), "{:?}", h.opened);
     let message = h.state.message.clone().unwrap_or_default();
     assert!(
         message.starts_with("Can't open a pull request page for 'origin'"),
