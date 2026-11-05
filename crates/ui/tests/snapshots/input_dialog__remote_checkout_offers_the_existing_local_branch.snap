@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/input_dialog.rs
+expression: "render(&dialog, 64, 12)"
+---
+
+  ┌ Checkout origin/master ──────────────────────────────────┐
+  │                                                          │
+  │   A local branch named 'master' already exists. Do you   │
+  │  want to check it out instead of creating a new branch   │
+  │                  from 'origin/master'?                   │
+  │                                                          │
+  │ [x] Pull the latest changes from the remote branch       │
+  │                                                          │
+  │                  [ Checkout Existing Branch ] [ Cancel ] │
+  └──────────────────────────────────────────────────────────┘

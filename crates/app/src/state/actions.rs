@@ -71,6 +71,37 @@ enum Step {
 impl AppState {
     /// Starts an action chosen from a menu: asks for inputs, then confirms,
     /// then runs it. Only one action runs at a time.
+    /// Checking out a remote branch whose name a local branch already has
+    /// would fail on the name clash, so offer the local branch instead, with
+    /// a pull when it differs from the remote branch (like VS Code's Git
+    /// Graph). The double-click, the menus and the toolbar all come here.
+    fn offer_existing_branch(&self, action: Action) -> Action {
+        let Action::CheckoutRemoteBranch {
+            remote,
+            branch,
+            local_name,
+        } = &action
+        else {
+            return action;
+        };
+        let target = |full_name: String| {
+            self.refs
+                .iter()
+                .find(|r| r.full_name == full_name)
+                .map(|r| &r.target)
+        };
+        let Some(local) = target(format!("refs/heads/{local_name}")) else {
+            return action;
+        };
+        let pull = target(format!("refs/remotes/{remote}/{branch}")) != Some(local);
+        Action::CheckoutExistingBranch {
+            name: local_name.clone(),
+            remote: remote.clone(),
+            branch: branch.clone(),
+            pull,
+        }
+    }
+
     pub fn start_action(&mut self, mut action: Action, label: String) -> Vec<Command> {
         // Clone suggests the folder that holds this repository.
         if let Action::Repo(RepoAction::Clone { parent, .. }) = &mut action
@@ -79,6 +110,7 @@ impl AppState {
         {
             *parent = dir.display().to_string();
         }
+        let action = self.offer_existing_branch(action);
         if self.running.is_some() {
             self.message = Some("Wait for the current action to finish.".into());
             return Vec::new();

@@ -631,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-actions"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "ggt-git",
  "ggt-model",
@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-git"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "ggt-model",
  "ggt-testkit",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-graph"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "ggt-model",
  "insta",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-model"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "pretty_assertions",
  "thiserror 2.0.21",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-testkit"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "pretty_assertions",
  "tempfile",
@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "ggt-ui"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "ggt-actions",
  "ggt-git",
@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "git-graph-tui"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "anyhow",
  "clap",

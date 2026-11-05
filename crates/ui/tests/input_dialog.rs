@@ -108,6 +108,18 @@ fn remote_checkout_asks_for_the_new_branch_name() {
 }
 
 #[test]
+fn remote_checkout_offers_the_existing_local_branch() {
+    let action = Action::CheckoutExistingBranch {
+        name: "master".into(),
+        remote: "origin".into(),
+        branch: "master".into(),
+        pull: true,
+    };
+    let dialog = InputDialog::for_action("Checkout origin/master", &action).unwrap();
+    insta::assert_snapshot!(render(&dialog, 64, 12));
+}
+
+#[test]
 fn reset_mode_list_open() {
     let action = Action::ResetCurrentTo {
         commit: commit(),
