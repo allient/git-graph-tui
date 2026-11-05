@@ -231,6 +231,65 @@ fn remote_checkout_dialog_asks_for_the_new_branch_like_vs_code() {
     assert_eq!(action.confirm_label(), Some("Checkout Branch"));
 }
 
+fn checkout_existing(pull: bool) -> Action {
+    Action::CheckoutExistingBranch {
+        name: "master".into(),
+        remote: "origin".into(),
+        branch: "master".into(),
+        pull,
+    }
+}
+
+#[test]
+fn checkout_existing_branch_switches_and_optionally_pulls_the_remote_branch() {
+    assert_eq!(
+        single(&checkout_existing(false)),
+        write(&["switch", "--", "master"])
+    );
+    let Plan::Git(commands) = checkout_existing(true).plan(repo()) else {
+        panic!("expected git commands");
+    };
+    let steps: Vec<(CommandKind, Vec<String>)> = commands
+        .iter()
+        .map(|c| (c.kind(), c.argv()[6..].to_vec()))
+        .collect();
+    assert_eq!(
+        steps,
+        vec![
+            write(&["switch", "--", "master"]),
+            (
+                CommandKind::Network,
+                strings(&["pull", "--", "origin", "master"])
+            ),
+        ]
+    );
+}
+
+#[test]
+fn checkout_existing_branch_dialog_offers_the_local_branch_and_a_pull() {
+    let mut action = checkout_existing(true);
+    assert_eq!(
+        action.question().as_deref(),
+        Some(
+            "A local branch named 'master' already exists. Do you want to check it out instead of creating a new branch from 'origin/master'?"
+        )
+    );
+    assert_eq!(action.confirm_label(), Some("Checkout Existing Branch"));
+    assert_eq!(
+        action.inputs(),
+        vec![InputSpec::toggle(
+            InputId::Pull,
+            "Pull the latest changes from the remote branch",
+            true
+        )]
+    );
+    action
+        .set_input(InputId::Pull, InputValue::Bool(false))
+        .unwrap();
+    assert_eq!(action, checkout_existing(false));
+    assert!(action.conflicts_with_operation());
+}
+
 #[test]
 fn rebase_current_branch() {
     let action = Action::RebaseCurrentOnto {

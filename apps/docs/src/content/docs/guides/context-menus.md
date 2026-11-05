@@ -11,6 +11,8 @@ Right-click anything in the graph to see what you can do with it. From the keybo
 
 Right-click a branch badge to check it out, rename or delete it, merge it into the current branch, rebase onto it, push it, or open a pull request.
 
+Checking out a remote branch (from its menu or with a double-click) asks for the name of the new local branch. If a local branch with that name already exists, it offers to check that one out instead, with an optional pull of the remote branch's changes.
+
 A remote branch's menu also has **Delete Remote Branch...**, **Pull into current branch...** and **Fetch into local branch...**, which updates a local branch without checking it out.
 
 ## Commit menu

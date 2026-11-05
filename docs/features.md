@@ -30,7 +30,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Resizable by dragging the divider; hidden on terminals under 90 columns
 
 ### Actions on branches (right-click a branch badge)
-- [x] Checkout (local, or create a tracking branch from a remote one), create, rename, delete
+- [x] Checkout (local, or create a tracking branch from a remote one; a remote branch whose local branch already exists offers that one, with an optional pull), create, rename, delete
 - [x] Merge into current branch (asks like VS Code: new commit even if fast-forward is possible, Squash Commits, No Commit), rebase current branch onto it, reset
 - [x] Pull, push, fetch into local branch
 - [x] Create archive, copy branch name

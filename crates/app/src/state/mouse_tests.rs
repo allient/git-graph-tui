@@ -2,7 +2,7 @@
 //! resolve against the hit-maps of what was drawn.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use ggt_actions::MenuItem;
+use ggt_actions::{Action, MenuItem};
 use ggt_testkit::FixtureRepo;
 use ggt_ui::HitTarget;
 use pretty_assertions::assert_eq;
@@ -303,6 +303,76 @@ fn double_clicking_a_remote_branch_asks_for_the_local_name() {
         matches!(h.state.dialog, Some(Dialog::Input { .. })),
         "{:?}",
         h.state.message
+    );
+}
+
+/// The action of the open input dialog.
+fn dialog_action(h: &Harness) -> Option<&Action> {
+    match &h.state.dialog {
+        Some(Dialog::Input { action, .. }) => Some(action),
+        _ => None,
+    }
+}
+
+#[test]
+fn double_clicking_a_remote_branch_with_a_local_one_offers_it_and_a_pull() {
+    let repo = FixtureRepo::sample();
+    repo.checkout("feature/login");
+    repo.push("feature/login");
+    repo.checkout("main");
+    // The local branch is one commit behind its remote branch.
+    repo.git(&["branch", "--force", "feature/login", "feature/login~1"]);
+    let mut h = open(&repo);
+    h.state.double_click = Duration::from_secs(60);
+    let (x, y) = find(&h, "origin/feature/login");
+    double_click(&mut h, x + 1, y);
+    assert_eq!(
+        dialog_action(&h),
+        Some(&Action::CheckoutExistingBranch {
+            name: "feature/login".into(),
+            remote: "origin".into(),
+            branch: "feature/login".into(),
+            pull: true,
+        }),
+        "{:?}",
+        h.state.message
+    );
+    h.key(KeyCode::Enter);
+    assert_eq!(
+        repo.git(&["symbolic-ref", "--short", "HEAD"]),
+        "feature/login"
+    );
+    assert_eq!(
+        repo.git(&["rev-parse", "feature/login"]),
+        repo.git(&["rev-parse", "origin/feature/login"]),
+        "the pull brought the local branch up to date"
+    );
+}
+
+#[test]
+fn an_up_to_date_local_branch_is_offered_without_a_pull() {
+    let repo = FixtureRepo::sample();
+    repo.checkout("feature/login");
+    repo.push("feature/login");
+    repo.checkout("main");
+    let mut h = open(&repo);
+    // Both at one commit share a badge (`feature/login │ origin`), so come
+    // through the remote branch's menu entry instead of a double-click.
+    h.state.start_action(
+        Action::CheckoutRemoteBranch {
+            remote: "origin".into(),
+            branch: "feature/login".into(),
+            local_name: "feature/login".into(),
+        },
+        "Checkout Branch...".into(),
+    );
+    assert!(
+        matches!(
+            dialog_action(&h),
+            Some(Action::CheckoutExistingBranch { pull: false, .. })
+        ),
+        "{:?}",
+        dialog_action(&h)
     );
 }
 

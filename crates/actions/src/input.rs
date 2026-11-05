@@ -39,6 +39,8 @@ pub enum InputId {
     Path,
     /// Create the worktree's branch instead of checking out an existing one.
     NewBranch,
+    /// Pull after checking out.
+    Pull,
 }
 
 /// How a dialog should edit a field.

@@ -106,6 +106,15 @@ pub enum Action {
         branch: String,
         local_name: String,
     },
+    /// Checking out a remote branch whose name a local branch already has:
+    /// switches to the local branch instead, optionally pulling the remote
+    /// branch into it.
+    CheckoutExistingBranch {
+        name: String,
+        remote: String,
+        branch: String,
+        pull: bool,
+    },
     CreateBranch {
         at: Oid,
         name: String,
@@ -409,6 +418,15 @@ impl Action {
             Self::Worktree(action) => action.plan(repo),
             Self::Operation(action) => action.plan(repo),
             Self::InteractiveRebase(rebase) => rebase.plan(repo),
+            Self::CheckoutExistingBranch {
+                remote,
+                branch,
+                pull: true,
+                ..
+            } => Plan::Git(vec![
+                GitCommand::write(repo, self.git_args()),
+                GitCommand::network(repo, strings(&["pull", "--", remote, branch])),
+            ]),
             // `merge --squash` only stages the result; commit it with the
             // message git prepared, unless the user asked for no commit.
             Self::MergeIntoCurrent {
@@ -501,7 +519,9 @@ impl Action {
     /// The arguments after `git` for actions that run git (empty otherwise).
     fn git_args(&self) -> Vec<String> {
         match self {
-            Self::CheckoutBranch { name } => strings(&["switch", "--", name]),
+            Self::CheckoutBranch { name } | Self::CheckoutExistingBranch { name, .. } => {
+                strings(&["switch", "--", name])
+            }
             Self::CheckoutRemoteBranch {
                 remote,
                 branch,
@@ -600,6 +620,7 @@ impl Action {
             self,
             Self::CheckoutBranch { .. }
                 | Self::CheckoutRemoteBranch { .. }
+                | Self::CheckoutExistingBranch { .. }
                 | Self::CheckoutCommit { .. }
                 | Self::MergeIntoCurrent { .. }
                 | Self::RebaseCurrentOnto { .. }
@@ -789,6 +810,14 @@ impl Action {
             Self::CheckoutRemoteBranch { remote, branch, .. } => Some(format!(
                 "Enter the name of the new branch you would like to create when checking out '{remote}/{branch}':"
             )),
+            Self::CheckoutExistingBranch {
+                name,
+                remote,
+                branch,
+                ..
+            } => Some(format!(
+                "A local branch named '{name}' already exists. Do you want to check it out instead of creating a new branch from '{remote}/{branch}'?"
+            )),
             Self::MergeIntoCurrent {
                 source, current, ..
             } => Some(match current {
@@ -810,6 +839,7 @@ impl Action {
     pub fn confirm_label(&self) -> Option<&'static str> {
         match self {
             Self::CheckoutRemoteBranch { .. } => Some("Checkout Branch"),
+            Self::CheckoutExistingBranch { .. } => Some("Checkout Existing Branch"),
             Self::MergeIntoCurrent { .. } => Some("Yes, merge"),
             _ => None,
         }
@@ -825,6 +855,11 @@ impl Action {
                 "Name of the new local branch",
                 RefName,
                 local_name,
+            )],
+            Self::CheckoutExistingBranch { pull, .. } => vec![InputSpec::toggle(
+                InputId::Pull,
+                "Pull the latest changes from the remote branch",
+                *pull,
             )],
             Self::FetchIntoLocal {
                 local_name, force, ..
@@ -948,6 +983,7 @@ impl Action {
                 Self::DeleteBranch { force: field, .. } | Self::FetchIntoLocal { force: field, .. },
                 InputId::Force,
             )
+            | (Self::CheckoutExistingBranch { pull: field, .. }, InputId::Pull)
             | (Self::MergeIntoCurrent { no_ff: field, .. }, InputId::NoFastForward)
             | (Self::MergeIntoCurrent { squash: field, .. }, InputId::Squash)
             | (
