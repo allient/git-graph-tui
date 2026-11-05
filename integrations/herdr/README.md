@@ -4,11 +4,13 @@ A [herdr](https://herdr.dev/) plugin that opens git-graph-tui in a herdr tab, fo
 
 ## Install
 
-The plugin is a thin launcher: install git-graph-tui itself first, from a checkout of this repository:
+The plugin is a thin launcher: install git-graph-tui (the `ggt` command) first. With Homebrew, on macOS or Linux:
 
 ```sh
-cargo install --path crates/app
+brew install allient/tap/git-graph-tui
 ```
+
+The [main README](../../README.md#installation) has the other ways (a shell installer, or `cargo install --path crates/app` from a checkout).
 
 Then install the plugin from GitHub:
 
@@ -51,7 +53,7 @@ git-graph-tui opens in a new tab, in the first of these that herdr knows:
 
 Quit git-graph-tui (`q`) to close the tab.
 
-If herdr can't find the app, the tab says so and waits for Enter. The plugin looks for `ggt` (or `git-graph-tui`, its name before 0.3.0) on the herdr server's `PATH`, then in `~/.cargo/bin`.
+If herdr can't find the app, the tab says so and waits for Enter. The plugin looks for `ggt` (or `git-graph-tui`, its name before 0.3.0) on the herdr server's `PATH`, then in `~/.cargo/bin`, then in Homebrew's `bin` (`$HOMEBREW_PREFIX`, `/opt/homebrew`, `/usr/local` or `/home/linuxbrew/.linuxbrew`).
 
 ## Right-click
 
