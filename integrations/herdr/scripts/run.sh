@@ -15,12 +15,17 @@ if [ -d "$target" ]; then
 fi
 
 # $TGG_BIN, else the first of `ggt` (the command since 0.3.0) and
-# `git-graph-tui` (older releases) on PATH, then in cargo's install directory
-# (the herdr server's PATH may not include it).
+# `git-graph-tui` (older releases) on PATH, then in cargo's install directory,
+# then in Homebrew's (a herdr server started outside a login shell may have
+# neither on its PATH).
 bin=${TGG_BIN:-}
 if [ -z "$bin" ]; then
   cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
-  for candidate in ggt git-graph-tui "$cargo_bin/ggt" "$cargo_bin/git-graph-tui"; do
+  set -- ggt git-graph-tui "$cargo_bin/ggt" "$cargo_bin/git-graph-tui"
+  for prefix in "${HOMEBREW_PREFIX:-}" /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew; do
+    [ -n "$prefix" ] && set -- "$@" "$prefix/bin/ggt" "$prefix/bin/git-graph-tui"
+  done
+  for candidate in "$@"; do
     if command -v "$candidate" >/dev/null 2>&1; then
       bin=$candidate
       break

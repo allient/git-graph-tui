@@ -114,6 +114,12 @@ stub_app "$scratch/cargo/bin" ggt
 check "run: then cargo's install directory" "exit=0${nl}ggt cwd=$repo args=." \
   "$(reset; PATH=/usr/bin:/bin CARGO_HOME="$scratch/cargo" TGG_BIN= TGG_TARGET_DIR="$repo" \
     $SH "$scripts/run.sh" </dev/null >/dev/null 2>&1; echo "exit=$?"; cat "$STUB_LOG")"
+mkdir -p "$scratch/brew/bin"
+stub_app "$scratch/brew/bin" ggt
+check "run: then Homebrew's install directory" "exit=0${nl}ggt cwd=$repo args=." \
+  "$(reset; PATH=/usr/bin:/bin CARGO_HOME="$scratch/no-cargo" HOMEBREW_PREFIX="$scratch/brew" \
+    TGG_BIN= TGG_TARGET_DIR="$repo" $SH "$scripts/run.sh" </dev/null >/dev/null 2>&1
+    echo "exit=$?"; cat "$STUB_LOG")"
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures failed"
