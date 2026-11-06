@@ -122,26 +122,29 @@ fn file_labels_show_counts_renames_and_binaries() {
 // ---- selection and keys ----
 
 #[test]
-fn selection_starts_on_the_first_file_and_skips_folders() {
+fn folders_can_be_selected_and_toggled_with_keyboard() {
     let mut view = view();
     assert_eq!(selected_path(&view), "apps/full-app/a.rs");
-    view.handle_key(Key::Down);
-    assert_eq!(selected_path(&view), "apps/full-app/b.rs");
-    view.handle_key(Key::Down);
-    assert_eq!(selected_path(&view), "apps/z.rs");
-    view.handle_key(Key::Down);
-    assert_eq!(selected_path(&view), "docs/guide.md", "skips docs/");
-    view.handle_key(Key::End);
-    assert_eq!(selected_path(&view), "README.md");
-    view.handle_key(Key::Down);
-    assert_eq!(selected_path(&view), "README.md", "stops at the end");
     view.handle_key(Key::Home);
-    assert_eq!(selected_path(&view), "apps/full-app/a.rs");
-    view.handle_key(Key::Up);
+    view.handle_key(Key::Left);
     assert_eq!(
-        selected_path(&view),
-        "apps/full-app/a.rs",
-        "stops at the start"
+        labels(&view),
+        ["apps/", "docs/", "  docs/guide.md", "README.md"]
+    );
+    view.handle_key(Key::Right);
+    assert_eq!(labels(&view).len(), 8);
+    view.handle_key(Key::Down);
+    view.handle_key(Key::Enter);
+    assert_eq!(
+        labels(&view),
+        [
+            "apps/",
+            "  full-app/",
+            "  apps/z.rs",
+            "docs/",
+            "  docs/guide.md",
+            "README.md"
+        ]
     );
 }
 
@@ -187,8 +190,15 @@ fn clicking_a_parent_jumps_to_it_and_clicking_a_file_opens_it() {
         DetailsOutcome::OpenFile(file("README.md", 1, 0))
     );
     assert_eq!(selected_path(&view), "README.md");
-    let folder = hits.file_row(0);
-    assert!(folder.is_none(), "folders are not clickable");
+    let folder = hits.file_row(0).unwrap();
+    assert_eq!(
+        view.handle_click(&hits, folder.x, folder.y),
+        DetailsOutcome::Stay
+    );
+    assert_eq!(
+        labels(&view),
+        ["apps/", "docs/", "  docs/guide.md", "README.md"]
+    );
     assert_eq!(view.handle_click(&hits, 0, 0), DetailsOutcome::Stay);
     assert_eq!(hits.hit(0, 0), DetailsHit::Outside);
 }
@@ -246,7 +256,7 @@ fn a_comparison_lists_its_files_across_the_whole_panel() {
         "{title:?}"
     );
     assert!(
-        line(&buf, 1).starts_with(" ▾ apps/ "),
+        line(&buf, 1).starts_with(" ▾▾ apps/ "),
         "{:?}",
         line(&buf, 1)
     );
@@ -400,9 +410,13 @@ fn parent_hashes_and_emails_are_underlined_links() {
 #[test]
 fn folders_and_files_have_their_icons() {
     let (buf, _) = render(&view(), Rect::new(0, 0, 100, 12));
-    assert!(tree(&buf, 1).starts_with(" ▾ apps/"), "{:?}", tree(&buf, 1));
     assert!(
-        tree(&buf, 2).starts_with("   ▾ full-app/"),
+        tree(&buf, 1).starts_with(" ▾▾ apps/"),
+        "{:?}",
+        tree(&buf, 1)
+    );
+    assert!(
+        tree(&buf, 2).starts_with("   ▾▾ full-app/"),
         "{:?}",
         tree(&buf, 2)
     );
@@ -418,7 +432,7 @@ fn folders_and_files_have_their_icons() {
     };
     let buf = render_with(&view(), Rect::new(0, 0, 100, 12), &nerd);
     assert!(
-        tree(&buf, 1).starts_with(" \u{ea83} apps/"),
+        tree(&buf, 1).starts_with(" ▾\u{ea83} apps/"),
         "{:?}",
         tree(&buf, 1)
     );
