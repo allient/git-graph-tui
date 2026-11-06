@@ -1,9 +1,9 @@
 ---
 source: crates/app/src/view.rs
-expression: popup
+expression: "popup.replace(env!(\"CARGO_PKG_VERSION\"), \"<VERSION>\")"
 ---
 ┌ Update available · esc closes ───────────────────────────────────────┐
-│Installed: 0.3.5    Latest: v9.0.0                                    │
+│Installed: <VERSION>    Latest: v9.0.0                                    │
 │                                                                      │
 │Homebrew: brew upgrade allient/tap/git-graph-tui                      │
 │Other installs: see the release page for your installer.              │

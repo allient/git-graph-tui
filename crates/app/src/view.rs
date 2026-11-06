@@ -361,7 +361,7 @@ mod tests {
             .map(|y| (4..76).map(|x| buf[(x, y)].symbol()).collect::<String>())
             .collect::<Vec<_>>()
             .join("\n");
-        insta::assert_snapshot!(popup);
+        insta::assert_snapshot!(popup.replace(env!("CARGO_PKG_VERSION"), "<VERSION>"));
     }
 
     #[test]
