@@ -55,6 +55,7 @@ fn pane_width(total: u16, chosen: Option<u16>) -> u16 {
 /// Draws the Source Control pane and, beside it, the toolbar and the graph;
 /// then the status bar and whatever is open on top. Updates the viewport
 /// height and stores the hit-maps that mouse events resolve against.
+#[expect(clippy::too_many_lines, reason = "composes the screen and overlays")]
 pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let [main_area, status_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
@@ -132,6 +133,34 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
             frame.set_cursor_position(cursor);
         }
         picker.hits = Some(hits);
+    }
+    if state.update_panel {
+        let version = state.update_available.as_deref().unwrap_or("unknown");
+        let info = crate::state::Info {
+            title: "Update available".into(),
+            lines: vec![
+                format!(
+                    "Installed: {}    Latest: {version}",
+                    env!("CARGO_PKG_VERSION")
+                ),
+                String::new(),
+                "Homebrew: brew upgrade allient/tap/git-graph-tui".into(),
+                "Other installs: see the release page for your installer.".into(),
+                String::new(),
+                "o release notes    d dismiss this version    esc close".into(),
+            ],
+        };
+        crate::panels::draw_info(frame, screen, &info, theme);
+        state.update_link_hit = None;
+        state.update_dismiss_hit = None;
+        let width = 72.min(screen.width.saturating_sub(2)).max(1);
+        let height = 10.min(screen.height.saturating_sub(2)).max(1);
+        if width >= 58 && height >= 8 {
+            let x = screen.x + (screen.width - width) / 2 + 1;
+            let y = screen.y + (screen.height - height) / 2 + 6;
+            state.update_link_hit = Some(Rect::new(x, y, 15, 1));
+            state.update_dismiss_hit = Some(Rect::new(x + 19, y, 22, 1));
+        }
     }
     if let Some(info) = &state.info {
         crate::panels::draw_info(frame, screen, info, theme);
@@ -237,7 +266,8 @@ fn draw_empty_hint(frame: &mut Frame<'_>, graph_area: Rect, state: &AppState) {
         .render(hint, frame.buffer_mut());
 }
 
-fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Theme) {
+fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &mut AppState, theme: &Theme) {
+    state.update_hit = None;
     if let Some(find) = &state.find {
         draw_find(frame, area, find, theme);
         return;
@@ -266,6 +296,21 @@ fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: &Them
         spans.push(Span::styled(
             format!(" {message} "),
             Style::new().fg(theme.lane(5)),
+        ));
+    }
+    if let Some(version) = &state.update_available {
+        let label = format!(" ↑ {version} update [U] ");
+        let offset: usize = spans.iter().map(Span::width).sum();
+        let start = u16::try_from(offset).unwrap_or(u16::MAX);
+        let width = u16::try_from(label.chars().count())
+            .unwrap_or(u16::MAX)
+            .min(area.width.saturating_sub(start));
+        if width > 0 {
+            state.update_hit = Some(Rect::new(area.x + start, area.y, width, 1));
+        }
+        spans.push(Span::styled(
+            label,
+            Style::new().fg(theme.lane(5)).add_modifier(Modifier::BOLD),
         ));
     }
     let left = Line::from(spans);
@@ -299,6 +344,24 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    #[test]
+    fn update_panel_shows_upgrade_guidance() {
+        let repo = FixtureRepo::sample();
+        let mut h = Harness::open(&repo);
+        h.state.update_available = Some("v9.0.0".into());
+        h.state.update_panel = true;
+        let mut terminal = Terminal::new(TestBackend::new(80, 16)).unwrap();
+        terminal
+            .draw(|f| draw(f, &mut h.state, &Theme::default()))
+            .unwrap();
+        let buf = terminal.backend().buffer();
+        let popup = (3..13)
+            .map(|y| (4..76).map(|x| buf[(x, y)].symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n");
+        insta::assert_snapshot!(popup);
     }
 
     #[test]

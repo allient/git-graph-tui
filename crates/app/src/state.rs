@@ -239,6 +239,10 @@ impl Request {
 
 /// Everything the UI shows and every in-flight git request.
 #[derive(Debug)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent UI modes and update requests are state flags"
+)]
 pub struct AppState {
     pub repo: PathBuf,
     pub commits: Vec<Commit>,
@@ -265,6 +269,13 @@ pub struct AppState {
     pub history_complete: bool,
     /// Status-bar message (the last git error).
     pub message: Option<String>,
+    pub update_available: Option<String>,
+    pub update_panel: bool,
+    pub update_requested: bool,
+    pub update_dismissed: Option<String>,
+    pub update_hit: Option<Rect>,
+    pub update_link_hit: Option<Rect>,
+    pub update_dismiss_hit: Option<Rect>,
     pub should_quit: bool,
     /// The open context menu, if any.
     pub menu: Option<PopupMenu>,
@@ -365,6 +376,13 @@ impl AppState {
             page_size: DEFAULT_PAGE_SIZE,
             history_complete: false,
             message: None,
+            update_available: None,
+            update_panel: false,
+            update_requested: false,
+            update_dismissed: None,
+            update_hit: None,
+            update_link_hit: None,
+            update_dismiss_hit: None,
             should_quit: false,
             menu: None,
             graph_hits: HitMap::default(),
@@ -538,9 +556,27 @@ impl AppState {
         base.max(self.status_poll.cost * 10)
     }
 
+    #[expect(clippy::too_many_lines, reason = "routes input across the app modes")]
     fn on_key(&mut self, key: KeyEvent) -> Vec<Command> {
         if key.kind != KeyEventKind::Press {
             return Vec::new();
+        }
+        if self.update_panel {
+            return match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
+                    self.update_panel = false;
+                    Vec::new()
+                }
+                KeyCode::Char('o') => vec![Command::OpenUrl(
+                    "https://github.com/allient/git-graph-tui/releases/latest".into(),
+                )],
+                KeyCode::Char('d') => {
+                    self.update_panel = false;
+                    self.update_dismissed = self.update_available.take();
+                    Vec::new()
+                }
+                _ => Vec::new(),
+            };
         }
         if self.dialog.is_some() {
             return self.on_dialog_key(key);
@@ -592,6 +628,14 @@ impl AppState {
                 self.should_quit = true;
                 return Vec::new();
             }
+            (KeyCode::Char('U'), _) => {
+                if self.update_available.is_some() {
+                    self.update_panel = true;
+                } else {
+                    self.update_requested = true;
+                    self.message = Some("Checking for updates…".into());
+                }
+            }
             (KeyCode::Char('r'), _) => {
                 // A manual refresh clears old messages; automatic ones keep the
                 // result of the action that triggered them.
@@ -623,8 +667,39 @@ impl AppState {
         self.load_more_if_needed()
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "routes mouse input across the app modes"
+    )]
     fn on_mouse(&mut self, mouse: MouseEvent) -> Vec<Command> {
         let (x, y) = (mouse.column, mouse.row);
+        if self.update_panel {
+            if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                let point = Position { x, y };
+                if self.update_link_hit.is_some_and(|r| r.contains(point)) {
+                    return vec![Command::OpenUrl(
+                        "https://github.com/allient/git-graph-tui/releases/latest".into(),
+                    )];
+                }
+                if self.update_dismiss_hit.is_some_and(|r| r.contains(point)) {
+                    self.update_dismissed = self.update_available.take();
+                }
+                self.update_panel = false;
+            }
+            return Vec::new();
+        }
+        if self.dialog.is_none()
+            && self.info.is_none()
+            && self.menu.is_none()
+            && self.picker.is_none()
+            && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            && self
+                .update_hit
+                .is_some_and(|r| r.contains(Position { x, y }))
+        {
+            self.update_panel = true;
+            return Vec::new();
+        }
         if self.dialog.is_some() {
             return match mouse.kind {
                 MouseEventKind::Down(MouseButton::Left) => self.on_dialog_click(x, y),
