@@ -377,15 +377,15 @@ fn an_up_to_date_local_branch_is_offered_without_a_pull() {
 }
 
 #[test]
-fn double_clicking_a_commit_row_checks_out_its_branch() {
+fn double_clicking_a_commit_row_opens_details_without_checkout() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
     h.state.double_click = Duration::from_secs(60);
     // The subject of develop's tip, not its badge.
     let (x, y) = find(&h, "Return a value");
     double_click(&mut h, x + 1, y);
-    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "develop");
-    assert!(h.state.details.is_none());
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "main");
+    assert!(h.state.details.is_some());
 }
 
 #[test]
@@ -412,8 +412,8 @@ fn double_clicking_a_commit_without_a_branch_checks_nothing_out() {
     double_click(&mut h, x + 1, y);
     assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"]), "main");
     assert!(
-        h.state.details.is_none(),
-        "the second click closes the details"
+        h.state.details.is_some(),
+        "the second click keeps the details open"
     );
 }
 

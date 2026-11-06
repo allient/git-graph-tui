@@ -717,15 +717,27 @@ impl AppState {
         }
     }
 
-    /// Double-clicking a branch, or a commit a branch points at, checks it
-    /// out, like VS Code; a single click toggles the commit's details.
+    /// Double-clicking a branch badge checks it out; a commit row opens details.
     fn on_graph_left_click(&mut self, target: &HitTarget) -> Vec<Command> {
-        if let Some(branch) = self.double_clicked_branch(target) {
+        let double = self.is_double_click(target);
+        if double && matches!(target, HitTarget::Commit(_)) {
+            self.details_before_click = None;
+            if self
+                .details
+                .as_ref()
+                .is_some_and(|d| self.selected_commit().is_some_and(|c| c.id == d.commit))
+            {
+                return Vec::new();
+            }
+            return self.toggle_details();
+        }
+        if double && matches!(target, HitTarget::Ref { .. }) {
+            let branch = target;
             // Undo the first click: a double-click only checks out.
             if let Some(PreviousDetails(previous)) = self.details_before_click.take() {
                 self.details = previous;
             }
-            return self.checkout_ref(&branch);
+            return self.checkout_ref(branch);
         }
         if *target == HitTarget::Uncommitted {
             self.details_before_click = None;
@@ -736,37 +748,14 @@ impl AppState {
         commands
     }
 
-    /// The branch badge to check out when this left click on `target`
-    /// completes a double-click: the badge itself, or the first branch on a
-    /// commit row (the current branch first, then local, then remote ones).
-    fn double_clicked_branch(&mut self, target: &HitTarget) -> Option<HitTarget> {
+    /// Detects two consecutive clicks on the same graph target.
+    fn is_double_click(&mut self, target: &HitTarget) -> bool {
         let now = Instant::now();
         let double = self.last_click.as_ref().is_some_and(|(at, last)| {
             last == target && now.duration_since(*at) < self.double_click
         });
         self.last_click = (!double).then(|| (now, target.clone()));
-        if !double {
-            return None;
-        }
-        match target {
-            HitTarget::Ref { .. } => Some(target.clone()),
-            HitTarget::Commit(index) => {
-                let commit = self.commits.get(*index)?;
-                badges_for(&commit.id, &self.refs)
-                    .into_iter()
-                    .find(|b| {
-                        matches!(
-                            b.kind,
-                            BadgeKind::Head | BadgeKind::Branch | BadgeKind::Remote
-                        )
-                    })
-                    .map(|b| HitTarget::Ref {
-                        commit: *index,
-                        full_name: b.full_name,
-                    })
-            }
-            HitTarget::Uncommitted => None,
-        }
+        double
     }
 
     /// Checks out the branch a badge shows (a remote one asks for the local name).

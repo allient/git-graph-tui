@@ -86,6 +86,7 @@ fn enter_opens_the_details_under_the_commit_and_esc_closes_them() {
 fn clicking_a_commit_toggles_its_details() {
     let repo = FixtureRepo::sample();
     let mut h = open(&repo);
+    h.state.double_click = Duration::ZERO;
     click_text(&mut h, "Update docs");
     assert_eq!(h.selected_subject(), Some("Update docs"));
     assert!(h.find_on_screen("Changed files (1)").is_some());
