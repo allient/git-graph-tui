@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ggt_git::show::{CommitDetails, FileChange, Numstat};
 use ggt_model::{Change, Oid};
@@ -191,7 +191,8 @@ pub struct CommitDetailsView {
     header: Header,
     files: Vec<FileChange>,
     rows: Vec<TreeRow>,
-    /// Index into `rows`, always a file row.
+    collapsed: BTreeSet<String>,
+    /// Index into `rows`.
     selected: Option<usize>,
     /// What starts an issue reference in the message (`#` in `#123`).
     issue_prefix: String,
@@ -225,6 +226,7 @@ impl CommitDetailsView {
             header,
             files,
             rows: Vec::new(),
+            collapsed: BTreeSet::new(),
             selected: None,
             issue_prefix: "#".into(),
             layout: FileLayout::Tree,
@@ -304,13 +306,16 @@ impl CommitDetailsView {
             Key::Down => self.step(true),
             Key::Up => self.step(false),
             Key::Home | Key::PageUp => {
-                let first = self.file_rows().next();
+                let first = (!self.rows.is_empty()).then_some(0);
                 self.select_row(first);
             }
             Key::End | Key::PageDown => {
-                let last = self.file_rows().next_back();
+                let last = self.rows.len().checked_sub(1);
                 self.select_row(last);
             }
+            Key::Enter if self.selected_dir().is_some() => self.toggle_dir(),
+            Key::Left if self.selected_dir().is_some() => self.set_dir_collapsed(true),
+            Key::Right if self.selected_dir().is_some() => self.set_dir_collapsed(false),
             Key::Enter => {
                 if let Some(file) = self.selected_file() {
                     return DetailsOutcome::OpenFile(file.clone());
@@ -374,6 +379,10 @@ impl CommitDetailsView {
         match hits.hit(x, y) {
             DetailsHit::File(row) => {
                 self.selected = Some(row);
+                if self.selected_dir().is_some() {
+                    self.toggle_dir();
+                    return DetailsOutcome::Stay;
+                }
                 self.selected_file()
                     .cloned()
                     .map_or(DetailsOutcome::Stay, DetailsOutcome::OpenFile)
@@ -718,8 +727,24 @@ impl CommitDetailsView {
             match row {
                 TreeRow::Dir { depth, name } => {
                     let folder = theme.icons.glyph(Glyph::Folder);
-                    let label = format!("{}{folder} {name}/", "  ".repeat(*depth));
-                    buf.set_string(area.x + 1, y, fit(&label, width), muted);
+                    let marker = if self
+                        .dir_path(row_index)
+                        .is_some_and(|p| self.collapsed.contains(&p))
+                    {
+                        "▸"
+                    } else {
+                        "▾"
+                    };
+                    let label = format!("{}{marker}{folder} {name}/", "  ".repeat(*depth));
+                    let style = if self.selected == Some(row_index) {
+                        muted.bg(theme.selected_bg)
+                    } else {
+                        muted
+                    };
+                    buf.set_string(area.x + 1, y, " ".repeat(width), style);
+                    buf.set_string(area.x + 1, y, fit(&label, width), style);
+                    hits.files
+                        .push((Rect::new(area.x, y, area.width, 1), row_index));
                 }
                 TreeRow::File { depth, index } => {
                     let Some(file) = self.files.get(*index) else {
@@ -802,12 +827,54 @@ impl CommitDetailsView {
             return;
         };
         let next = if down {
-            self.file_rows().find(|&i| i > current)
+            (current + 1 < self.rows.len()).then_some(current + 1)
         } else {
-            self.file_rows().rev().find(|&i| i < current)
+            current.checked_sub(1)
         };
         if next.is_some() {
             self.select_row(next);
+        }
+    }
+
+    fn dir_path(&self, row: usize) -> Option<String> {
+        let TreeRow::Dir { depth, .. } = self.rows.get(row)? else {
+            return None;
+        };
+        let mut parts = Vec::new();
+        for entry in &self.rows[..=row] {
+            if let TreeRow::Dir { depth, name } = entry {
+                parts.truncate(*depth);
+                parts.push(name.as_str());
+            }
+        }
+        parts.truncate(depth + 1);
+        Some(parts.join("/"))
+    }
+
+    fn selected_dir(&self) -> Option<String> {
+        self.dir_path(self.selected?)
+    }
+
+    fn toggle_dir(&mut self) {
+        if let Some(path) = self.selected_dir() {
+            let collapse = !self.collapsed.contains(&path);
+            self.set_dir_collapsed(collapse);
+        }
+    }
+
+    fn set_dir_collapsed(&mut self, collapse: bool) {
+        if let Some(path) = self.selected_dir() {
+            if collapse {
+                self.collapsed.insert(path.clone());
+            } else {
+                self.collapsed.remove(&path);
+            }
+            self.rebuild_rows();
+            if let Some(row) =
+                (0..self.rows.len()).find(|&i| self.dir_path(i).as_deref() == Some(&path))
+            {
+                self.select_row(Some(row));
+            }
         }
     }
 
@@ -832,6 +899,23 @@ impl CommitDetailsView {
                     .collect()
             }
         };
+        if self.layout == FileLayout::Tree {
+            let mut ancestors: Vec<String> = Vec::new();
+            self.rows.retain(|row| {
+                let depth = match row {
+                    TreeRow::Dir { depth, .. } | TreeRow::File { depth, .. } => *depth,
+                };
+                ancestors.truncate(depth);
+                let hidden = ancestors.iter().any(|path| self.collapsed.contains(path));
+                if let TreeRow::Dir { name, .. } = row {
+                    let path = ancestors
+                        .last()
+                        .map_or_else(|| name.clone(), |parent| format!("{parent}/{name}"));
+                    ancestors.push(path);
+                }
+                !hidden
+            });
+        }
         let row_of = |index: usize| {
             self.rows
                 .iter()

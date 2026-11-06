@@ -15,7 +15,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
 - [x] Toggle remote branches on/off
-- [x] Double-click a branch, or a commit a branch points at, to check it out (the details panel stays as it was)
+- [x] Double-click a branch badge to check it out (the details panel stays as it was); double-click a commit row to open its details
 - [x] Resize the panes and columns by dragging their dividers (remembered in the config file)
 - [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
@@ -92,3 +92,5 @@ Steps 1 to 3 and step 5 are done; step 4 is in progress (the herdr plugin and th
 3. **Parity:** compare commits, archive, remotes management, issue linking, PR creation.
 4. **Integrations and release:** herdr plugin (done), GitHub Releases and Homebrew tap (done, from v0.1.0).
 5. **Beyond:** interactive rebase, conflict handling, worktrees, reflog.
+
+- [x] Notify users of new stable releases with a background check and upgrade guidance.

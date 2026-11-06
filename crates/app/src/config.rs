@@ -23,6 +23,9 @@
 //! url = "https://jira.example.com/browse/PROJ-$1"   # $1 is the number
 //! prefix = "PROJ-"        # what starts a reference; default "#"
 //!
+//! [updates]
+//! check = true            # check GitHub for new stable releases (default true)
+//!
 //! [refresh]               # pick up changes made outside the app
 //! watch = true            # reload when git's files change (default true)
 //! status_interval = 3     # seconds between working-tree checks while the
@@ -50,6 +53,20 @@ pub struct Config {
     pub diff: Diff,
     pub issues: Issues,
     pub refresh: Refresh,
+    pub updates: Updates,
+}
+
+/// Automatic release checks; no network request is made when disabled.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Updates {
+    pub check: bool,
+}
+
+impl Default for Updates {
+    fn default() -> Self {
+        Self { check: true }
+    }
 }
 
 /// Picking up changes made outside the app (another terminal, an editor).
@@ -409,6 +426,7 @@ mod tests {
                 diff: Diff::default(),
                 issues: Issues::default(),
                 refresh: Refresh::default(),
+                updates: Updates::default(),
             }
         );
     }

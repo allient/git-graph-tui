@@ -36,6 +36,8 @@ ggt-graph.workspace = true
 ggt-model.workspace = true
 ggt-ui.workspace = true
 toml.workspace = true
+ureq.workspace = true
+semver.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

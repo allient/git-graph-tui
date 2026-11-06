@@ -239,6 +239,10 @@ impl Request {
 
 /// Everything the UI shows and every in-flight git request.
 #[derive(Debug)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent UI modes and update requests are state flags"
+)]
 pub struct AppState {
     pub repo: PathBuf,
     pub commits: Vec<Commit>,
@@ -265,6 +269,13 @@ pub struct AppState {
     pub history_complete: bool,
     /// Status-bar message (the last git error).
     pub message: Option<String>,
+    pub update_available: Option<String>,
+    pub update_panel: bool,
+    pub update_requested: bool,
+    pub update_dismissed: Option<String>,
+    pub update_hit: Option<Rect>,
+    pub update_link_hit: Option<Rect>,
+    pub update_dismiss_hit: Option<Rect>,
     pub should_quit: bool,
     /// The open context menu, if any.
     pub menu: Option<PopupMenu>,
@@ -365,6 +376,13 @@ impl AppState {
             page_size: DEFAULT_PAGE_SIZE,
             history_complete: false,
             message: None,
+            update_available: None,
+            update_panel: false,
+            update_requested: false,
+            update_dismissed: None,
+            update_hit: None,
+            update_link_hit: None,
+            update_dismiss_hit: None,
             should_quit: false,
             menu: None,
             graph_hits: HitMap::default(),
@@ -538,9 +556,27 @@ impl AppState {
         base.max(self.status_poll.cost * 10)
     }
 
+    #[expect(clippy::too_many_lines, reason = "routes input across the app modes")]
     fn on_key(&mut self, key: KeyEvent) -> Vec<Command> {
         if key.kind != KeyEventKind::Press {
             return Vec::new();
+        }
+        if self.update_panel {
+            return match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
+                    self.update_panel = false;
+                    Vec::new()
+                }
+                KeyCode::Char('o') => vec![Command::OpenUrl(
+                    "https://github.com/allient/git-graph-tui/releases/latest".into(),
+                )],
+                KeyCode::Char('d') => {
+                    self.update_panel = false;
+                    self.update_dismissed = self.update_available.take();
+                    Vec::new()
+                }
+                _ => Vec::new(),
+            };
         }
         if self.dialog.is_some() {
             return self.on_dialog_key(key);
@@ -592,6 +628,14 @@ impl AppState {
                 self.should_quit = true;
                 return Vec::new();
             }
+            (KeyCode::Char('U'), _) => {
+                if self.update_available.is_some() {
+                    self.update_panel = true;
+                } else {
+                    self.update_requested = true;
+                    self.message = Some("Checking for updates…".into());
+                }
+            }
             (KeyCode::Char('r'), _) => {
                 // A manual refresh clears old messages; automatic ones keep the
                 // result of the action that triggered them.
@@ -623,8 +667,39 @@ impl AppState {
         self.load_more_if_needed()
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "routes mouse input across the app modes"
+    )]
     fn on_mouse(&mut self, mouse: MouseEvent) -> Vec<Command> {
         let (x, y) = (mouse.column, mouse.row);
+        if self.update_panel {
+            if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                let point = Position { x, y };
+                if self.update_link_hit.is_some_and(|r| r.contains(point)) {
+                    return vec![Command::OpenUrl(
+                        "https://github.com/allient/git-graph-tui/releases/latest".into(),
+                    )];
+                }
+                if self.update_dismiss_hit.is_some_and(|r| r.contains(point)) {
+                    self.update_dismissed = self.update_available.take();
+                }
+                self.update_panel = false;
+            }
+            return Vec::new();
+        }
+        if self.dialog.is_none()
+            && self.info.is_none()
+            && self.menu.is_none()
+            && self.picker.is_none()
+            && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            && self
+                .update_hit
+                .is_some_and(|r| r.contains(Position { x, y }))
+        {
+            self.update_panel = true;
+            return Vec::new();
+        }
         if self.dialog.is_some() {
             return match mouse.kind {
                 MouseEventKind::Down(MouseButton::Left) => self.on_dialog_click(x, y),
@@ -717,15 +792,27 @@ impl AppState {
         }
     }
 
-    /// Double-clicking a branch, or a commit a branch points at, checks it
-    /// out, like VS Code; a single click toggles the commit's details.
+    /// Double-clicking a branch badge checks it out; a commit row opens details.
     fn on_graph_left_click(&mut self, target: &HitTarget) -> Vec<Command> {
-        if let Some(branch) = self.double_clicked_branch(target) {
+        let double = self.is_double_click(target);
+        if double && matches!(target, HitTarget::Commit(_)) {
+            self.details_before_click = None;
+            if self
+                .details
+                .as_ref()
+                .is_some_and(|d| self.selected_commit().is_some_and(|c| c.id == d.commit))
+            {
+                return Vec::new();
+            }
+            return self.toggle_details();
+        }
+        if double && matches!(target, HitTarget::Ref { .. }) {
+            let branch = target;
             // Undo the first click: a double-click only checks out.
             if let Some(PreviousDetails(previous)) = self.details_before_click.take() {
                 self.details = previous;
             }
-            return self.checkout_ref(&branch);
+            return self.checkout_ref(branch);
         }
         if *target == HitTarget::Uncommitted {
             self.details_before_click = None;
@@ -736,37 +823,14 @@ impl AppState {
         commands
     }
 
-    /// The branch badge to check out when this left click on `target`
-    /// completes a double-click: the badge itself, or the first branch on a
-    /// commit row (the current branch first, then local, then remote ones).
-    fn double_clicked_branch(&mut self, target: &HitTarget) -> Option<HitTarget> {
+    /// Detects two consecutive clicks on the same graph target.
+    fn is_double_click(&mut self, target: &HitTarget) -> bool {
         let now = Instant::now();
         let double = self.last_click.as_ref().is_some_and(|(at, last)| {
             last == target && now.duration_since(*at) < self.double_click
         });
         self.last_click = (!double).then(|| (now, target.clone()));
-        if !double {
-            return None;
-        }
-        match target {
-            HitTarget::Ref { .. } => Some(target.clone()),
-            HitTarget::Commit(index) => {
-                let commit = self.commits.get(*index)?;
-                badges_for(&commit.id, &self.refs)
-                    .into_iter()
-                    .find(|b| {
-                        matches!(
-                            b.kind,
-                            BadgeKind::Head | BadgeKind::Branch | BadgeKind::Remote
-                        )
-                    })
-                    .map(|b| HitTarget::Ref {
-                        commit: *index,
-                        full_name: b.full_name,
-                    })
-            }
-            HitTarget::Uncommitted => None,
-        }
+        double
     }
 
     /// Checks out the branch a badge shows (a remote one asks for the local name).

@@ -11,6 +11,7 @@ mod panels;
 mod state;
 #[cfg(test)]
 mod testing;
+mod update_check;
 mod view;
 mod watch;
 
@@ -45,13 +46,23 @@ fn main() -> Result<()> {
     let editor = external::editor(&env);
     let issues = config.issues;
     let refresh = config.refresh;
+    let updates = config.updates;
+    let update_cache = config_path
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("update-cache.toml"));
     // Resolve the repository before touching the terminal, so errors print normally.
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
     let (before, after) = ratatui::run(|terminal| {
         let programs = Programs { pager, editor };
-        let settings = Settings { issues, refresh };
+        let settings = Settings {
+            issues,
+            refresh,
+            updates,
+            update_cache,
+        };
         run(terminal, repo, icons, config.layout, programs, settings)
     })?;
     // Remember resized panes and columns for next time.
@@ -85,10 +96,16 @@ struct Programs {
 struct Settings {
     issues: config::Issues,
     refresh: config::Refresh,
+    updates: config::Updates,
+    update_cache: Option<PathBuf>,
 }
 
 /// Runs the app until it quits. Returns the pane and column widths it started
 /// with and those it ended with.
+#[expect(
+    clippy::too_many_lines,
+    reason = "owns the event loop and background services"
+)]
 fn run(
     terminal: &mut DefaultTerminal,
     repo: PathBuf,
@@ -130,6 +147,13 @@ fn run(
     state.issues = settings.issues;
     let before = state.apply_layout(layout);
     dispatch(&mut state, &runner, Event::Refresh);
+    let (update_tx, update_rx) = crossbeam_channel::unbounded();
+    let mut update_cache = update_check::Cache::default();
+    let mut checking = false;
+    if settings.updates.check && std::env::var_os("GIT_GRAPH_TUI_NO_UPDATE_CHECK").is_none() {
+        start_update_check(&update_tx, settings.update_cache.clone(), false);
+        checking = true;
+    }
 
     loop {
         terminal.draw(|frame| {
@@ -153,6 +177,37 @@ fn run(
                 }
                 TermEvent::FocusLost => focused = false,
                 _ => {}
+            }
+        }
+        if state.update_requested && !checking {
+            state.update_requested = false;
+            start_update_check(&update_tx, settings.update_cache.clone(), true);
+            checking = true;
+        }
+        if let Ok(cache) = update_rx.try_recv() {
+            checking = false;
+            state.update_available = cache
+                .available(env!("CARGO_PKG_VERSION"))
+                .map(str::to_owned);
+            if state.message.as_deref() == Some("Checking for updates…") {
+                state.message = Some(
+                    if state.update_available.is_some() {
+                        "Update available."
+                    } else {
+                        "No update found; check your connection if offline."
+                    }
+                    .into(),
+                );
+            }
+            update_cache = cache;
+        }
+        if let Some(version) = state.update_dismissed.take() {
+            update_cache.dismissed = Some(version);
+            if let Some(path) = settings.update_cache.clone() {
+                let cache = update_cache.clone();
+                std::thread::spawn(move || {
+                    let _ = cache.save(&path);
+                });
             }
         }
         let now = Instant::now();
@@ -179,6 +234,18 @@ fn run(
             dispatch(&mut state, &runner, Event::Git(result));
         }
     }
+}
+
+/// Update checks run outside the event loop and do not keep the app alive.
+fn start_update_check(
+    tx: &crossbeam_channel::Sender<update_check::Cache>,
+    path: Option<PathBuf>,
+    force: bool,
+) {
+    let tx = tx.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(update_check::check(path.as_deref(), force));
+    });
 }
 
 /// Steps the TUI aside, runs `program` in the plain terminal and comes back

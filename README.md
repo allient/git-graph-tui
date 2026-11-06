@@ -28,7 +28,8 @@ Terminal git tools make you choose. Some draw a beautiful graph but are read-onl
 - **Commit details.** Changed files as a tree with `+/-` counts, a built-in diff viewer, or your own pager (`delta`) or difftool.
 - **Power tools.** Interactive rebase, conflict banner with continue and abort, reflog recovery, worktrees, compare commits.
 - **Safe.** Every destructive action asks first and says exactly what will happen.
-- **Fast and simple.** Loads history in pages and never blocks the UI. Its only dependency is `git`.
+- **Fast and simple.** Loads history in pages and never blocks the UI. Its only external runtime dependency is `git`.
+- **Update notices.** A quiet background check lets you know when a new stable release is available.
 
 | Context menus | Commit details |
 | --- | --- |

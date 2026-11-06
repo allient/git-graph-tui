@@ -95,3 +95,31 @@ fn enter_closes_and_other_keys_are_ignored() {
     h.key(KeyCode::Enter);
     assert!(h.state.info.is_none());
 }
+
+#[test]
+fn update_notice_opens_and_dismisses_by_mouse() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.update_available = Some("v9.0.0".into());
+    h.draw(W, H);
+    let notice = h.state.update_hit.expect("notice hit");
+    click(&mut h, MouseButton::Left, notice.x, notice.y);
+    assert!(h.state.update_panel);
+    assert!(h.find_on_screen("Homebrew: brew upgrade").is_some());
+    let dismiss = h.state.update_dismiss_hit.expect("dismiss hit");
+    click(&mut h, MouseButton::Left, dismiss.x, dismiss.y);
+    assert!(!h.state.update_panel);
+    assert_eq!(h.state.update_dismissed.as_deref(), Some("v9.0.0"));
+    assert!(h.state.update_available.is_none());
+}
+
+#[test]
+fn update_notice_is_keyboard_accessible() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    h.state.update_available = Some("v9.0.0".into());
+    h.key(KeyCode::Char('U'));
+    assert!(h.state.update_panel);
+    h.key(KeyCode::Char('d'));
+    assert_eq!(h.state.update_dismissed.as_deref(), Some("v9.0.0"));
+}
