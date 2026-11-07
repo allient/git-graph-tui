@@ -15,7 +15,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Incremental loading while scrolling
 - [x] Branch filter: show all, one or several branches, or custom glob patterns
 - [x] Toggle remote branches on/off
-- [x] Double-click a branch badge to check it out (the details panel stays as it was); double-click a commit row to open its details
+- [x] Double-click a branch, or a commit a branch points at, to check it out (the details panel stays as it was)
 - [x] Resize the panes and columns by dragging their dividers (remembered in the config file)
 - [x] Find: search by message, author, date, hash, branch or tag name
 - [x] Jump to HEAD, refresh, and fetch from the toolbar
