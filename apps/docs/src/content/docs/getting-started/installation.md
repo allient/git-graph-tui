@@ -46,3 +46,7 @@ ggt --version
 ```
 
 The command is `ggt`. Before 0.3.0 it was called `git-graph-tui`.
+
+## Recommended: a Nerd Font
+
+For the best look, install a [Nerd Font](https://www.nerdfonts.com/) and select it in your terminal; without one, git-graph-tui draws plain Unicode symbols. See [Icons](/reference/configuration/#icons).
