@@ -5,6 +5,7 @@ mod cli;
 mod clipboard;
 mod config;
 mod external;
+mod fonts;
 mod git;
 mod herdr;
 mod panels;
@@ -41,7 +42,7 @@ fn main() -> Result<()> {
         Some(path) => config::load(path)?,
         None => config::Config::default(),
     };
-    let icons = cli.icons(&env, config.icons)?;
+    let icons = cli.icons(&env, config.icons, &|| fonts::nerd_font_installed(&env))?;
     let pager = external::pager(&env, config.diff.pager);
     let editor = external::editor(&env);
     let issues = config.issues;

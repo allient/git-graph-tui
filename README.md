@@ -56,6 +56,20 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/allient/git-graph-
 
 The command is `ggt`. It needs `git` on your `PATH`. To build it yourself, see [Build from source](#build-from-source).
 
+## Recommended: install a Nerd Font
+
+For the best look, install a [Nerd Font](https://www.nerdfonts.com/) and select it in your terminal. Without one, `ggt` draws plain Unicode symbols and everything still works.
+
+macOS Terminal.app, iTerm2, VS Code's terminal and most Linux terminals don't ship Nerd Font symbols, so you install the font and pick it by hand:
+
+```sh
+brew install --cask font-jetbrains-mono-nerd-font   # macOS
+```
+
+Then select it: Terminal.app → Settings → Profiles → Text → Font → "JetBrainsMono Nerd Font Mono". On Linux, download a font from [nerdfonts.com](https://www.nerdfonts.com/font-downloads), unzip it into `~/.local/share/fonts` and run `fc-cache -f`.
+
+`--icons auto` (the default) uses the icons in Ghostty, WezTerm and Kitty, which bundle the symbols, and when it finds a Nerd Font installed. Otherwise it falls back to plain Unicode. If a Nerd Font is installed but your terminal isn't using it, the icons show as empty boxes: run `ggt --icons unicode`, or select the font. To choose by hand: `ggt --icons nerd`, `export GIT_GRAPH_TUI_ICONS=nerd`, or `icons = "nerd"` in the [config file](https://git-graph-tui.allient.io/reference/configuration/).
+
 ## Usage
 
 Run it inside a git repository, or give it a path:

@@ -57,12 +57,12 @@ ggt [PATH] [--icons auto|nerd|unicode]
 
 ## Icons
 
-With `auto` (the default), git-graph-tui uses VS Code's icons (Codicons) in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Elsewhere it draws plain Unicode symbols (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu).
+With `auto` (the default), git-graph-tui uses VS Code's icons (Codicons) in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols (also inside tmux or herdr), and whenever it finds a Nerd Font installed. With none, it draws plain Unicode symbols (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu).
 
-To get the icons in another terminal:
+macOS Terminal.app, iTerm2 and most Linux terminals don't ship the symbols. For the best look:
 
-1. Install a [Nerd Font](https://www.nerdfonts.com/), for example `brew install --cask font-jetbrains-mono-nerd-font`.
-2. Select it in your terminal's settings.
-3. Run with `--icons nerd`, or `export GIT_GRAPH_TUI_ICONS=nerd`.
+1. Install a [Nerd Font](https://www.nerdfonts.com/), for example `brew install --cask font-jetbrains-mono-nerd-font`. On Linux, unzip it into `~/.local/share/fonts` and run `fc-cache -f`.
+2. Select it in your terminal's settings (Terminal.app: Settings → Profiles → Text → Font → "JetBrainsMono Nerd Font Mono").
+3. Optional: force it with `--icons nerd`, `export GIT_GRAPH_TUI_ICONS=nerd` or `icons = "nerd"` in the config file.
 
-If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.
+Detection looks for installed font files, not for the font your terminal uses. If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.

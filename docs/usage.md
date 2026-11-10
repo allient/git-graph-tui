@@ -41,7 +41,7 @@ Push, pull and fetch never prompt for a password: use SSH keys or a git credenti
 
 ## Icons
 
-The toolbar, the Source Control pane and the details panel's file tree show VS Code's own icons (Codicons, such as `cod-folder` and `cod-file` before folders and files, `cod-diff_multiple` for "Open Changes" and `cod-go_to_file` for "Open File", `cod-close`, `cod-search`, `cod-list_tree` and `cod-list_flat` for the details' buttons) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu, `▾` folder, `·` file, `⧉` Open Changes, `↗` Open File, `✕` close, `⌕` find, `├` tree, `≡` list). Every icon button has a blank cell after it, so a Codicon drawn wider than its cell doesn't run into the next one. The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Other terminals need a [Nerd Font](https://www.nerdfonts.com/) installed and selected, and the icons turned on by hand:
+The toolbar, the Source Control pane and the details panel's file tree show VS Code's own icons (Codicons, such as `cod-folder` and `cod-file` before folders and files, `cod-diff_multiple` for "Open Changes" and `cod-go_to_file` for "Open File", `cod-close`, `cod-search`, `cod-list_tree` and `cod-list_flat` for the details' buttons) when the terminal can draw them, and plain Unicode symbols otherwise (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu, `▾` folder, `·` file, `⧉` Open Changes, `↗` Open File, `✕` close, `⌕` find, `├` tree, `≡` list). Every icon button has a blank cell after it, so a Codicon drawn wider than its cell doesn't run into the next one. The default, `auto`, turns the icons on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols (also inside tmux or herdr), and whenever it finds a Nerd Font installed (in `~/Library/Fonts`, `/Library/Fonts`, `~/.local/share/fonts`, `~/.fonts` or `/usr/share/fonts`); with none it uses the plain symbols. Installed is not the same as selected, so if the terminal isn't set to that font the icons show as boxes: select it, or use `--icons unicode`. Terminals such as macOS Terminal.app and iTerm2 don't ship the symbols, so they need a [Nerd Font](https://www.nerdfonts.com/) installed and selected:
 
 1. Install a Nerd Font, for example JetBrains Mono:
 
@@ -50,8 +50,8 @@ The toolbar, the Source Control pane and the details panel's file tree show VS C
    ```
 
    On Linux, download it from [nerdfonts.com/font-downloads](https://www.nerdfonts.com/font-downloads) and unzip it into `~/.local/share/fonts`, then run `fc-cache -f`.
-2. Select the font in your terminal's settings (for example "JetBrainsMono Nerd Font"). WezTerm, Kitty and Ghostty already include the Nerd Font symbols, so you can skip steps 1 and 2 there.
-3. Turn the icons on (not needed in Ghostty, WezTerm or Kitty), for one run or for every run:
+2. Select the font in your terminal's settings (for example "JetBrainsMono Nerd Font Mono"; in Terminal.app: Settings → Profiles → Text → Font). WezTerm, Kitty and Ghostty already include the Nerd Font symbols, so you can skip steps 1 and 2 there.
+3. Optional: force the icons on instead of relying on detection, for one run or for every run:
 
    ```sh
    ggt --icons nerd                                # one run
