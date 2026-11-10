@@ -57,12 +57,20 @@ ggt [PATH] [--icons auto|nerd|unicode]
 
 ## Icons
 
-With `auto` (the default), git-graph-tui uses VS Code's icons (Codicons) in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Elsewhere it draws plain Unicode symbols (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu).
+A [Nerd Font](https://www.nerdfonts.com/) gives the best experience: git-graph-tui draws VS Code's icons (Codicons) in the toolbar, the Source Control pane, the file tree and the ref badges, which get rounded ends. Without one, it draws plain Unicode symbols (`[↻]` Refresh, `[⇣]` Fetch, `[...]` menu) and square badges.
 
-To get the icons in another terminal:
+With `auto` (the default), the icons turn on in Ghostty, WezTerm and Kitty, which ship the Nerd Font symbols, also inside tmux or herdr. Any other terminal can't report its font, so the icons stay off until you turn them on:
 
-1. Install a [Nerd Font](https://www.nerdfonts.com/), for example `brew install --cask font-jetbrains-mono-nerd-font`.
-2. Select it in your terminal's settings.
-3. Run with `--icons nerd`, or `export GIT_GRAPH_TUI_ICONS=nerd`.
+1. Install a Nerd Font, for example JetBrains Mono:
+   - macOS: `brew install --cask font-jetbrains-mono-nerd-font`
+   - Linux: download it from [nerdfonts.com/font-downloads](https://www.nerdfonts.com/font-downloads), unzip it into `~/.local/share/fonts` and run `fc-cache -f`.
+   - Windows: download it from the same page, then right-click the `.ttf` files and choose **Install**.
+2. Select it as your terminal's font, for example "JetBrainsMono Nerd Font":
+   - iTerm2: Settings → Profiles → Text → Font.
+   - Terminal.app: Settings → Profiles → Text → Font → Change.
+   - VS Code: `"terminal.integrated.fontFamily": "JetBrainsMono Nerd Font"`.
+   - Windows Terminal: Settings → your profile → Appearance → Font face.
+   - Alacritty: `[font.normal] family = "JetBrainsMono Nerd Font"` in `alacritty.toml`.
+3. Turn the icons on: `ggt --icons nerd` for one run, `export GIT_GRAPH_TUI_ICONS=nerd` in `~/.zshrc` or `~/.bashrc`, or `icons = "nerd"` in the config file.
 
-If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.
+If the icons show as empty boxes or question marks, the terminal isn't using a Nerd Font: select it again, or use `--icons unicode`.

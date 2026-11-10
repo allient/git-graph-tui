@@ -39,6 +39,12 @@ cd git-graph-tui
 cargo install --path crates/app
 ```
 
+## Recommended: a Nerd Font
+
+For the best experience, use a terminal font with the [Nerd Font](https://www.nerdfonts.com/) symbols. git-graph-tui then draws VS Code's own icons (Codicons) in the toolbar, the Source Control pane, the file tree and the ref badges. Without one, it falls back to plain Unicode symbols.
+
+In Ghostty, WezTerm and Kitty the icons turn on by themselves. In any other terminal, install a Nerd Font, select it in the terminal's settings and run `ggt --icons nerd` (or set `icons = "nerd"` in the config file). [Icons](/reference/configuration/#icons) has the step-by-step setup for each terminal.
+
 ## Check it works
 
 ```sh

@@ -58,6 +58,8 @@ The toolbar, the Source Control pane and the details panel's file tree show VS C
    export GIT_GRAPH_TUI_ICONS=nerd                 # every run (add it to ~/.zshrc or ~/.bashrc)
    ```
 
+   Or set `icons = "nerd"` in the [config file](#config-file).
+
    `--icons unicode` always uses the plain symbols, `--icons auto` goes back to detecting the terminal, and the flag wins over the variable. If the icons show as empty boxes, the terminal isn't using a Nerd Font: use `--icons unicode`.
 
 ## Config file

@@ -56,6 +56,42 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/allient/git-graph-
 
 The command is `ggt`. It needs `git` on your `PATH`. To build it yourself, see [Build from source](#build-from-source).
 
+### Recommended: a Nerd Font
+
+For the best experience, use a terminal font with the [Nerd Font](https://www.nerdfonts.com/) symbols. git-graph-tui then draws VS Code's own icons (Codicons) in the toolbar, the Source Control pane, the file tree and the branch, tag and stash badges, which get rounded ends. Without one, it falls back to plain Unicode symbols (`[↻]`, `[⇣]`, `[...]`) and square badges.
+
+**Ghostty, WezTerm and Kitty** already ship the Nerd Font symbols: the icons turn on by themselves, also inside tmux and herdr. Nothing to do.
+
+**Any other terminal** (iTerm2, Terminal.app, Alacritty, VS Code, Windows Terminal, GNOME Terminal…):
+
+1. Install a Nerd Font, for example JetBrains Mono:
+
+   ```sh
+   brew install --cask font-jetbrains-mono-nerd-font   # macOS
+   ```
+
+   On Linux, download it from [nerdfonts.com/font-downloads](https://www.nerdfonts.com/font-downloads), unzip it into `~/.local/share/fonts` and run `fc-cache -f`. On Windows, download it from the same page, then right-click the `.ttf` files and choose **Install**.
+2. Select it as your terminal's font, for example "JetBrainsMono Nerd Font":
+   - iTerm2: Settings → Profiles → Text → Font.
+   - Terminal.app: Settings → Profiles → Text → Font → Change.
+   - VS Code: set `"terminal.integrated.fontFamily": "JetBrainsMono Nerd Font"`.
+   - Windows Terminal: Settings → your profile → Appearance → Font face.
+   - Alacritty: `[font.normal] family = "JetBrainsMono Nerd Font"` in `alacritty.toml`.
+3. Turn the icons on, since git-graph-tui can't tell which font a terminal uses. Pick one:
+
+   ```sh
+   ggt --icons nerd                  # one run
+   export GIT_GRAPH_TUI_ICONS=nerd   # every run (add it to ~/.zshrc or ~/.bashrc)
+   ```
+
+   Or set it once in `~/.config/git-graph-tui/config.toml`:
+
+   ```toml
+   icons = "nerd"
+   ```
+
+If the icons show as empty boxes or question marks, the terminal isn't using a Nerd Font: select it again, or go back to plain symbols with `--icons unicode`. See [Icons](https://git-graph-tui.allient.io/reference/configuration/#icons) for details.
+
 ## Usage
 
 Run it inside a git repository, or give it a path:
