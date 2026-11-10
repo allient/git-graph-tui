@@ -19,7 +19,7 @@ pub struct Cli {
 
     /// Toolbar icons: VS Code's icons from a Nerd Font, or plain Unicode.
     /// `auto` uses the icons in terminals that ship Nerd Font symbols
-    /// (Ghostty, WezTerm, Kitty). Defaults to `$GIT_GRAPH_TUI_ICONS`, then auto.
+    /// (Ghostty, WezTerm, Kitty) or when a Nerd Font is installed. Defaults to `$GIT_GRAPH_TUI_ICONS`, then auto.
     #[arg(long, value_enum, value_name = "STYLE")]
     pub icons: Option<IconStyle>,
 }
@@ -35,11 +35,13 @@ pub enum IconStyle {
 impl Cli {
     /// The icons to draw: the flag, else [`ICONS_ENV`], else the config
     /// file's `icons`, else `auto`, which picks Nerd Font icons when the
-    /// terminal is known to have them. `env` looks up an environment variable.
+    /// terminal is known to have them or a Nerd Font is installed. `env` looks
+    /// up an environment variable; `font_installed` is only asked in `auto`.
     pub fn icons(
         &self,
         env: &dyn Fn(&str) -> Option<String>,
         config: Option<IconStyle>,
+        font_installed: &dyn Fn() -> bool,
     ) -> Result<Icons> {
         let style = match (self.icons, env(ICONS_ENV)) {
             (Some(style), _) => style,
@@ -53,7 +55,7 @@ impl Cli {
         };
         Ok(match style {
             IconStyle::Nerd => Icons::Nerd,
-            IconStyle::Auto if ships_nerd_font_symbols(env) => Icons::Nerd,
+            IconStyle::Auto if ships_nerd_font_symbols(env) || font_installed() => Icons::Nerd,
             IconStyle::Auto | IconStyle::Unicode => Icons::Unicode,
         })
     }
@@ -106,7 +108,7 @@ mod tests {
 
     fn icons(args: &[&str], vars: &[(&str, &str)]) -> Result<Icons> {
         let cli = Cli::try_parse_from(std::iter::once("ggt").chain(args.iter().copied())).unwrap();
-        cli.icons(&env(vars), None)
+        cli.icons(&env(vars), None, &|| false)
     }
 
     #[test]
@@ -215,20 +217,42 @@ mod tests {
     fn the_config_file_picks_icons_after_the_flag_and_the_variable() {
         let cli = Cli::try_parse_from(["ggt"]).unwrap();
         assert_eq!(
-            cli.icons(&env(&[]), Some(IconStyle::Nerd)).unwrap(),
+            cli.icons(&env(&[]), Some(IconStyle::Nerd), &|| false)
+                .unwrap(),
             Icons::Nerd
         );
         assert_eq!(
             cli.icons(
                 &env(&[("GIT_GRAPH_TUI_ICONS", "unicode")]),
-                Some(IconStyle::Nerd)
+                Some(IconStyle::Nerd),
+                &|| false
             )
             .unwrap(),
             Icons::Unicode
         );
         let flag = Cli::try_parse_from(["ggt", "--icons", "unicode"]).unwrap();
         assert_eq!(
-            flag.icons(&env(&[]), Some(IconStyle::Nerd)).unwrap(),
+            flag.icons(&env(&[]), Some(IconStyle::Nerd), &|| false)
+                .unwrap(),
+            Icons::Unicode
+        );
+    }
+
+    #[test]
+    fn auto_uses_icons_when_a_nerd_font_is_installed() {
+        let cli = Cli::try_parse_from(["ggt"]).unwrap();
+        let terminal = env(&[("TERM_PROGRAM", "Apple_Terminal")]);
+        assert_eq!(cli.icons(&terminal, None, &|| true).unwrap(), Icons::Nerd);
+        assert_eq!(
+            cli.icons(&terminal, None, &|| false).unwrap(),
+            Icons::Unicode
+        );
+        // An explicit choice never scans for fonts.
+        let unicode = Cli::try_parse_from(["ggt", "--icons", "unicode"]).unwrap();
+        assert_eq!(
+            unicode
+                .icons(&terminal, None, &|| panic!("scanned"))
+                .unwrap(),
             Icons::Unicode
         );
     }
