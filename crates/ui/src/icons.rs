@@ -90,6 +90,8 @@ pub enum Glyph {
     TreeView,
     /// Shows the details panel's files as a flat list of paths.
     ListView,
+    /// Opens the Commit button's menu.
+    ChevronDown,
 }
 
 impl Icons {
@@ -111,6 +113,7 @@ impl Icons {
             (Self::Unicode, Glyph::Find) => '⌕',
             (Self::Unicode, Glyph::TreeView) => '├',
             (Self::Unicode, Glyph::ListView) => '≡',
+            (Self::Unicode, Glyph::ChevronDown) => '⌄',
             (Self::Nerd, Glyph::Check) => '\u{eab2}',
             (Self::Nerd, Glyph::Refresh) => '\u{eb37}',
             (Self::Nerd, Glyph::More) => '\u{ea7c}',
@@ -129,6 +132,8 @@ impl Icons {
             (Self::Nerd, Glyph::Find) => '\u{ea6d}',
             (Self::Nerd, Glyph::TreeView) => '\u{eb86}',
             (Self::Nerd, Glyph::ListView) => '\u{eb84}',
+            // cod-chevron_down, the Commit button's menu in VS Code.
+            (Self::Nerd, Glyph::ChevronDown) => '\u{eab4}',
         }
     }
 }
@@ -156,5 +161,13 @@ mod tests {
         assert_eq!(Icons::Nerd.glyph(Glyph::Find), '\u{ea6d}');
         assert_eq!(Icons::Nerd.glyph(Glyph::TreeView), '\u{eb86}');
         assert_eq!(Icons::Nerd.glyph(Glyph::ListView), '\u{eb84}');
+    }
+
+    #[test]
+    fn the_commit_menu_chevron_has_both_styles() {
+        use unicode_width::UnicodeWidthChar;
+        assert_eq!(Icons::Unicode.glyph(Glyph::ChevronDown), '⌄');
+        assert_eq!(Icons::Unicode.glyph(Glyph::ChevronDown).width(), Some(1));
+        assert_eq!(Icons::Nerd.glyph(Glyph::ChevronDown), '\u{eab4}');
     }
 }

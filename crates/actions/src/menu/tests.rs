@@ -3,9 +3,9 @@ use pretty_assertions::assert_eq;
 
 use super::*;
 use crate::{
-    Action, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget, GraphColumn,
-    Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction, TagAction,
-    UiEffect, WorkingTreeAction, WorktreeAction,
+    Action, AfterCommit, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget,
+    GraphColumn, Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction,
+    TagAction, UiEffect, WorkingTreeAction, WorktreeAction,
 };
 use ggt_git::worktree::Worktree;
 
@@ -821,6 +821,7 @@ fn commit_and_changes_submenus_match_vs_code() {
             scope,
             amend,
             signoff,
+            then: None,
         })
     };
     assert_eq!(
@@ -1452,4 +1453,81 @@ fn the_main_and_the_current_worktree_cannot_be_removed() {
     assert!(labels(&worktree_menu(&linked_worktree(), true)).contains(
         &"Remove Worktree... (disabled: git-graph-tui is running in this worktree.)".to_owned()
     ));
+}
+
+fn button_commit(amend: bool, then: Option<AfterCommit>) -> Action {
+    Action::Ui(UiEffect::Commit {
+        scope: CommitScope::Staged,
+        amend,
+        signoff: false,
+        then,
+    })
+}
+
+#[test]
+fn commit_button_menu_matches_vs_code() {
+    let menu = commit_button_menu(&ctx());
+    assert_eq!(
+        labels(&menu),
+        [
+            "Commit",
+            "Commit (Amend)",
+            "---",
+            "Commit & Push",
+            "Commit & Sync"
+        ]
+    );
+    // Commit is what the button itself does: commit what is staged.
+    assert_eq!(action(&menu, "Commit"), &button_commit(false, None));
+    assert_eq!(action(&menu, "Commit (Amend)"), &button_commit(true, None));
+    assert_eq!(
+        action(&menu, "Commit & Push"),
+        &button_commit(false, Some(AfterCommit::Push))
+    );
+    assert_eq!(
+        action(&menu, "Commit & Sync"),
+        &button_commit(false, Some(AfterCommit::Sync))
+    );
+}
+
+#[test]
+fn after_commit_runs_the_menus_push_and_sync() {
+    assert_eq!(AfterCommit::Push.action(), RepoAction::Push);
+    assert_eq!(AfterCommit::Sync.action(), RepoAction::Sync);
+    assert_eq!(AfterCommit::Push.label(), "Push");
+    assert_eq!(AfterCommit::Sync.label(), "Sync");
+}
+
+#[test]
+fn commit_button_menu_explains_what_cannot_run() {
+    let no_remote = MenuContext {
+        remotes: Vec::new(),
+        ..ctx()
+    };
+    assert_eq!(
+        labels(&commit_button_menu(&no_remote)),
+        [
+            "Commit",
+            "Commit (Amend)",
+            "---",
+            "Commit & Push (disabled: There is no remote.)",
+            "Commit & Sync (disabled: There is no remote.)",
+        ]
+    );
+    let detached_without_commits = MenuContext {
+        head: HeadState::Detached,
+        head_commit: None,
+        ..ctx()
+    };
+    let detached = " (disabled: HEAD isn't on a branch.)";
+    assert_eq!(
+        labels(&commit_button_menu(&detached_without_commits)),
+        [
+            "Commit".to_owned(),
+            "Commit (Amend) (disabled: There is no commit yet.)".to_owned(),
+            "---".to_owned(),
+            format!("Commit & Push{detached}"),
+            format!("Commit & Sync{detached}"),
+        ]
+    );
 }

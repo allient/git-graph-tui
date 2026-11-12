@@ -1,6 +1,7 @@
 //! The Source Control pane beside the graph, against real fixture repositories.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ggt_actions::MenuItem;
 use ggt_testkit::FixtureRepo;
 use pretty_assertions::assert_eq;
 
@@ -276,4 +277,189 @@ fn after_a_menu_choice_from_the_pane_keys_go_back_to_the_graph() {
         "not typed into the message"
     );
     assert!(!h.state.source_control.focus);
+}
+
+/// Labels of the open popup menu, `---` for separators.
+fn menu_labels(h: &Harness) -> Vec<String> {
+    h.state
+        .menu
+        .as_ref()
+        .map(|m| {
+            m.items()
+                .iter()
+                .map(|item| match item {
+                    MenuItem::Entry(e) => e.label.clone(),
+                    _ => "---".to_owned(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn open_commit_menu(h: &mut Harness) {
+    let (x, y) = find(h, "│⌄");
+    click(h, x + 1, y);
+}
+
+/// Stages notes.txt and types `message`.
+fn stage_notes(h: &mut Harness, message: &str) {
+    let (x, y) = button_on(h, "notes.txt", "+");
+    click(h, x, y);
+    let (x, y) = find(h, " Message");
+    click(h, x + 2, y);
+    type_text(h, message);
+}
+
+/// Clicks the menu entry `label`: the first line below the Commit button's
+/// chevron that holds it (the button itself is also called "Commit").
+fn choose(h: &mut Harness, label: &str) {
+    let (_, button_y) = find(h, "│⌄");
+    let area = h.screen.area;
+    let (x, y) = (button_y + 1..area.bottom())
+        .find_map(|y| {
+            let line: String = (area.left()..area.right())
+                .map(|x| h.screen[(x, y)].symbol())
+                .collect();
+            let x = u16::try_from(line[..line.find(label)?].chars().count()).ok()?;
+            Some((x, y))
+        })
+        .unwrap_or_else(|| panic!("{label:?} not in the menu"));
+    click(h, x + 1, y);
+}
+
+fn origin_main(repo: &FixtureRepo) -> String {
+    repo.git(&["ls-remote", "origin", "refs/heads/main"])
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[test]
+fn the_commit_chevron_opens_the_commit_menu_and_esc_closes_it() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    open_commit_menu(&mut h);
+    assert_eq!(
+        menu_labels(&h),
+        [
+            "Commit",
+            "Commit (Amend)",
+            "---",
+            "Commit & Push",
+            "Commit & Sync"
+        ]
+    );
+    press(&mut h, KeyCode::Esc);
+    assert!(h.state.menu.is_none());
+}
+
+#[test]
+fn the_keyboard_opens_the_commit_menu_from_the_chevron() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    press(&mut h, KeyCode::Char('c'));
+    press(&mut h, KeyCode::Tab);
+    press(&mut h, KeyCode::Tab);
+    press(&mut h, KeyCode::Enter);
+    assert_eq!(menu_labels(&h).first().map(String::as_str), Some("Commit"));
+}
+
+#[test]
+fn commit_from_the_menu_is_the_buttons_commit() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    stage_notes(&mut h, "Add notes");
+    let pushed = origin_main(&repo);
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit");
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "Add notes");
+    assert_eq!(origin_main(&repo), pushed, "not pushed");
+}
+
+#[test]
+fn commit_amend_with_an_empty_message_keeps_the_last_one() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let head = repo.git(&["rev-parse", "HEAD"]);
+    let subject = repo.git(&["log", "-1", "--format=%s"]);
+    stage_notes(&mut h, "");
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit (Amend)");
+    assert_ne!(repo.git(&["rev-parse", "HEAD"]), head, "amended");
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), subject);
+    let files = repo.git(&["show", "--format=", "--name-only", "HEAD"]);
+    assert!(files.lines().any(|f| f == "notes.txt"), "{files}");
+}
+
+#[test]
+fn commit_and_push_pushes_the_new_commit() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    stage_notes(&mut h, "Add notes");
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit & Push");
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "Add notes");
+    assert_eq!(origin_main(&repo), repo.git(&["rev-parse", "HEAD"]));
+    assert_eq!(h.state.message.as_deref(), Some("✓ Push"));
+    assert_eq!(h.state.source_control.view.message(), "");
+}
+
+#[test]
+fn commit_and_sync_pulls_then_pushes_the_new_commit() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    stage_notes(&mut h, "Add notes");
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit & Sync");
+    assert_eq!(repo.git(&["log", "-1", "--format=%s"]), "Add notes");
+    assert_eq!(origin_main(&repo), repo.git(&["rev-parse", "HEAD"]));
+    assert_eq!(h.state.message.as_deref(), Some("✓ Sync"));
+}
+
+#[test]
+fn commit_and_push_pushes_nothing_when_the_commit_is_refused() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    let pushed = origin_main(&repo);
+    // No message, then nothing staged: the commit never starts.
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit & Push");
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some("Type a commit message first.")
+    );
+    type_text(&mut h, "Nothing");
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit & Push");
+    assert_eq!(
+        h.state.message.as_deref(),
+        Some("Nothing staged: stage files with + first.")
+    );
+    assert_eq!(origin_main(&repo), pushed);
+    assert!(h.state.running.is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn commit_and_sync_does_not_sync_when_the_commit_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let repo = FixtureRepo::sample();
+    // A pre-commit hook makes the commit step itself fail.
+    let hook = repo.path().join(".git/hooks/pre-commit");
+    std::fs::write(&hook, "#!/bin/sh\necho 'hook says no' >&2\nexit 1\n").unwrap();
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut h = open(&repo);
+    let head = repo.git(&["rev-parse", "HEAD"]);
+    let pushed = origin_main(&repo);
+    stage_notes(&mut h, "Add notes");
+    open_commit_menu(&mut h);
+    choose(&mut h, "Commit & Sync");
+    let message = h.state.message.clone().unwrap_or_default();
+    assert!(message.starts_with("Commit failed"), "{message}");
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]), head);
+    assert_eq!(origin_main(&repo), pushed);
+    assert!(h.state.running.is_none(), "no pull or push started");
+    assert_eq!(h.state.source_control.view.message(), "Add notes");
 }
