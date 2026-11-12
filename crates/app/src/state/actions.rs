@@ -9,7 +9,7 @@ use ggt_ui::{
     ConfirmDialog, DialogHitMap, DialogOutcome, InputDialog, InputHitMap, InputOutcome, Key,
 };
 
-use super::{AppState, Command, Comparison, Request};
+use super::{AppState, Command, Comparison, Level, Request};
 
 /// A modal dialog on top of everything else.
 #[derive(Debug)]
@@ -115,11 +115,11 @@ impl AppState {
         }
         let action = self.offer_existing_branch(action);
         if self.running.is_some() {
-            self.message = Some("Wait for the current action to finish.".into());
+            self.notify(Level::Warning, "Wait for the current action to finish.");
             return Vec::new();
         }
         if let Some(why) = self.refused_during_operation(&action) {
-            self.message = Some(why);
+            self.notify(Level::Warning, why);
             return Vec::new();
         }
         if let Some(view) = InputDialog::for_action(&label, &action) {
@@ -171,7 +171,7 @@ impl AppState {
                 let Some(first) = remaining.pop_front() else {
                     return Vec::new();
                 };
-                self.message = Some(format!("{label}…"));
+                self.notify(Level::Info, format!("{label}…"));
                 self.running = Some(Running {
                     label,
                     action,
@@ -181,7 +181,7 @@ impl AppState {
                 vec![Command::Run(first)]
             }
             Plan::Clipboard(text) => {
-                self.message = Some(format!("Copied to the clipboard: {text}"));
+                self.notify(Level::Success, format!("Copied to the clipboard: {text}"));
                 vec![Command::Clipboard(text)]
             }
             Plan::Ui(UiEffect::ToggleBranchFilter { branch }) => self.toggle_branch_filter(branch),
@@ -253,13 +253,14 @@ impl AppState {
                     self.running = Some(running);
                     return vec![Command::Run(next)];
                 }
-                self.message = Some(match &running.action {
+                let done = match &running.action {
                     Action::Repo(clone @ RepoAction::Clone { .. }) => {
                         let dest = clone.destination().unwrap_or_default();
                         format!("✓ Cloned into {dest}. Open it with: ggt {dest}")
                     }
                     _ => format!("✓ {}", running.label),
-                });
+                };
+                self.notify(Level::Success, done);
                 if matches!(
                     running.action,
                     Action::WorkingTree(WorkingTreeAction::Commit { .. })
@@ -287,17 +288,20 @@ impl AppState {
                         .set_input(InputId::Force, InputValue::Bool(true))
                         .is_ok()
                     {
-                        self.message = Some(err.user_message());
+                        self.notify(Level::Warning, err.user_message());
                         return self.confirm_or_run(forced, "Force Delete Branch".into());
                     }
                 }
-                self.message = Some(rebase_raced(&err, &running.action).unwrap_or_else(|| {
-                    // Not a failure: git is waiting for the conflicts to be resolved.
-                    if let ExecError::Failed {
+                // Not a failure: git is waiting for the conflicts to be resolved.
+                let conflicted = matches!(
+                    &err,
+                    ExecError::Failed {
                         failure: Failure::Conflict,
                         ..
-                    } = &err
-                    {
+                    }
+                );
+                let text = rebase_raced(&err, &running.action).unwrap_or_else(|| {
+                    if conflicted {
                         return format!(
                             "{} stopped on conflicts: resolve them, then Continue or Abort.",
                             running.label
@@ -306,7 +310,13 @@ impl AppState {
                     let why =
                         fetch_rejected(&err, &running.action).unwrap_or_else(|| err.user_message());
                     format!("{} failed: {why}", running.label)
-                }));
+                });
+                let level = if conflicted {
+                    Level::Warning
+                } else {
+                    Level::Error
+                };
+                self.notify(level, text);
                 // Earlier steps may have changed the repository.
                 self.refresh()
             }
@@ -351,7 +361,7 @@ impl AppState {
             }
             Step::Cancel => {
                 self.dialog_hits = None;
-                self.message = Some(format!("{} cancelled.", dialog.label()));
+                self.notify(Level::Info, format!("{} cancelled.", dialog.label()));
                 Vec::new()
             }
             Step::Submitted(action) => {
@@ -454,12 +464,15 @@ impl AppState {
     pub(super) fn on_remote_url(&mut self, remote: &str, branch: &str, url: &str) -> Vec<Command> {
         let url = url.trim();
         if let Some(page) = ggt_actions::pull_request_url(url, branch) {
-            self.message = Some(format!("Opening {page}"));
+            self.notify(Level::Info, format!("Opening {page}"));
             return vec![Command::OpenUrl(page)];
         }
-        self.message = Some(format!(
-            "Can't open a pull request page for '{remote}' ({url}): only GitHub, GitLab or Bitbucket remotes have one."
-        ));
+        self.notify(
+            Level::Warning,
+            format!(
+                "Can't open a pull request page for '{remote}' ({url}): only GitHub, GitLab or Bitbucket remotes have one."
+            ),
+        );
         Vec::new()
     }
 }

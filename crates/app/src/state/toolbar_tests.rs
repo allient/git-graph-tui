@@ -84,7 +84,7 @@ fn the_toolbar_is_the_first_line() {
     let repo = FixtureRepo::sample();
     let h = open(&repo);
     let (_, y) = find(&h, "Branches: [Show All");
-    assert_eq!(y, 0);
+    assert_eq!(y, 1, "the middle row of the three-row toolbar");
     assert!(h.find_on_screen("[⇣]").is_some());
 }
 
@@ -217,8 +217,8 @@ fn tab_moves_to_the_toolbar_and_enter_presses_a_button() {
     let mut h = open(&repo);
     press(&mut h, KeyCode::Tab);
     assert!(h.state.toolbar.focus.is_some());
-    // Branch filter → remotes → fetch.
-    for _ in 0..2 {
+    // Branch filter → remotes → find → fetch.
+    for _ in 0..3 {
         press(&mut h, KeyCode::Right);
     }
     press(&mut h, KeyCode::Enter);

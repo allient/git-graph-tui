@@ -1,6 +1,6 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{Key, Theme, fit};
@@ -12,13 +12,16 @@ pub enum ToolbarButton {
     ShowRemotes,
     Refresh,
     Fetch,
+    /// Opens the find bar, like `/`.
+    Find,
     /// The repository "..." menu (S11).
     RepoMenu,
 }
 
-const ORDER: [ToolbarButton; 5] = [
+const ORDER: [ToolbarButton; 6] = [
     ToolbarButton::BranchFilter,
     ToolbarButton::ShowRemotes,
+    ToolbarButton::Find,
     ToolbarButton::Fetch,
     ToolbarButton::Refresh,
     ToolbarButton::RepoMenu,
@@ -34,6 +37,8 @@ pub enum ToolbarOutcome {
     ToggleRemotes,
     Refresh,
     Fetch,
+    /// Open the find bar.
+    Find,
     /// Open `menu_for(&Target::Repository, ..)`.
     OpenRepoMenu(Position),
     /// Keyboard focus leaves the toolbar (back to the graph).
@@ -169,6 +174,7 @@ impl Toolbar {
             Some(ToolbarButton::ShowRemotes) => ToolbarOutcome::ToggleRemotes,
             Some(ToolbarButton::Refresh) => ToolbarOutcome::Refresh,
             Some(ToolbarButton::Fetch) => ToolbarOutcome::Fetch,
+            Some(ToolbarButton::Find) => ToolbarOutcome::Find,
             Some(ToolbarButton::RepoMenu) => {
                 ToolbarOutcome::OpenRepoMenu(below(ToolbarButton::RepoMenu))
             }
@@ -189,14 +195,16 @@ impl Toolbar {
         self.focus = Some(order[next]);
     }
 
-    /// Draws the toolbar on the first row of `area`.
+    /// Draws the toolbar on the middle row of `area`, so extra height reads as
+    /// padding above and below the buttons.
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) -> ToolbarHitMap {
         let mut hits = ToolbarHitMap::default();
         if area.width == 0 || area.height == 0 {
             return hits;
         }
-        let y = area.y;
+        let y = area.y + area.height / 2;
         let right: Vec<(ToolbarButton, &str)> = [
+            (ToolbarButton::Find, theme.icons.find()),
             (ToolbarButton::Fetch, theme.icons.fetch()),
             (ToolbarButton::Refresh, theme.icons.refresh()),
             (ToolbarButton::RepoMenu, theme.icons.more()),
@@ -249,7 +257,15 @@ impl Toolbar {
         }
         let mut x = area.x + to_u16(right_start);
         for (button, text) in right {
-            x = self.button(buf, &mut hits, (x, y), button, text, theme) + 1;
+            let start = x;
+            x = self.button(buf, &mut hits, (x, y), button, text, theme);
+            // Bold makes the thin icon glyphs easier to see; a terminal can't
+            // enlarge them.
+            buf.set_style(
+                Rect::new(start, y, x - start, 1),
+                Style::default().add_modifier(Modifier::BOLD),
+            );
+            x += 1;
         }
         hits
     }

@@ -170,6 +170,10 @@ impl AppState {
                 Action::Repo(RepoAction::Fetch { prune: false }),
                 "Fetch".into(),
             ),
+            ToolbarOutcome::Find => {
+                self.open_find();
+                Vec::new()
+            }
             ToolbarOutcome::OpenRepoMenu(anchor) => {
                 self.open_repo_menu(anchor);
                 Vec::new()

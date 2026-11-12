@@ -6,7 +6,7 @@ use ggt_git::show::{self, Diff};
 use ggt_model::{Change, Stash};
 use ggt_ui::{DiffView, PaneFile};
 
-use super::{AppState, Command, Request};
+use super::{AppState, Command, Level, Request};
 use crate::external;
 
 /// What the reads are put together into.
@@ -171,7 +171,10 @@ impl AppState {
     /// repository is reloaded once it exits.
     pub(super) fn open_in_editor(&mut self, file: &PaneFile) -> Vec<Command> {
         if !file.on_disk {
-            self.message = Some(format!("Can't open {}: it was deleted.", file.path));
+            self.notify(
+                Level::Warning,
+                format!("Can't open {}: it was deleted.", file.path),
+            );
             return Vec::new();
         }
         vec![Command::External(external::editor_command(

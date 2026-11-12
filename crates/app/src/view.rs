@@ -8,13 +8,16 @@ use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget};
 
-use crate::state::{AppState, Dialog, DialogHits, Find, MIN_WIDTH_FOR_PANE};
+use crate::state::{AppState, Dialog, DialogHits, Find, Level, MIN_WIDTH_FOR_PANE};
 
 /// Key hints shown at the right of the status bar.
 const HINTS: &str =
     "j/k move  enter details  m menu  / find  c commit  tab toolbar  H head  r refresh  q quit";
 
 /// Most lines the inline details panel takes.
+/// Rows of the toolbar: its buttons sit on the middle one, with a blank row
+/// above and below.
+const TOOLBAR_HEIGHT: u16 = 3;
 const DETAILS_HEIGHT: u16 = 12;
 
 /// Graph lines kept visible above and below an open details panel.
@@ -64,7 +67,7 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     let banner = state.banner();
     let banner_height = u16::from(banner.is_some());
     let [toolbar_area, banner_area, graph_area] = Layout::vertical([
-        Constraint::Length(1),
+        Constraint::Length(TOOLBAR_HEIGHT),
         Constraint::Length(banner_height),
         Constraint::Fill(1),
     ])
@@ -295,7 +298,12 @@ fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &mut AppState, theme: &
     if let Some(message) = &state.message {
         spans.push(Span::styled(
             format!(" {message} "),
-            Style::new().fg(theme.lane(5)),
+            Style::new().fg(match state.message_level {
+                Level::Success => theme.success,
+                Level::Warning => theme.warning,
+                Level::Error => theme.error,
+                Level::Info => theme.text,
+            }),
         ));
     }
     if let Some(version) = &state.update_available {
@@ -310,7 +318,7 @@ fn draw_status(frame: &mut Frame<'_>, area: Rect, state: &mut AppState, theme: &
         }
         spans.push(Span::styled(
             label,
-            Style::new().fg(theme.lane(5)).add_modifier(Modifier::BOLD),
+            Style::new().fg(theme.link).add_modifier(Modifier::BOLD),
         ));
     }
     let left = Line::from(spans);
@@ -387,7 +395,7 @@ mod tests {
     fn viewport_height_follows_the_terminal() {
         let repo = FixtureRepo::sample();
         let mut h = Harness::open(&repo);
-        let mut terminal = Terminal::new(TestBackend::new(80, 6)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(80, 8)).unwrap();
         terminal
             .draw(|f| {
                 draw(f, &mut h.state, &Theme::default());
@@ -395,7 +403,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             h.state.viewport_height, 2,
-            "the toolbar, status bar and column header take a line each; rows take two"
+            "the toolbar takes three lines, the status bar and column header one each; rows take two"
         );
     }
 
@@ -403,7 +411,7 @@ mod tests {
     fn hit_map_reflects_scrolling() {
         let repo = FixtureRepo::sample();
         let mut h = Harness::open(&repo);
-        let mut terminal = Terminal::new(TestBackend::new(80, 4)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(80, 6)).unwrap();
         terminal
             .draw(|f| {
                 draw(f, &mut h.state, &Theme::default());
@@ -413,9 +421,9 @@ mod tests {
         terminal
             .draw(|f| draw(f, &mut h.state, &Theme::default()))
             .unwrap();
-        // Toolbar, 2 graph lines, status bar; the last row (index 7, after
-        // the fixture's stash row) is on the bottom graph line.
-        assert_eq!(h.state.graph_hits.hit(40, 2), Some(&HitTarget::Commit(7)));
+        // Three toolbar lines, 2 graph lines, status bar; the last row (index
+        // 7, after the fixture's stash row) is on the bottom graph line.
+        assert_eq!(h.state.graph_hits.hit(40, 4), Some(&HitTarget::Commit(7)));
     }
 
     #[test]
@@ -459,5 +467,33 @@ mod tests {
                 .unwrap()
                 .contains("Authentication failed.")
         );
+    }
+
+    #[test]
+    fn status_messages_are_green_orange_or_red_by_outcome() {
+        let theme = Theme::default();
+        let repo = FixtureRepo::sample();
+        let mut h = Harness::open(&repo);
+        let mut terminal = Terminal::new(TestBackend::new(110, 5)).unwrap();
+        for (level, text, color) in [
+            (Level::Success, "✓ Checkout main", theme.success),
+            (Level::Warning, "Nothing to commit.", theme.warning),
+            (Level::Error, "Push failed: rejected", theme.error),
+        ] {
+            h.state.notify(level, text);
+            terminal.draw(|f| draw(f, &mut h.state, &theme)).unwrap();
+            let buf = terminal.backend().buffer();
+            let row = buf.area.height - 1;
+            let len = u16::try_from(text.chars().count()).unwrap();
+            let x = (0..buf.area.width - len)
+                .find(|&x| {
+                    (0..len)
+                        .map(|i| buf[(x + i, row)].symbol().to_owned())
+                        .collect::<String>()
+                        == text
+                })
+                .unwrap_or_else(|| panic!("{text} not on the status bar"));
+            assert_eq!(buf[(x, row)].fg, color, "{text}");
+        }
     }
 }

@@ -77,7 +77,7 @@ pub fn draw_output(
                     Span::raw("  "),
                     Span::styled(
                         mark,
-                        Style::new().fg(if ok { theme.lane(2) } else { theme.lane(5) }),
+                        Style::new().fg(if ok { theme.success } else { theme.error }),
                     ),
                 ])
             }

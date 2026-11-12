@@ -28,7 +28,7 @@ use ratatui::DefaultTerminal;
 use crate::cli::Cli;
 use crate::external::External;
 use crate::git::{ProcessExecutor, Runner, discover_repo};
-use crate::state::{AppState, Command, Event};
+use crate::state::{AppState, Command, Event, Level};
 use crate::watch::{GitDirs, RepoWatch};
 
 /// How long to wait for input before checking for git results.
@@ -191,13 +191,13 @@ fn run(
                 .available(env!("CARGO_PKG_VERSION"))
                 .map(str::to_owned);
             if state.message.as_deref() == Some("Checking for updates…") {
-                state.message = Some(
+                state.notify(
+                    Level::Info,
                     if state.update_available.is_some() {
                         "Update available."
                     } else {
                         "No update found; check your connection if offline."
-                    }
-                    .into(),
+                    },
                 );
             }
             update_cache = cache;
@@ -221,7 +221,7 @@ fn run(
         }
         for program in external {
             if let Some(message) = hand_over(terminal, &program)? {
-                state.message = Some(message);
+                state.notify(Level::Error, message);
             }
             // Focus reports were off while the program ran; the user is back
             // in this terminal.
@@ -293,12 +293,15 @@ fn dispatch(state: &mut AppState, runner: &Runner<ProcessExecutor>, event: Event
             }
             Command::Clipboard(text) => {
                 if let Err(err) = clipboard::copy(&text) {
-                    state.message = Some(format!("Could not copy to the clipboard: {err}"));
+                    state.notify(
+                        Level::Error,
+                        format!("Could not copy to the clipboard: {err}"),
+                    );
                 }
             }
             Command::OpenUrl(url) => {
                 if let Err(err) = browser::open(&url) {
-                    state.message = Some(format!("Could not open {url}: {err}"));
+                    state.notify(Level::Error, format!("Could not open {url}: {err}"));
                 }
             }
             Command::External(program) => external.push(program),
