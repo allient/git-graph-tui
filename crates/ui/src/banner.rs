@@ -87,7 +87,7 @@ impl Banner {
             Style::default().bg(theme.header_bg),
         );
         let bold = Style::default()
-            .fg(theme.lane(5))
+            .fg(theme.warning)
             .add_modifier(Modifier::BOLD);
         let mut x = area.x + 1;
         buf.set_stringn(x, y, &message, width - 1, bold);

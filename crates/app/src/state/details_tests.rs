@@ -11,7 +11,7 @@ use crate::testing::Harness;
 /// Wide enough for full hashes beside the Source Control pane (the panel
 /// starts at the Description column and its left half holds the fields).
 const W: u16 = 160;
-const H: u16 = 30;
+const H: u16 = 32;
 
 fn open(repo: &FixtureRepo) -> Harness {
     let mut h = Harness::open(repo);

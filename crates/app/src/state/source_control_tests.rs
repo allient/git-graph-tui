@@ -69,7 +69,7 @@ fn source_control_and_the_graph_sit_side_by_side() {
     let (graph_x, graph_y) = find(&h, "Graph");
     assert_eq!((pane_x, pane_y), (1, 0));
     assert_eq!(
-        graph_y, 1,
+        graph_y, 3,
         "the toolbar is above the graph, the pane beside both"
     );
     assert!(graph_x > 30, "{graph_x}");

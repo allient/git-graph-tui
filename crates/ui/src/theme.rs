@@ -51,6 +51,11 @@ pub struct Theme {
     pub modified: Color,
     pub deleted: Color,
     pub renamed: Color,
+    /// Status-bar messages: green for what worked, orange for what needs
+    /// attention (a refusal, a conflict), red for what failed.
+    pub success: Color,
+    pub warning: Color,
+    pub error: Color,
     pub icons: Icons,
     /// The frame of menus and dropdown lists.
     pub menu_border: Color,
@@ -125,6 +130,9 @@ impl Default for Theme {
             modified: Color::Yellow,
             deleted: Color::LightRed,
             renamed: Color::LightBlue,
+            success: Color::Rgb(0x00, 0xd9, 0x0a),
+            warning: Color::Rgb(0xd9, 0x85, 0x00),
+            error: Color::Rgb(0xff, 0x00, 0x00),
             icons: Icons::Unicode,
             menu_border: GIT_GRAPH_LANES[0],
             time_zone: TimeZone::UTC,

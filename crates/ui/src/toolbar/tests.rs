@@ -45,14 +45,14 @@ fn full_layout_on_a_wide_terminal() {
     let (line, _) = render(&toolbar(), 100);
     assert_eq!(
         line,
-        "                       Branches: [main, develop ▾]  [x] Show Remote Branches          [⇣] [↻] [...]"
+        "                       Branches: [main, develop ▾]  [x] Show Remote Branches      [⌕] [⇣] [↻] [...]"
     );
 }
 
 #[test]
 fn compact_layout_on_a_narrow_terminal() {
     let (line, _) = render(&Toolbar::new(&[], false), 53);
-    assert_eq!(line, "            [Show All ▾]  [ ] Remotes  [⇣] [↻] [...]");
+    assert_eq!(line, "        [Show All ▾]  [ ] Remotes  [⌕] [⇣] [↻] [...]");
 }
 
 #[test]
@@ -63,6 +63,7 @@ fn every_button_is_in_the_hit_map() {
         ToolbarButton::ShowRemotes,
         ToolbarButton::Refresh,
         ToolbarButton::Fetch,
+        ToolbarButton::Find,
         ToolbarButton::RepoMenu,
     ] {
         let rect = hits.button(button).unwrap();
@@ -101,6 +102,11 @@ fn clicks_activate_buttons_with_menus_opening_below_them() {
         toolbar.handle_click(&hits, fetch.x, fetch.y),
         ToolbarOutcome::Fetch
     );
+    let find = hits.button(ToolbarButton::Find).unwrap();
+    assert_eq!(
+        toolbar.handle_click(&hits, find.x, find.y),
+        ToolbarOutcome::Find
+    );
     assert_eq!(toolbar.handle_click(&hits, 0, 3), ToolbarOutcome::Stay);
 }
 
@@ -116,9 +122,9 @@ fn keyboard_focus_moves_between_buttons_and_activates_them() {
         toolbar.handle_key(Key::Char(' '), &hits),
         ToolbarOutcome::ToggleRemotes
     );
-    toolbar.handle_key(Key::Tab, &hits);
-    toolbar.handle_key(Key::Tab, &hits);
-    toolbar.handle_key(Key::Tab, &hits);
+    for _ in 0..4 {
+        toolbar.handle_key(Key::Tab, &hits);
+    }
     assert_eq!(toolbar.focus(), Some(ToolbarButton::RepoMenu));
     toolbar.handle_key(Key::Right, &hits);
     assert_eq!(toolbar.focus(), Some(ToolbarButton::BranchFilter), "wraps");

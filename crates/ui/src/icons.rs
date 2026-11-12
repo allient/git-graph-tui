@@ -28,6 +28,14 @@ impl Icons {
     }
 
     #[must_use]
+    pub fn find(self) -> &'static str {
+        match self {
+            Self::Unicode => "[⌕]",
+            Self::Nerd => " \u{ea6d} ",
+        }
+    }
+
+    #[must_use]
     pub fn more(self) -> &'static str {
         match self {
             Self::Unicode => "[...]",

@@ -251,9 +251,9 @@ fn clicking_a_menu_item_chooses_it() {
 fn graph_hits_come_from_the_last_frame() {
     let repo = FixtureRepo::sample();
     let h = open(&repo);
-    // Line 0 is the toolbar, line 1 the column header, lines 2-3 the
+    // Lines 0-2 are the toolbar, line 3 the column header, lines 4-5 the
     // uncommitted row and its connector.
-    assert_eq!(h.state.graph_hits.hit(100, 4), Some(&HitTarget::Commit(0)));
+    assert_eq!(h.state.graph_hits.hit(100, 6), Some(&HitTarget::Commit(0)));
 }
 
 fn double_click(h: &mut Harness, x: u16, y: u16) {

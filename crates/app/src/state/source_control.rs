@@ -5,7 +5,7 @@ use ggt_actions::{Action, AfterCommit, CommitScope, WorkingTreeAction, commit_bu
 use ggt_model::HeadState;
 use ggt_ui::{Key, PopupMenu, SourceControl, SourceControlHitMap, SourceControlOutcome};
 
-use super::{AppState, Command, actions::widget_key};
+use super::{AppState, Command, Level, actions::widget_key};
 
 /// Narrowest terminal that shows the pane beside the graph.
 pub const MIN_WIDTH_FOR_PANE: u16 = 90;
@@ -30,9 +30,12 @@ impl AppState {
     /// Control" in the uncommitted changes menu).
     pub(super) fn focus_source_control(&mut self) {
         if !self.source_control.visible {
-            self.message = Some(format!(
-                "Widen the terminal to at least {MIN_WIDTH_FOR_PANE} columns to show Source Control."
-            ));
+            self.notify(
+                Level::Warning,
+                format!(
+                    "Widen the terminal to at least {MIN_WIDTH_FOR_PANE} columns to show Source Control."
+                ),
+            );
             return;
         }
         self.toolbar.focus = None;
@@ -148,7 +151,7 @@ impl AppState {
     ) -> Vec<Command> {
         let message = self.source_control.view.message().to_owned();
         if message.trim().is_empty() && !amend {
-            self.message = Some("Type a commit message first.".into());
+            self.notify(Level::Warning, "Type a commit message first.");
             self.focus_source_control();
             return Vec::new();
         }
@@ -159,11 +162,11 @@ impl AppState {
             CommitScope::Auto => !staged,
         };
         if !amend && !all && !staged {
-            self.message = Some("Nothing staged: stage files with + first.".into());
+            self.notify(Level::Warning, "Nothing staged: stage files with + first.");
             return Vec::new();
         }
         if !amend && all && self.status.is_clean() {
-            self.message = Some("Nothing to commit.".into());
+            self.notify(Level::Warning, "Nothing to commit.");
             return Vec::new();
         }
         let label = if amend { "Amend" } else { "Commit" };

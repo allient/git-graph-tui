@@ -24,6 +24,17 @@ use crate::external::External;
 use crate::git::{JobHandle, JobId, JobResult};
 use crate::watch::Change;
 
+/// How the status bar colors a message: green for what worked, orange for
+/// what needs attention, red for what failed, plain for everything else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Level {
+    #[default]
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
 mod actions;
 mod compare;
 mod details;
@@ -267,8 +278,10 @@ pub struct AppState {
     pub page_size: usize,
     /// True once `git log` returned a short page (no older commits).
     pub history_complete: bool,
-    /// Status-bar message (the last git error).
+    /// Status-bar message: the outcome of the last action or git error.
     pub message: Option<String>,
+    /// Decides the color of `message`; set together with it by `notify`.
+    pub message_level: Level,
     pub update_available: Option<String>,
     pub update_panel: bool,
     pub update_requested: bool,
@@ -359,6 +372,12 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Shows `text` in the status bar, colored by `level`.
+    pub fn notify(&mut self, level: Level, text: impl Into<String>) {
+        self.message = Some(text.into());
+        self.message_level = level;
+    }
+
     pub fn new(repo: PathBuf) -> Self {
         Self {
             repo,
@@ -376,6 +395,7 @@ impl AppState {
             page_size: DEFAULT_PAGE_SIZE,
             history_complete: false,
             message: None,
+            message_level: Level::Info,
             update_available: None,
             update_panel: false,
             update_requested: false,
@@ -633,7 +653,7 @@ impl AppState {
                     self.update_panel = true;
                 } else {
                     self.update_requested = true;
-                    self.message = Some("Checking for updates…".into());
+                    self.notify(Level::Info, "Checking for updates…");
                 }
             }
             (KeyCode::Char('r'), _) => {
@@ -859,7 +879,7 @@ impl AppState {
             return Vec::new();
         };
         if self.menu_context().is_current_branch(&branch) {
-            self.message = Some(format!("Already on {branch}."));
+            self.notify(Level::Info, format!("Already on {branch}."));
             return Vec::new();
         }
         match self.checkout_action(&branch) {
@@ -949,7 +969,7 @@ impl AppState {
         };
         let items = menu_for(&target, &self.menu_context());
         if items.iter().all(|i| matches!(i, MenuItem::Separator)) {
-            self.message = Some("No actions here yet.".into());
+            self.notify(Level::Info, "No actions here yet.");
             return;
         }
         self.menu = Some(PopupMenu::new(items, anchor));
@@ -1018,7 +1038,7 @@ impl AppState {
         match handle(menu) {
             MenuOutcome::Open => Vec::new(),
             MenuOutcome::Disabled(reason) => {
-                self.message = Some(reason);
+                self.notify(Level::Warning, reason);
                 Vec::new()
             }
             MenuOutcome::Closed => {
@@ -1143,7 +1163,7 @@ impl AppState {
                     // A part failed: the rest of that diff is not shown.
                     self.working_diff = None;
                 }
-                self.message = Some(format!("{} ({command})", err.user_message()));
+                self.notify(Level::Error, format!("{} ({command})", err.user_message()));
                 Vec::new()
             }
         }
@@ -1197,7 +1217,7 @@ impl AppState {
     fn on_log_read(&mut self, skip: usize, max_count: usize, stdout: &str) -> Vec<Command> {
         match log::parse(stdout) {
             Ok(page) => self.on_log_page(skip, page, max_count),
-            Err(err) => self.message = Some(format!("Could not read git log: {err}")),
+            Err(err) => self.notify(Level::Error, format!("Could not read git log: {err}")),
         }
         // A pending parent jump, or a find in older history, does
         // its own paging.
@@ -1301,7 +1321,7 @@ impl AppState {
     ) {
         match parsed {
             Ok(value) => apply(self, value),
-            Err(err) => self.message = Some(format!("Could not read git output: {err}")),
+            Err(err) => self.notify(Level::Error, format!("Could not read git output: {err}")),
         }
     }
 
