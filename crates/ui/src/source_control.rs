@@ -1,6 +1,7 @@
 //! The Source Control pane: a header with commit, refresh and more-actions
-//! buttons, a multi-line commit message, a Commit button, and the changed
-//! files split into "Staged Changes" and "Changes", like VS Code.
+//! buttons, a multi-line commit message, a split Commit button (its chevron
+//! opens the commit menu), and the changed files split into "Staged
+//! Changes" and "Changes", like VS Code.
 
 use ggt_actions::{ChangesLayout, ChangesSort, ChangesView};
 use ggt_model::{Change, ChangedFile};
@@ -16,6 +17,9 @@ use crate::{Glyph, Key, TextField, Theme};
 const MESSAGE_LINES: u16 = 3;
 /// Lines above the file list: header, message, Commit button, blank.
 const TOP_LINES: u16 = 1 + MESSAGE_LINES + 2;
+/// Cells of the Commit button's chevron segment: divider, chevron, and a
+/// blank cell for a Nerd Font icon drawn wider than its cell.
+const CHEVRON_WIDTH: u16 = 3;
 
 /// What a key or click asks the app to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +38,9 @@ pub enum SourceControlOutcome {
     Refresh,
     /// Open the repository menu ("..."), anchored below the header button.
     More(Position),
+    /// Open the commit menu (Commit, Amend, Commit & Push, Commit & Sync),
+    /// anchored below the Commit button's chevron.
+    CommitMenu(Position),
     /// Show one file's diff (Enter, or a click on its row).
     OpenDiff(PaneFile),
     /// Show the diffs of every file of a section, one after the other
@@ -67,6 +74,8 @@ enum Focus {
     #[default]
     Message,
     Commit,
+    /// The Commit button's chevron, which opens the commit menu.
+    CommitMenu,
     Files,
 }
 
@@ -96,6 +105,8 @@ enum Hit {
     HeaderMore,
     Message,
     Commit,
+    /// The chevron segment of the Commit button.
+    CommitMenu,
     /// An item of the list.
     Row(usize),
     /// The `+` or `−` button of an item.
@@ -155,6 +166,8 @@ pub struct SourceControl {
     message_width: usize,
     /// Below the header's "..." button in the last frame.
     more_at: Position,
+    /// Below the Commit button's chevron in the last frame.
+    commit_menu_at: Position,
     /// Sections whose files are hidden, by clicking their header.
     staged_collapsed: bool,
     changes_collapsed: bool,
@@ -321,7 +334,20 @@ impl SourceControl {
             Focus::Commit => match key {
                 Key::Enter | Key::Char(' ') => return self.commit(),
                 Key::Char('m') => return SourceControlOutcome::More(self.more_at),
+                // Right and Tab reach the chevron, as Tab does in VS Code.
+                Key::Right | Key::Tab => self.focus = Focus::CommitMenu,
                 Key::Up | Key::BackTab => self.focus = Focus::Message,
+                Key::Down if !self.items().is_empty() => self.focus = Focus::Files,
+                Key::Esc => return SourceControlOutcome::Leave,
+                _ => {}
+            },
+            Focus::CommitMenu => match key {
+                Key::Enter | Key::Char(' ') => {
+                    return SourceControlOutcome::CommitMenu(self.commit_menu_at);
+                }
+                Key::Char('m') => return SourceControlOutcome::More(self.more_at),
+                Key::Left | Key::BackTab => self.focus = Focus::Commit,
+                Key::Up => self.focus = Focus::Message,
                 Key::Down | Key::Tab if !self.items().is_empty() => self.focus = Focus::Files,
                 Key::Esc => return SourceControlOutcome::Leave,
                 _ => {}
@@ -358,7 +384,7 @@ impl SourceControl {
                     Key::Char('-' | 'u') => return self.only(self.selected, false),
                     Key::Char('d') | Key::Delete => return self.discard(self.selected),
                     Key::Char('m') => return SourceControlOutcome::More(self.more_at),
-                    Key::BackTab => self.focus = Focus::Commit,
+                    Key::BackTab => self.focus = Focus::CommitMenu,
                     Key::Esc | Key::Tab => return SourceControlOutcome::Leave,
                     _ => {}
                 }
@@ -381,6 +407,10 @@ impl SourceControl {
             Some(Hit::Commit) => {
                 self.focus = Focus::Commit;
                 return self.commit();
+            }
+            Some(Hit::CommitMenu) => {
+                self.focus = Focus::CommitMenu;
+                return SourceControlOutcome::CommitMenu(self.commit_menu_at);
             }
             Some(Hit::Row(item)) => {
                 self.select(item);
@@ -599,20 +629,7 @@ impl SourceControl {
             return hits;
         }
         self.render_message(area, buf, theme, focused, &mut hits);
-
-        // Commit button, across the pane but the margins.
-        let button = Rect::new(area.x + 1, area.y + 1 + MESSAGE_LINES, area.width - 2, 1);
-        let mut style = Style::new()
-            .fg(theme.badge_text(theme.lane(0)))
-            .bg(theme.lane(0));
-        if focused && self.focus == Focus::Commit {
-            style = style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
-        }
-        buf.set_style(button, style);
-        let label = format!("{} Commit", theme.icons.glyph(Glyph::Check));
-        let x = button.x + (button.width.saturating_sub(8)) / 2;
-        buf.set_stringn(x, button.y, label, usize::from(button.width), style);
-        hits.regions.push((button, Hit::Commit));
+        self.render_commit_button(area, buf, theme, focused, &mut hits);
 
         // File list, scrolled so the selection stays visible.
         let items = self.items();
@@ -641,6 +658,45 @@ impl SourceControl {
             self.draw_item(buf, row_area, index, *item, theme, &mut hits);
         }
         hits
+    }
+
+    /// The split Commit button across the pane but the margins: `✓ Commit`,
+    /// then a divider and the chevron that opens the commit menu.
+    fn render_commit_button(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+        focused: bool,
+        hits: &mut SourceControlHitMap,
+    ) {
+        let button = Rect::new(area.x + 1, area.y + 1 + MESSAGE_LINES, area.width - 2, 1);
+        let main = Rect::new(button.x, button.y, button.width - CHEVRON_WIDTH, 1);
+        let chevron = Rect::new(main.right(), button.y, CHEVRON_WIDTH, 1);
+        let base = Style::new()
+            .fg(theme.badge_text(theme.lane(0)))
+            .bg(theme.lane(0));
+        let pressed = |part: Focus| {
+            if focused && self.focus == part {
+                base.add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            } else {
+                base
+            }
+        };
+        let style = pressed(Focus::Commit);
+        buf.set_style(main, style);
+        let label = format!("{} Commit", theme.icons.glyph(Glyph::Check));
+        let x = main.x + (main.width.saturating_sub(8)) / 2;
+        buf.set_stringn(x, main.y, label, usize::from(main.width), style);
+        hits.regions.push((main, Hit::Commit));
+
+        buf.set_style(chevron, base);
+        buf[(chevron.x, chevron.y)].set_char('│');
+        buf[(chevron.x + 1, chevron.y)]
+            .set_char(theme.icons.glyph(Glyph::ChevronDown))
+            .set_style(pressed(Focus::CommitMenu));
+        hits.regions.push((chevron, Hit::CommitMenu));
+        self.commit_menu_at = Position::new(chevron.x + 1, chevron.y + 1);
     }
 
     /// `SOURCE CONTROL` with the commit, refresh and "..." buttons.

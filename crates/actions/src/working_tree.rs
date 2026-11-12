@@ -2,6 +2,7 @@ use std::path::Path;
 
 use ggt_git::GitCommand;
 
+use crate::RepoAction;
 use crate::action::{Confirmation, Plan, ResetMode, UiEffect, strings};
 use crate::input::{self, Choice, InputError, InputId, InputKind, InputSpec, InputValue};
 
@@ -19,6 +20,34 @@ pub enum CommitScope {
     Auto,
     Staged,
     All,
+}
+
+/// What the Commit button's "Commit & Push" and "Commit & Sync" run after
+/// the commit, only when it succeeds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AfterCommit {
+    Push,
+    Sync,
+}
+
+impl AfterCommit {
+    /// The repository action it runs, the same one the "..." menu's Push
+    /// and Sync run.
+    #[must_use]
+    pub fn action(self) -> RepoAction {
+        match self {
+            Self::Push => RepoAction::Push,
+            Self::Sync => RepoAction::Sync,
+        }
+    }
+
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Push => "Push",
+            Self::Sync => "Sync",
+        }
+    }
 }
 
 /// Actions on the "Uncommitted Changes" row.

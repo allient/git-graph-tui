@@ -26,7 +26,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 - [x] Stage, unstage and discard a file or a whole section, by button (`+` `−` `↶`) or key
 - [x] Open a file's changes (working tree or staged; an untracked file shows every line added), or "Open Changes" (`⧉`) for every file of a section in one view
 - [x] "Open File" (`↗`) in your editor (`$VISUAL`, `$EDITOR`, else `vi`)
-- [x] Multi-line commit message and a Commit button; commit, refresh and "..." buttons in the header
+- [x] Multi-line commit message and a split Commit button whose chevron opens a menu (Commit, Commit (Amend), Commit & Push, Commit & Sync; push and sync run only after the commit succeeds); commit, refresh and "..." buttons in the header
 - [x] Resizable by dragging the divider; hidden on terminals under 90 columns
 
 ### Actions on branches (right-click a branch badge)

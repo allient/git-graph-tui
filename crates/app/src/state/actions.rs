@@ -57,6 +57,9 @@ pub(super) struct Running {
     label: String,
     action: Action,
     remaining: VecDeque<GitCommand>,
+    /// Starts once every step succeeded (Commit & Push's push); dropped
+    /// when one fails.
+    then: Option<(Action, String)>,
 }
 
 /// What a dialog answered.
@@ -143,6 +146,15 @@ impl AppState {
         self.run_action(action, label)
     }
 
+    /// Queues `action` after the action that just started, to run only
+    /// when all its steps succeed. Nothing happens when nothing started
+    /// (the action was refused, or waits in a dialog).
+    pub(super) fn run_after_success(&mut self, action: Action, label: String) {
+        if let Some(running) = &mut self.running {
+            running.then = Some((action, label));
+        }
+    }
+
     fn open_dialog(&mut self, dialog: Dialog) {
         self.dialog = Some(dialog);
         self.dialog_hits = None;
@@ -164,6 +176,7 @@ impl AppState {
                     label,
                     action,
                     remaining,
+                    then: None,
                 });
                 vec![Command::Run(first)]
             }
@@ -185,7 +198,8 @@ impl AppState {
                 scope,
                 amend,
                 signoff,
-            }) => self.commit(scope, amend, signoff),
+                then,
+            }) => self.commit(scope, amend, signoff, then),
             Plan::Ui(UiEffect::SetChangesView(view)) => {
                 self.source_control.view.set_view(view);
                 Vec::new()
@@ -252,7 +266,11 @@ impl AppState {
                 ) {
                     self.source_control.view.clear_message();
                 }
-                self.refresh()
+                let mut commands = self.refresh();
+                if let Some((action, label)) = running.then {
+                    commands.extend(self.start_action(action, label));
+                }
+                commands
             }
             Err(err) => {
                 // `branch -d` refuses unmerged branches: offer a force delete.

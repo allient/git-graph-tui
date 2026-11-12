@@ -5,8 +5,8 @@ use ggt_model::Oid;
 
 use crate::input::{self, Choice, InputError, InputId, InputKind, InputSpec, InputValue};
 use crate::{
-    ChangesSort, ChangesView, CommitScope, InteractiveRebase, OperationAction, PickPurpose,
-    RepoAction, StashAction, TagAction, WorkingTreeAction, WorktreeAction,
+    AfterCommit, ChangesSort, ChangesView, CommitScope, InteractiveRebase, OperationAction,
+    PickPurpose, RepoAction, StashAction, TagAction, WorkingTreeAction, WorktreeAction,
 };
 
 /// Abbreviated hash length in confirmation text (git's default).
@@ -256,11 +256,13 @@ pub enum UiEffect {
         purpose: PickPurpose,
     },
     /// Commit with the Source Control pane's message (the "..." menu's
-    /// Commit entries); the app checks there is something to commit.
+    /// Commit entries and the Commit button's menu); the app checks there
+    /// is something to commit, then runs `then` when the commit succeeds.
     Commit {
         scope: CommitScope,
         amend: bool,
         signoff: bool,
+        then: Option<AfterCommit>,
     },
     /// List the Source Control pane's files flat or as a folder tree.
     SetChangesView(ChangesView),

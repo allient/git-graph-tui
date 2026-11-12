@@ -92,7 +92,7 @@ fn lists_staged_and_unstaged_files_like_vs_code() {
             "  Message (Enter commits on \"main…",
             "  Alt+Enter: new line",
             "",
-            "              ✓ Commit",
+            "            ✓ Commit            │⌄",
             "",
             "▾ Staged Changes              ⧉ − 2",
             "  app.rs src                  ↗ − M",
@@ -704,4 +704,100 @@ fn a_folder_row_stages_or_discards_the_files_under_it() {
     );
     // Clicking a folder's name opens nothing.
     assert_eq!(pane.handle_click(&hits, 5, 7), SourceControlOutcome::Stay);
+}
+
+#[test]
+fn the_commit_button_is_split_with_a_chevron_for_its_menu() {
+    for icons in [Icons::Unicode, Icons::Nerd] {
+        let theme = Theme {
+            icons,
+            ..Theme::default()
+        };
+        let mut pane = pane();
+        let area = Rect::new(0, 0, W, 13);
+        let mut buf = Buffer::empty(area);
+        pane.render(area, &mut buf, &theme, false);
+        // The button spans x 1..35: `✓ Commit`, then `│`, the chevron and
+        // a blank cell for a Nerd Font icon drawn wider than its cell.
+        let chevron = icons.glyph(Glyph::ChevronDown).to_string();
+        assert_eq!(buf[(32, 4)].symbol(), "│", "{icons:?}");
+        assert_eq!(buf[(33, 4)].symbol(), chevron, "{icons:?}");
+        assert_eq!(buf[(34, 4)].symbol(), " ", "{icons:?}");
+        assert_eq!(
+            buf[(34, 4)].bg,
+            buf[(1, 4)].bg,
+            "the segment is part of the button"
+        );
+    }
+}
+
+#[test]
+fn clicking_the_chevron_opens_the_commit_menu_and_the_rest_commits() {
+    let mut pane = pane();
+    let (_, hits) = render(&mut pane, 13, true);
+    type_text(&mut pane, "Split");
+    for x in 32..35 {
+        assert_eq!(
+            pane.handle_click(&hits, x, 4),
+            SourceControlOutcome::CommitMenu(Position::new(33, 5)),
+            "x {x}"
+        );
+    }
+    for x in [1, 15, 31] {
+        assert_eq!(
+            pane.handle_click(&hits, x, 4),
+            SourceControlOutcome::Commit("Split".into()),
+            "x {x}"
+        );
+    }
+}
+
+#[test]
+fn the_keyboard_reaches_the_chevron_from_the_commit_button() {
+    let mut pane = pane();
+    render(&mut pane, 13, true);
+    pane.focus_message();
+    // Message → Commit button → its chevron, with Tab or Right.
+    for to_chevron in [[Key::Tab, Key::Tab], [Key::Down, Key::Right]] {
+        pane.focus_message();
+        press(&mut pane, &to_chevron);
+        assert_eq!(
+            press(&mut pane, &[Key::Enter]),
+            SourceControlOutcome::CommitMenu(Position::new(33, 5))
+        );
+    }
+    assert_eq!(
+        press(&mut pane, &[Key::Char(' ')]),
+        SourceControlOutcome::CommitMenu(Position::new(33, 5))
+    );
+    // Left goes back to the Commit button, which still commits.
+    type_text(&mut pane, "");
+    assert_eq!(
+        press(&mut pane, &[Key::Left, Key::Enter]),
+        SourceControlOutcome::Commit(String::new())
+    );
+    // Shift+Tab from the list comes back to the chevron, then the button.
+    pane.focus_message();
+    press(&mut pane, &TO_LIST);
+    assert_eq!(
+        press(&mut pane, &[Key::BackTab, Key::Enter]),
+        SourceControlOutcome::CommitMenu(Position::new(33, 5))
+    );
+    assert_eq!(press(&mut pane, &[Key::Esc]), SourceControlOutcome::Leave);
+}
+
+#[test]
+fn the_focused_chevron_is_drawn_pressed() {
+    let mut pane = pane();
+    pane.focus_message();
+    press(&mut pane, &[Key::Tab, Key::Tab]);
+    let area = Rect::new(0, 0, W, 13);
+    let mut buf = Buffer::empty(area);
+    pane.render(area, &mut buf, &Theme::default(), true);
+    let pressed = Modifier::BOLD | Modifier::UNDERLINED;
+    assert!(buf[(33, 4)].modifier.contains(pressed));
+    assert!(
+        !buf[(14, 4)].modifier.contains(pressed),
+        "not the Commit part"
+    );
 }

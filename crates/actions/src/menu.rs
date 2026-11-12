@@ -2,9 +2,9 @@ use ggt_git::worktree::Worktree;
 use ggt_model::{Oid, Stash};
 
 use crate::{
-    Action, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget, GraphColumn,
-    MenuContext, Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev, StashAction,
-    TagAction, Target, UiEffect, WorkingTreeAction, WorktreeAction,
+    Action, AfterCommit, ChangesLayout, ChangesSort, ChangesView, CommitScope, CommitTarget,
+    GraphColumn, MenuContext, Operation, OperationAction, PickPurpose, RepoAction, ResetMode, Rev,
+    StashAction, TagAction, Target, UiEffect, WorkingTreeAction, WorktreeAction,
 };
 
 /// One row of a context menu.
@@ -664,6 +664,48 @@ pub fn reflog_menu(id: &Oid, subject: &str, ctx: &MenuContext) -> Vec<MenuItem> 
     ])
 }
 
+/// The menu of the Commit button's chevron, in VS Code's order: commit
+/// what is staged, amend the last commit (an empty message keeps its
+/// message), then commit and push or sync. Push and Sync need HEAD on a
+/// branch and a remote; amending needs a commit.
+#[must_use]
+pub fn commit_button_menu(ctx: &MenuContext) -> Vec<MenuItem> {
+    let commit = |amend: bool, then: Option<AfterCommit>| {
+        Action::Ui(UiEffect::Commit {
+            scope: CommitScope::Staged,
+            amend,
+            signoff: false,
+            then,
+        })
+    };
+    let remote_missing = if ctx.default_remote().is_none() {
+        Some("There is no remote.")
+    } else if ctx.current_branch().is_none() {
+        Some(NOT_ON_BRANCH)
+    } else {
+        None
+    };
+    let no_commit = ctx
+        .head_commit
+        .is_none()
+        .then_some("There is no commit yet.");
+    vec![
+        MenuItem::Entry(MenuEntry::new("Commit", commit(false, None))),
+        entry_unless(no_commit, "Commit (Amend)", commit(true, None)),
+        MenuItem::Separator,
+        entry_unless(
+            remote_missing,
+            "Commit & Push",
+            commit(false, Some(AfterCommit::Push)),
+        ),
+        entry_unless(
+            remote_missing,
+            "Commit & Sync",
+            commit(false, Some(AfterCommit::Sync)),
+        ),
+    ]
+}
+
 /// VS Code's Commit submenu: commit what is staged (or everything when
 /// nothing is), only what is staged, or everything; each also as an amend
 /// and signed off. The message is the Source Control pane's.
@@ -681,6 +723,7 @@ fn commit_submenu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
                     scope,
                     amend,
                     signoff,
+                    then: None,
                 }),
             )
         })

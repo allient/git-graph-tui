@@ -1,9 +1,9 @@
 //! The Source Control pane (S3): focus, keys, clicks and the git actions it runs.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ggt_actions::{Action, CommitScope, WorkingTreeAction};
+use ggt_actions::{Action, AfterCommit, CommitScope, WorkingTreeAction, commit_button_menu};
 use ggt_model::HeadState;
-use ggt_ui::{Key, SourceControl, SourceControlHitMap, SourceControlOutcome};
+use ggt_ui::{Key, PopupMenu, SourceControl, SourceControlHitMap, SourceControlOutcome};
 
 use super::{AppState, Command, actions::widget_key};
 
@@ -105,6 +105,16 @@ impl AppState {
                 self.open_repo_menu(anchor);
                 return Vec::new();
             }
+            SourceControlOutcome::CommitMenu(anchor) => {
+                // Like the "..." menu, its choice runs from the graph.
+                self.source_control.focus = false;
+                self.menu = Some(PopupMenu::new(
+                    commit_button_menu(&self.menu_context()),
+                    anchor,
+                ));
+                self.menu_hits = None;
+                return Vec::new();
+            }
             SourceControlOutcome::OpenDiff(file) => return self.open_working_diff(&file),
             SourceControlOutcome::OpenChanges { staged, files } => {
                 return self.open_section_diff(staged, files);
@@ -118,21 +128,23 @@ impl AppState {
                 ("Unstage", WorkingTreeAction::Unstage { paths })
             }
             SourceControlOutcome::Commit(_) => {
-                return self.commit(CommitScope::Staged, false, false);
+                return self.commit(CommitScope::Staged, false, false, None);
             }
         };
         let (label, action) = action;
         self.start_action(Action::WorkingTree(action), label.into())
     }
 
-    /// Commits with the pane's message: the pane's `✓` (what is staged) and
-    /// the "..." menu's Commit entries. An amend may leave the message
-    /// empty to keep the last commit's.
+    /// Commits with the pane's message: the pane's `✓` (what is staged),
+    /// the Commit button's menu and the "..." menu's Commit entries. An
+    /// amend may leave the message empty to keep the last commit's. `then`
+    /// (Commit & Push, Commit & Sync) runs only once the commit succeeded.
     pub(super) fn commit(
         &mut self,
         scope: CommitScope,
         amend: bool,
         signoff: bool,
+        then: Option<AfterCommit>,
     ) -> Vec<Command> {
         let message = self.source_control.view.message().to_owned();
         if message.trim().is_empty() && !amend {
@@ -161,6 +173,13 @@ impl AppState {
             amend,
             signoff,
         };
-        self.start_action(Action::WorkingTree(action), label.into())
+        let busy = self.running.is_some();
+        let commands = self.start_action(Action::WorkingTree(action), label.into());
+        if let Some(then) = then
+            && !busy
+        {
+            self.run_after_success(Action::Repo(then.action()), then.label().into());
+        }
+        commands
     }
 }

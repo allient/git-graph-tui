@@ -15,7 +15,9 @@ mod target;
 
 pub use action::{Action, Confirmation, GraphColumn, Plan, ResetMode, Rev, UiEffect};
 pub use input::{Choice, InputError, InputId, InputKind, InputSpec, InputValue};
-pub use menu::{MenuEntry, MenuItem, column_menu, menu_for, reflog_menu, worktree_menu};
+pub use menu::{
+    MenuEntry, MenuItem, column_menu, commit_button_menu, menu_for, reflog_menu, worktree_menu,
+};
 pub use refname::{RefNameError, validate_ref_name};
 pub use target::{ChangesLayout, ChangesSort, ChangesView, CommitTarget, MenuContext, Target};
 mod stash;
@@ -24,7 +26,7 @@ mod working_tree;
 
 pub use stash::StashAction;
 pub use tag::TagAction;
-pub use working_tree::{CommitScope, WorkingTreeAction};
+pub use working_tree::{AfterCommit, CommitScope, WorkingTreeAction};
 mod worktree;
 pub use worktree::WorktreeAction;
 mod repo;
