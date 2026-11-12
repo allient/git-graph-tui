@@ -10,10 +10,10 @@
       "packages/*"
     ],
     "catalog": {
-      "@astrojs/starlight": "^0.42.8",
-      "astro": "^7.4.4",
-      "sharp": "^0.35.3",
-      "wrangler": "^4.156.0"
+      "@astrojs/starlight": "^0.42.11",
+      "astro": "^7.4.11",
+      "sharp": "^0.35.5",
+      "wrangler": "^4.161.0"
     }
   },
   "scripts": {
@@ -26,6 +26,6 @@
     "deploy:docs": "turbo run deploy --filter=docs"
   },
   "devDependencies": {
-    "turbo": "^2.11.10"
+    "turbo": "^2.11.11"
   }
 }
