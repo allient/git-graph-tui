@@ -209,6 +209,10 @@ impl AppState {
                 Vec::new()
             }
             Plan::Ui(UiEffect::ShowGitOutput) => self.show_git_output(),
+            Plan::Ui(UiEffect::CheckForUpdates) => {
+                self.check_for_updates();
+                Vec::new()
+            }
             Plan::Ui(UiEffect::ShowReflog) => self.show_reflog(),
             Plan::Ui(UiEffect::ShowWorktrees) => self.show_worktrees(),
             Plan::Ui(UiEffect::OpenInteractiveRebase { base }) => {

@@ -571,6 +571,8 @@ fn repository_menu(ctx: &MenuContext) -> Vec<Option<MenuItem>> {
         entry("Show Git Output", Action::Ui(UiEffect::ShowGitOutput)),
         entry("Show Reflog", Action::Ui(UiEffect::ShowReflog)),
         entry("Worktrees...", Action::Ui(UiEffect::ShowWorktrees)),
+        Some(MenuItem::Separator),
+        entry("Check for Updates", Action::Ui(UiEffect::CheckForUpdates)),
     ]
 }
 

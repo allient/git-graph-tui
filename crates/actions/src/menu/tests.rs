@@ -740,6 +740,8 @@ fn repository_menu_matches_the_vs_code_order() {
             "Show Git Output",
             "Show Reflog",
             "Worktrees...",
+            "---",
+            "Check for Updates",
         ]
     );
     assert_eq!(
@@ -1182,6 +1184,10 @@ fn repository_actions_are_prefilled() {
         action(&menu, "Worktrees..."),
         &Action::Ui(UiEffect::ShowWorktrees)
     );
+    assert_eq!(
+        action(&menu, "Check for Updates"),
+        &Action::Ui(UiEffect::CheckForUpdates)
+    );
 }
 
 #[test]
@@ -1212,6 +1218,8 @@ fn repository_menu_without_remotes_or_branch() {
             "Show Git Output",
             "Show Reflog",
             "Worktrees...",
+            "---",
+            "Check for Updates",
         ]
     );
     assert_eq!(

@@ -550,3 +550,13 @@ fn create_tag_from_the_menu_is_annotated_even_without_a_message() {
     accept_dialogs(&mut h);
     assert_eq!(repo.git(&["cat-file", "-t", "v9"]), "tag");
 }
+
+#[test]
+fn check_for_updates_in_the_repository_menu_asks_for_a_check() {
+    let repo = FixtureRepo::sample();
+    let mut h = open(&repo);
+    open_repo_menu(&mut h);
+    click_text(&mut h, "Check for Updates");
+    assert!(h.state.update_requested, "the main loop looks again now");
+    assert_eq!(h.state.message.as_deref(), Some("Checking for updates…"));
+}

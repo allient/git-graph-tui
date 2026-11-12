@@ -270,6 +270,8 @@ pub enum UiEffect {
     SetChangesSort(ChangesSort),
     /// Show the log of git commands and their output.
     ShowGitOutput,
+    /// Look for a newer release now, ignoring the daily cache (also `U`).
+    CheckForUpdates,
     /// Show where HEAD has been (the reflog), to recover lost commits.
     ShowReflog,
     /// Show the repository's worktrees, to add, remove or prune them.

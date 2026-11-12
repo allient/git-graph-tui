@@ -372,6 +372,17 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// `U` and the "..." menu's Check for Updates: shows the update that is
+    /// known, or asks the main loop to look again right now.
+    pub(super) fn check_for_updates(&mut self) {
+        if self.update_available.is_some() {
+            self.update_panel = true;
+        } else {
+            self.update_requested = true;
+            self.notify(Level::Info, "Checking for updates…");
+        }
+    }
+
     /// Shows `text` in the status bar, colored by `level`.
     pub fn notify(&mut self, level: Level, text: impl Into<String>) {
         self.message = Some(text.into());
@@ -576,7 +587,6 @@ impl AppState {
         base.max(self.status_poll.cost * 10)
     }
 
-    #[expect(clippy::too_many_lines, reason = "routes input across the app modes")]
     fn on_key(&mut self, key: KeyEvent) -> Vec<Command> {
         if key.kind != KeyEventKind::Press {
             return Vec::new();
@@ -649,12 +659,7 @@ impl AppState {
                 return Vec::new();
             }
             (KeyCode::Char('U'), _) => {
-                if self.update_available.is_some() {
-                    self.update_panel = true;
-                } else {
-                    self.update_requested = true;
-                    self.notify(Level::Info, "Checking for updates…");
-                }
+                self.check_for_updates();
             }
             (KeyCode::Char('r'), _) => {
                 // A manual refresh clears old messages; automatic ones keep the
