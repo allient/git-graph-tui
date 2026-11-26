@@ -1,4 +1,4 @@
-<a href="https://allient.io"><img src=".github/assets/made-at-allient.svg" alt="Made at Allient" align="right"></a>
+<a href="https://allient.io"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/made-at-allient-dark.svg"><img src=".github/assets/made-at-allient.svg" alt="Made at Allient" align="right"></picture></a>
 
 # git-graph-tui
 
