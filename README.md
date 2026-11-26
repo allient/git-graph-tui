@@ -1,3 +1,14 @@
+<p align="center">
+  <a href="https://allient.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/allient-logo-white.svg">
+      <img src=".github/assets/allient-logo.svg" alt="Allient" height="48">
+    </picture>
+  </a>
+  <br>
+  <sub>An open-source project made with ❤️ by <a href="https://allient.io">Allient</a></sub>
+</p>
+
 # git-graph-tui
 
 [![Release](https://img.shields.io/github/v/release/allient/git-graph-tui)](https://github.com/allient/git-graph-tui/releases/latest)
