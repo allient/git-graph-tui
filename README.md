@@ -2,11 +2,11 @@
   <a href="https://allient.io">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset=".github/assets/allient-logo-white.svg">
-      <img src=".github/assets/allient-logo.svg" alt="Allient" height="48">
+      <img src=".github/assets/allient-logo.svg" alt="Allient" height="32">
     </picture>
   </a>
   <br>
-  <sub>An open-source project made with ❤️ by <a href="https://allient.io">Allient</a></sub>
+  <sub>An open-source project made with ❤️</sub>
 </p>
 
 # git-graph-tui
