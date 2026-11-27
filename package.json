@@ -3,17 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "description": "JavaScript side of the git-graph-tui monorepo (the documentation site). The app itself is the Rust workspace in Cargo.toml.",
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "workspaces": {
     "packages": [
       "apps/*",
       "packages/*"
     ],
     "catalog": {
-      "@astrojs/starlight": "^0.42.11",
-      "astro": "^7.4.11",
+      "@astrojs/starlight": "^0.43.2",
+      "astro": "^7.4.13",
       "sharp": "^0.35.5",
-      "wrangler": "^4.161.0"
+      "wrangler": "^4.168.0"
     }
   },
   "scripts": {
@@ -26,6 +26,6 @@
     "deploy:docs": "turbo run deploy --filter=docs"
   },
   "devDependencies": {
-    "turbo": "^2.11.11"
+    "turbo": "^2.11.13"
   }
 }

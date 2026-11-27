@@ -508,8 +508,7 @@ impl InputDialog {
     fn question_lines(&self, width: u16) -> Vec<String> {
         self.question
             .as_deref()
-            .map(|q| wrap(q, text_width(width)))
-            .unwrap_or_default()
+            .map_or_default(|q| wrap(q, text_width(width)))
     }
 
     /// Draws the question centered from row `y`; returns the first row after

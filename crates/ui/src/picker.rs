@@ -163,8 +163,7 @@ impl Picker {
     pub fn selected(&self) -> Vec<String> {
         self.selected
             .as_ref()
-            .map(|s| s.iter().cloned().collect())
-            .unwrap_or_default()
+            .map_or_default(|s| s.iter().cloned().collect())
     }
 
     /// The rows the query leaves visible.

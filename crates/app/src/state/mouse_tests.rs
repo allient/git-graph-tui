@@ -30,19 +30,15 @@ fn click(h: &mut Harness, button: MouseButton, x: u16, y: u16) {
 }
 
 fn labels(state: &AppState) -> Vec<String> {
-    state
-        .menu
-        .as_ref()
-        .map(|m| {
-            m.items()
-                .iter()
-                .filter_map(|item| match item {
-                    MenuItem::Entry(e) => Some(e.label.clone()),
-                    MenuItem::Separator | MenuItem::Submenu { .. } => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    state.menu.as_ref().map_or_default(|m| {
+        m.items()
+            .iter()
+            .filter_map(|item| match item {
+                MenuItem::Entry(e) => Some(e.label.clone()),
+                MenuItem::Separator | MenuItem::Submenu { .. } => None,
+            })
+            .collect()
+    })
 }
 
 /// Screen position of the first cell showing `text`.
@@ -419,20 +415,16 @@ fn double_clicking_a_commit_without_a_branch_checks_nothing_out() {
 
 /// Top-level rows of the open menu: entries and `Label ▸` submenus.
 fn top_level(state: &AppState) -> Vec<String> {
-    state
-        .menu
-        .as_ref()
-        .map(|m| {
-            m.items()
-                .iter()
-                .filter_map(|item| match item {
-                    MenuItem::Entry(e) => Some(e.label.clone()),
-                    MenuItem::Submenu { label, .. } => Some(format!("{label} ▸")),
-                    MenuItem::Separator => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    state.menu.as_ref().map_or_default(|m| {
+        m.items()
+            .iter()
+            .filter_map(|item| match item {
+                MenuItem::Entry(e) => Some(e.label.clone()),
+                MenuItem::Submenu { label, .. } => Some(format!("{label} ▸")),
+                MenuItem::Separator => None,
+            })
+            .collect()
+    })
 }
 
 #[test]
