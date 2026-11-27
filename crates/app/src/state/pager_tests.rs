@@ -106,6 +106,7 @@ fn with_a_pager_enter_pipes_the_diff_into_it_instead() {
             program: "sh".into(),
             args: sh(line),
             refresh: false,
+            upgrade: false,
         }]
     );
     assert!(h.state.details.is_some(), "the details stay open");
@@ -185,6 +186,7 @@ fn t_runs_difftool_against_the_first_parent() {
                 ":(literal)src/lib.rs".into(),
             ],
             refresh: false,
+            upgrade: false,
         }]
     );
     assert!(h.state.diff.is_none());

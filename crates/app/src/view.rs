@@ -139,31 +139,11 @@ pub fn draw(frame: &mut Frame<'_>, state: &mut AppState, theme: &Theme) {
     }
     if state.update_panel {
         let version = state.update_available.as_deref().unwrap_or("unknown");
-        let info = crate::state::Info {
-            title: "Update available".into(),
-            lines: vec![
-                format!(
-                    "Installed: {}    Latest: {version}",
-                    env!("CARGO_PKG_VERSION")
-                ),
-                String::new(),
-                "Homebrew: brew upgrade allient/tap/git-graph-tui".into(),
-                "Other installs: see the release page for your installer.".into(),
-                String::new(),
-                "o release notes    d dismiss this version    esc close".into(),
-            ],
-        };
-        crate::panels::draw_info(frame, screen, &info, theme);
-        state.update_link_hit = None;
-        state.update_dismiss_hit = None;
-        let width = 72.min(screen.width.saturating_sub(2)).max(1);
-        let height = 10.min(screen.height.saturating_sub(2)).max(1);
-        if width >= 58 && height >= 8 {
-            let x = screen.x + (screen.width - width) / 2 + 1;
-            let y = screen.y + (screen.height - height) / 2 + 6;
-            state.update_link_hit = Some(Rect::new(x, y, 15, 1));
-            state.update_dismiss_hit = Some(Rect::new(x + 19, y, 22, 1));
-        }
+        let buttons = state.update_panel_buttons();
+        state.update_buttons =
+            crate::panels::draw_update(frame, screen, version, state.install, &buttons, theme);
+    } else {
+        state.update_buttons.clear();
     }
     if let Some(info) = &state.info {
         crate::panels::draw_info(frame, screen, info, theme);
@@ -358,6 +338,7 @@ mod tests {
     fn update_panel_shows_upgrade_guidance() {
         let repo = FixtureRepo::sample();
         let mut h = Harness::open(&repo);
+        h.state.install = crate::upgrade::Install::Homebrew;
         h.state.update_available = Some("v9.0.0".into());
         h.state.update_panel = true;
         let mut terminal = Terminal::new(TestBackend::new(80, 16)).unwrap();
@@ -365,7 +346,26 @@ mod tests {
             .draw(|f| draw(f, &mut h.state, &Theme::default()))
             .unwrap();
         let buf = terminal.backend().buffer();
-        let popup = (3..13)
+        let popup = (3..12)
+            .map(|y| (4..76).map(|x| buf[(x, y)].symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n");
+        insta::assert_snapshot!(popup.replace(env!("CARGO_PKG_VERSION"), "<VERSION>"));
+    }
+
+    #[test]
+    fn update_panel_wraps_the_install_script_command() {
+        let repo = FixtureRepo::sample();
+        let mut h = Harness::open(&repo);
+        h.state.install = crate::upgrade::Install::ShellInstaller;
+        h.state.update_available = Some("v9.0.0".into());
+        h.state.update_panel = true;
+        let mut terminal = Terminal::new(TestBackend::new(80, 18)).unwrap();
+        terminal
+            .draw(|f| draw(f, &mut h.state, &Theme::default()))
+            .unwrap();
+        let buf = terminal.backend().buffer();
+        let popup = (4..14)
             .map(|y| (4..76).map(|x| buf[(x, y)].symbol()).collect::<String>())
             .collect::<Vec<_>>()
             .join("\n");

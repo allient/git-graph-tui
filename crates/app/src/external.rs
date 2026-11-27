@@ -19,6 +19,8 @@ pub struct External {
     pub args: Vec<String>,
     /// Reload the repository afterwards: the program may have changed files.
     pub refresh: bool,
+    /// It upgrades git-graph-tui: on success the app says to restart.
+    pub upgrade: bool,
 }
 
 /// The diff pager to use: `$GIT_GRAPH_TUI_PAGER`, else the config file's
@@ -68,6 +70,7 @@ pub fn editor_command(repo: &Path, editor: &str, path: &str) -> External {
         program: program.to_owned(),
         args,
         refresh: true,
+        upgrade: false,
     }
 }
 
@@ -110,6 +113,7 @@ pub fn pager_command(repo: &Path, diff_args: &[String], pager: &str) -> External
         program: program.to_owned(),
         args: vec![flag.to_owned(), line],
         refresh: false,
+        upgrade: false,
     }
 }
 
@@ -122,6 +126,7 @@ pub fn difftool_command(repo: &Path, difftool_args: Vec<String>) -> External {
         program: "git".to_owned(),
         args,
         refresh: false,
+        upgrade: false,
     }
 }
 
@@ -205,6 +210,7 @@ mod tests {
                         .into()
                 ],
                 refresh: false,
+                upgrade: false,
             }
         );
     }
@@ -248,6 +254,7 @@ mod tests {
             program: "sh".into(),
             args: vec!["-c".into(), "exit 3".into()],
             refresh: false,
+            upgrade: false,
         };
         assert_eq!(
             run(&failing).as_deref(),
@@ -263,6 +270,7 @@ mod tests {
             program: "git-graph-tui-no-such-program".into(),
             args: Vec::new(),
             refresh: false,
+            upgrade: false,
         };
         let message = run(&missing).unwrap();
         assert!(message.starts_with("nope failed: "), "{message}");

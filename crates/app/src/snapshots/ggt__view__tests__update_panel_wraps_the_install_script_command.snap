@@ -1,0 +1,14 @@
+---
+source: crates/app/src/view.rs
+expression: "popup.replace(env!(\"CARGO_PKG_VERSION\"), \"<VERSION>\")"
+---
+┌ Update available · esc closes ───────────────────────────────────────┐
+│Installed: <VERSION>    Latest: v9.0.0                                    │
+│                                                                      │
+│Installed with the install script. Upgrade by running it again:       │
+│  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allient/git│
+│-graph-tui/releases/latest/download/git-graph-tui-installer.sh | sh   │
+│                                                                      │
+│[ Upgrade now (u) ] [ Copy command (c) ] [ Release notes (o) ]        │
+│[ Skip this version (d) ]                                             │
+└──────────────────────────────────────────────────────────────────────┘

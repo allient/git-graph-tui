@@ -105,8 +105,14 @@ fn update_notice_opens_and_dismisses_by_mouse() {
     let notice = h.state.update_hit.expect("notice hit");
     click(&mut h, MouseButton::Left, notice.x, notice.y);
     assert!(h.state.update_panel);
-    assert!(h.find_on_screen("Homebrew: brew upgrade").is_some());
-    let dismiss = h.state.update_dismiss_hit.expect("dismiss hit");
+    assert!(h.find_on_screen("Update available").is_some());
+    let dismiss = h
+        .state
+        .update_buttons
+        .iter()
+        .find(|(_, b)| *b == UpdateButton::Skip)
+        .map(|(r, _)| *r)
+        .expect("skip button");
     click(&mut h, MouseButton::Left, dismiss.x, dismiss.y);
     assert!(!h.state.update_panel);
     assert_eq!(h.state.update_dismissed.as_deref(), Some("v9.0.0"));

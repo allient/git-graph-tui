@@ -50,6 +50,7 @@ mod source_control;
 pub use find::Find;
 pub use source_control::{MIN_WIDTH_FOR_PANE, SourceControlState};
 mod toolbar;
+mod update;
 mod working_diff;
 mod worktrees;
 
@@ -63,6 +64,7 @@ pub use output::{GitOutput, OutputLine, OutputView};
 pub use rebase::RebaseView;
 pub use reflog::ReflogView;
 pub use toolbar::{OpenPicker, ToolbarState};
+pub use update::UpdateButton;
 pub use worktrees::{WorktreeEntry, WorktreesView};
 
 /// Commits loaded per `git log` call.
@@ -92,6 +94,8 @@ pub enum Event {
     },
     /// Time to look for edited files (`git status`).
     StatusTick,
+    /// The upgrade from the update panel finished successfully.
+    Upgraded,
 }
 
 /// Bookkeeping for `git status` reads.
@@ -287,8 +291,10 @@ pub struct AppState {
     pub update_requested: bool,
     pub update_dismissed: Option<String>,
     pub update_hit: Option<Rect>,
-    pub update_link_hit: Option<Rect>,
-    pub update_dismiss_hit: Option<Rect>,
+    /// The update panel's buttons, where the last frame drew them.
+    pub update_buttons: Vec<(Rect, UpdateButton)>,
+    /// How this binary was installed: decides the upgrade command.
+    pub install: crate::upgrade::Install,
     pub should_quit: bool,
     /// The open context menu, if any.
     pub menu: Option<PopupMenu>,
@@ -412,8 +418,8 @@ impl AppState {
             update_requested: false,
             update_dismissed: None,
             update_hit: None,
-            update_link_hit: None,
-            update_dismiss_hit: None,
+            update_buttons: Vec::new(),
+            install: crate::upgrade::Install::Unknown,
             should_quit: false,
             menu: None,
             graph_hits: HitMap::default(),
@@ -502,6 +508,7 @@ impl AppState {
             Event::Key(key) => self.on_key(key),
             Event::Mouse(mouse) => self.on_mouse(mouse),
             Event::Git(result) => self.on_git(result),
+            Event::Upgraded => self.on_upgraded(),
         }
     }
 
@@ -592,21 +599,7 @@ impl AppState {
             return Vec::new();
         }
         if self.update_panel {
-            return match key.code {
-                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
-                    self.update_panel = false;
-                    Vec::new()
-                }
-                KeyCode::Char('o') => vec![Command::OpenUrl(
-                    "https://github.com/allient/git-graph-tui/releases/latest".into(),
-                )],
-                KeyCode::Char('d') => {
-                    self.update_panel = false;
-                    self.update_dismissed = self.update_available.take();
-                    Vec::new()
-                }
-                _ => Vec::new(),
-            };
+            return self.on_update_panel_key(key.code);
         }
         if self.dialog.is_some() {
             return self.on_dialog_key(key);
@@ -700,16 +693,7 @@ impl AppState {
         let (x, y) = (mouse.column, mouse.row);
         if self.update_panel {
             if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
-                let point = Position { x, y };
-                if self.update_link_hit.is_some_and(|r| r.contains(point)) {
-                    return vec![Command::OpenUrl(
-                        "https://github.com/allient/git-graph-tui/releases/latest".into(),
-                    )];
-                }
-                if self.update_dismiss_hit.is_some_and(|r| r.contains(point)) {
-                    self.update_dismissed = self.update_available.take();
-                }
-                self.update_panel = false;
+                return self.on_update_panel_click(x, y);
             }
             return Vec::new();
         }
@@ -1457,6 +1441,8 @@ mod stash_tests;
 mod tests;
 #[cfg(test)]
 mod toolbar_tests;
+#[cfg(test)]
+mod update_tests;
 #[cfg(test)]
 mod working_diff_tests;
 #[cfg(test)]
