@@ -6,10 +6,10 @@ default-members = ["crates/app"]
 [workspace.package]
 version = "0.6.2"
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.100"
 license = "MIT"
 repository = "https://github.com/allient/git-graph-tui"
-homepage = "https://github.com/allient/git-graph-tui"
+homepage = "https://git-graph-tui.allient.io"
 authors = ["Allient"]
 publish = false
 
@@ -31,18 +31,18 @@ unicode-width = "0.2.3"
 terminal-colorsaurus = "1.0.3"
 
 # App plumbing
-clap = { version = "4.6.7", features = ["derive"] }
+clap = { version = "4.6.10", features = ["derive"] }
 crossbeam-channel = "0.5.17"
 dirs = "7.0.0"
 serde = { version = "1.0.229", features = ["derive"] }
-toml = "1.2.0"
-notify = "8.2.1"
-ureq = { version = "3.5.1", default-features = false, features = ["rustls", "json"] }
-semver = "1.0.27"
-jiff = "0.2.39"
+toml = "1.2.3"
+notify = "9.0.0"
+ureq = { version = "3.5.2", default-features = false, features = ["rustls", "json"] }
+semver = "1.0.28"
+jiff = "1.0.3"
 
 # Errors and diagnostics
-anyhow = "1.0.104"
+anyhow = "1.0.105"
 thiserror = "2.0.21"
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
@@ -52,6 +52,10 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 insta = "1.49.0"
 pretty_assertions = "1.4.1"
 tempfile = "3.27.0"
+
+[workspace.lints.cargo]
+# Planned dependencies stay in the catalog above until a crate uses them.
+unused_workspace_dependencies = "allow"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

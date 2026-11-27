@@ -21,6 +21,8 @@ allow = [
   "CC0-1.0",
   # Mozilla root certificate data used by webpki-roots.
   "CDLA-Permissive-2.0",
+  # Boost license, used by xxhash-rust (through notify).
+  "BSL-1.0",
   "ISC",
   "Unicode-3.0",
   "Zlib",
