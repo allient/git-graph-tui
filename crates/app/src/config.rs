@@ -3,6 +3,8 @@
 //!
 //! ```toml
 //! icons = "auto"          # "auto", "nerd" or "unicode"
+//! theme = "auto"          # "auto" (match the terminal's background),
+//!                         # "dark" or "light"
 //!
 //! [layout]                # written back when panes or columns are resized
 //! source_control_width = 36
@@ -40,6 +42,7 @@ use anyhow::{Context, Result};
 use ggt_actions::{ChangesSort, ChangesView, GraphColumn};
 use serde::{Deserialize, Serialize};
 
+use crate::appearance::ThemeChoice;
 use crate::cli::IconStyle;
 
 /// Environment variable naming the config file to use instead of the default.
@@ -49,6 +52,7 @@ pub const CONFIG_ENV: &str = "GIT_GRAPH_TUI_CONFIG";
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub icons: Option<IconStyle>,
+    pub theme: ThemeChoice,
     pub layout: Layout,
     pub diff: Diff,
     pub issues: Issues,
@@ -418,6 +422,7 @@ mod tests {
             load(&file).unwrap(),
             Config {
                 icons: Some(IconStyle::Nerd),
+                theme: ThemeChoice::Auto,
                 layout: Layout {
                     source_control_width: Some(40),
                     date_column: Some(20),
@@ -429,6 +434,23 @@ mod tests {
                 updates: Updates::default(),
             }
         );
+    }
+
+    #[test]
+    fn reads_the_theme() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        for (text, expected) in [
+            ("theme = \"light\"\n", ThemeChoice::Light),
+            ("theme = \"dark\"\n", ThemeChoice::Dark),
+            ("theme = \"auto\"\n", ThemeChoice::Auto),
+            ("", ThemeChoice::Auto),
+        ] {
+            fs::write(&file, text).unwrap();
+            assert_eq!(load(&file).unwrap().theme, expected, "{text:?}");
+        }
+        fs::write(&file, "theme = \"solarized\"\n").unwrap();
+        assert!(load(&file).is_err());
     }
 
     #[test]

@@ -22,6 +22,24 @@ const GIT_GRAPH_LANES: [Color; 12] = [
     Color::Rgb(0xff, 0xcc, 0x00),
 ];
 
+/// The same hues for a light terminal background: the bright ones (green,
+/// orange, cyan, lime, yellow) are darkened so lines and dots stay visible
+/// on white.
+const LIGHT_LANES: [Color; 12] = [
+    Color::Rgb(0x00, 0x85, 0xd9),
+    Color::Rgb(0xd9, 0x00, 0x8f),
+    Color::Rgb(0x00, 0xa6, 0x08),
+    Color::Rgb(0xc2, 0x77, 0x00),
+    Color::Rgb(0xa3, 0x00, 0xd9),
+    Color::Rgb(0xe0, 0x00, 0x00),
+    Color::Rgb(0x00, 0xa8, 0x9e),
+    Color::Rgb(0xc9, 0x2f, 0xd0),
+    Color::Rgb(0x5f, 0x96, 0x00),
+    Color::Rgb(0xdc, 0x5b, 0x23),
+    Color::Rgb(0x6f, 0x24, 0xd6),
+    Color::Rgb(0xa6, 0x84, 0x00),
+];
+
 /// Colors and icons used by the widgets. Lane colors cycle through `lanes`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
@@ -110,6 +128,14 @@ impl Theme {
 
 impl Default for Theme {
     fn default() -> Self {
+        Self::dark()
+    }
+}
+
+impl Theme {
+    /// For terminals with a dark background: VS Code Git Graph's colors.
+    #[must_use]
+    pub fn dark() -> Self {
         Self {
             lanes: GIT_GRAPH_LANES.to_vec(),
             text: Color::Reset,
@@ -135,6 +161,41 @@ impl Default for Theme {
             error: Color::Rgb(0xff, 0x00, 0x00),
             icons: Icons::Unicode,
             menu_border: GIT_GRAPH_LANES[0],
+            time_zone: TimeZone::UTC,
+        }
+    }
+
+    /// For terminals with a light background: light gray selection and
+    /// header, darker text colors.
+    #[must_use]
+    pub fn light() -> Self {
+        // Dark gold: ANSI yellow is often unreadable on white.
+        let gold = Color::Rgb(0xa6, 0x84, 0x00);
+        Self {
+            lanes: LIGHT_LANES.to_vec(),
+            text: Color::Reset,
+            muted: Color::Indexed(245),
+            selected_bg: Color::Indexed(253),
+            header_bg: Color::Indexed(255),
+            badge_fg: Color::Black,
+            badge_fg_on_dark: Color::White,
+            badge_bg: Color::Indexed(252),
+            tag: gold,
+            stash: Color::Indexed(241),
+            date: Color::Indexed(241),
+            author: Color::Indexed(241),
+            hash: Color::Indexed(244),
+            // VS Code's light theme link color.
+            link: Color::Rgb(0x00, 0x6a, 0xb1),
+            added: Color::Green,
+            modified: gold,
+            deleted: Color::Red,
+            renamed: Color::Blue,
+            success: Color::Rgb(0x00, 0x8a, 0x07),
+            warning: Color::Rgb(0xb3, 0x6b, 0x00),
+            error: Color::Rgb(0xd7, 0x00, 0x00),
+            icons: Icons::Unicode,
+            menu_border: LIGHT_LANES[0],
             time_zone: TimeZone::UTC,
         }
     }
@@ -192,6 +253,60 @@ mod tests {
         // The grayscale ramp: dark half white, light half black.
         assert_eq!(theme.badge_text(Color::Indexed(232)), Color::White);
         assert_eq!(theme.badge_text(Color::Indexed(250)), Color::Black);
+    }
+
+    /// Whether `color` is light enough that black text reads on it.
+    fn is_light(theme: &Theme, color: Color) -> bool {
+        theme.badge_text(color) == theme.badge_fg
+    }
+
+    #[test]
+    fn the_default_theme_is_dark() {
+        assert_eq!(Theme::default(), Theme::dark());
+    }
+
+    #[test]
+    fn the_light_theme_uses_light_backgrounds() {
+        let theme = Theme::light();
+        assert!(is_light(&theme, theme.selected_bg));
+        assert!(is_light(&theme, theme.header_bg));
+        assert!(is_light(&theme, theme.badge_bg));
+        let dark = Theme::dark();
+        assert!(!is_light(&dark, dark.selected_bg));
+        assert!(!is_light(&dark, dark.header_bg));
+    }
+
+    #[test]
+    fn the_light_theme_has_no_text_colors_meant_for_dark_backgrounds() {
+        let theme = Theme::light();
+        let washed_out = [
+            Color::Yellow,
+            Color::LightGreen,
+            Color::LightRed,
+            Color::LightBlue,
+            Color::Gray,
+            Color::White,
+        ];
+        for color in [
+            theme.muted,
+            theme.tag,
+            theme.stash,
+            theme.date,
+            theme.author,
+            theme.hash,
+            theme.added,
+            theme.modified,
+            theme.deleted,
+            theme.renamed,
+        ] {
+            assert!(!washed_out.contains(&color), "{color:?}");
+        }
+        // Lane colors are lines and dots on a light background: none as
+        // bright as the dark theme's yellow or lime.
+        for lane in &theme.lanes {
+            assert!(!is_light(&theme, *lane), "{lane:?}");
+        }
+        assert_eq!(theme.lanes.len(), Theme::dark().lanes.len());
     }
 
     #[test]

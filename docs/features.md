@@ -9,6 +9,7 @@ Target feature set, based on Git Graph for VS Code. The detailed specs for the f
 ### Graph view
 - [x] Commit graph with color-coded lanes per branch and merge lines, drawn with thin lines (`│`) that turn once, on the commit's line, with rounded corners where a line changes lanes (`●─╮`, `●─╯`), in Git Graph's own palette (blue, magenta, green, orange, purple, red, cyan, ...)
 - [x] Local and remote branches, tags, stashes and remote HEAD labels, as colored badges; each stash is its own row (`stash@{n}`) above the commit it was made on, with the stash menu on right-click
+- [x] Dark and light colors: the app asks the terminal for its background color and picks the matching theme; `theme = "dark"` or `"light"` in the config file chooses one
 - [x] Uncommitted changes shown as a virtual row at the top
 - [x] Columns: graph, description, date (in local time), author, commit hash (show/hide, adapt to width)
 - [x] Highlight HEAD and mute commits that aren't ancestors of HEAD

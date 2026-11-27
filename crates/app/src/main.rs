@@ -1,5 +1,6 @@
 //! `ggt` (git-graph-tui): a Git Graph for the terminal.
 
+mod appearance;
 mod browser;
 mod cli;
 mod clipboard;
@@ -56,6 +57,9 @@ fn main() -> Result<()> {
     let repo = discover_repo(&ProcessExecutor::new(), &cli.path)
         .map_err(|err| anyhow::anyhow!(err.user_message()))
         .with_context(|| format!("cannot open {}", cli.path.display()))?;
+    // Ask for the background before the app takes over the terminal: once it
+    // reads input, the terminal's answer would arrive as key presses.
+    let background = appearance::background(config.theme, &appearance::query_terminal, &env);
     let (before, after) = ratatui::run(|terminal| {
         let programs = Programs { pager, editor };
         let settings = Settings {
@@ -64,7 +68,15 @@ fn main() -> Result<()> {
             updates,
             update_cache,
         };
-        run(terminal, repo, icons, config.layout, programs, settings)
+        run(
+            terminal,
+            repo,
+            icons,
+            background,
+            config.layout,
+            programs,
+            settings,
+        )
     })?;
     // Remember resized panes and columns for next time.
     if let Some(path) = config_path.filter(|_| after != before) {
@@ -111,6 +123,7 @@ fn run(
     terminal: &mut DefaultTerminal,
     repo: PathBuf,
     icons: Icons,
+    background: appearance::Background,
     layout: config::Layout,
     programs: Programs,
     settings: Settings,
@@ -139,7 +152,7 @@ fn run(
     let theme = Theme {
         icons,
         time_zone: time_zone.clone(),
-        ..Theme::default()
+        ..background.theme()
     };
     let mut state = AppState::new(repo);
     state.time_zone = time_zone;

@@ -9,6 +9,7 @@ Settings live in `~/.config/git-graph-tui/config.toml` (under `$XDG_CONFIG_HOME`
 
 ```toml
 icons = "auto"            # "auto", "nerd" or "unicode"
+theme = "auto"            # "auto" matches the terminal's background; "dark" or "light" to choose
 
 [layout]                  # saved for you when you quit after resizing
 source_control_width = 36
