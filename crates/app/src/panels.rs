@@ -11,7 +11,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Widget, Wrap};
 
 use crate::state::{
-    GitOutput, Info, OutputLine, RebaseView, ReflogView, WorktreeEntry, WorktreesView,
+    GitOutput, Info, OutputLine, RebaseView, ReflogView, UpdateButton, WorktreeEntry, WorktreesView,
 };
 
 /// Widest the info dialog gets.
@@ -40,6 +40,106 @@ pub fn draw_info(frame: &mut Frame<'_>, screen: Rect, info: &Info, theme: &Theme
         .block(block)
         .wrap(Wrap { trim: false })
         .render(area, frame.buffer_mut());
+}
+
+/// The "Update available" panel, centered on `screen`: the versions, how
+/// this copy was installed, its upgrade command, then `buttons` in a row
+/// (wrapping when narrow). Returns where each button landed.
+pub fn draw_update(
+    frame: &mut Frame<'_>,
+    screen: Rect,
+    latest: &str,
+    install: crate::upgrade::Install,
+    buttons: &[UpdateButton],
+    theme: &Theme,
+) -> Vec<(Rect, UpdateButton)> {
+    let width = INFO_WIDTH.min(screen.width.saturating_sub(2)).max(1);
+    let inner_width = usize::from(width.saturating_sub(2)).max(1);
+    let mut text: Vec<Line<'_>> = vec![
+        Line::from(format!(
+            "Installed: {}    Latest: {latest}",
+            env!("CARGO_PKG_VERSION")
+        )),
+        Line::default(),
+        Line::from(install.summary()),
+    ];
+    if let Some(command) = install.command() {
+        // Long commands are split anywhere: Copy gives the exact text.
+        let chars: Vec<char> = format!("  {command}").chars().collect();
+        for chunk in chars.chunks(inner_width) {
+            text.push(Line::styled(
+                chunk.iter().collect::<String>(),
+                Style::new().fg(theme.link),
+            ));
+        }
+    }
+    text.push(Line::default());
+    let labels: Vec<String> = buttons
+        .iter()
+        .map(|b| format!("[ {} ]", b.label()))
+        .collect();
+    // Lay the buttons out in rows first, to know how tall the panel is.
+    let mut rows: Vec<Vec<usize>> = vec![Vec::new()];
+    let mut used = 0;
+    for (i, label) in labels.iter().enumerate() {
+        let w = Span::raw(label.as_str()).width() + 1;
+        if used + w > inner_width + 1 && !rows.last().is_some_and(Vec::is_empty) {
+            rows.push(Vec::new());
+            used = 0;
+        }
+        if let Some(row) = rows.last_mut() {
+            row.push(i);
+        }
+        used += w;
+    }
+    let content = u16::try_from(text.len() + rows.len()).unwrap_or(u16::MAX);
+    let height = content
+        .saturating_add(2)
+        .min(screen.height.saturating_sub(2))
+        .max(1);
+    let area = Rect::new(
+        screen.x + (screen.width - width) / 2,
+        screen.y + (screen.height - height) / 2,
+        width,
+        height,
+    );
+    Clear.render(area, frame.buffer_mut());
+    let block = Block::bordered()
+        .border_style(Style::new().fg(theme.muted))
+        .title(" Update available · esc closes ");
+    let inner = block.inner(area);
+    block.render(area, frame.buffer_mut());
+    let text_rows = u16::try_from(text.len()).unwrap_or(u16::MAX);
+    Paragraph::new(text).render(inner, frame.buffer_mut());
+    let primary = Style::new()
+        .fg(theme.badge_text(theme.menu_border))
+        .bg(theme.menu_border)
+        .add_modifier(Modifier::BOLD);
+    let normal = Style::new().fg(theme.text).bg(theme.selected_bg);
+    let mut hits = Vec::new();
+    for (r, row) in rows.iter().enumerate() {
+        let y = inner.y + text_rows + u16::try_from(r).unwrap_or(u16::MAX);
+        if y >= inner.bottom() {
+            break;
+        }
+        let mut x = inner.x;
+        for &i in row {
+            let label = &labels[i];
+            let w = u16::try_from(Span::raw(label.as_str()).width()).unwrap_or(u16::MAX);
+            if x + w > inner.right() {
+                break;
+            }
+            let style = if buttons[i] == UpdateButton::Upgrade {
+                primary
+            } else {
+                normal
+            };
+            frame.buffer_mut().set_string(x, y, label, style);
+            hits.push((Rect::new(x, y, w, 1), buttons[i]));
+            x += w + 1;
+        }
+    }
+    hits
 }
 
 /// The git output view over `area`; returns the rows it shows per page.

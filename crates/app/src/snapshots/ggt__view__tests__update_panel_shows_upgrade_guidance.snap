@@ -5,10 +5,9 @@ expression: "popup.replace(env!(\"CARGO_PKG_VERSION\"), \"<VERSION>\")"
 ┌ Update available · esc closes ───────────────────────────────────────┐
 │Installed: <VERSION>    Latest: v9.0.0                                    │
 │                                                                      │
-│Homebrew: brew upgrade allient/tap/git-graph-tui                      │
-│Other installs: see the release page for your installer.              │
+│Installed with Homebrew. Upgrade with:                                │
+│  brew upgrade allient/tap/git-graph-tui                              │
 │                                                                      │
-│o release notes    d dismiss this version    esc close                │
-│                                                                      │
-│                                                                      │
+│[ Upgrade now (u) ] [ Copy command (c) ] [ Release notes (o) ]        │
+│[ Skip this version (d) ]                                             │
 └──────────────────────────────────────────────────────────────────────┘

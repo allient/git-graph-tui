@@ -14,6 +14,7 @@ mod state;
 #[cfg(test)]
 mod testing;
 mod update_check;
+mod upgrade;
 mod view;
 mod watch;
 
@@ -155,6 +156,7 @@ fn run(
         ..background.theme()
     };
     let mut state = AppState::new(repo);
+    state.install = upgrade::current(&env);
     state.time_zone = time_zone;
     state.pager = programs.pager;
     state.editor = programs.editor;
@@ -233,8 +235,12 @@ fn run(
             next_status = now + state.status_poll_interval(status_every);
         }
         for program in external {
-            if let Some(message) = hand_over(terminal, &program)? {
-                state.notify(Level::Error, message);
+            match hand_over(terminal, &program)? {
+                Some(message) => state.notify(Level::Error, message),
+                None if program.upgrade => {
+                    dispatch(&mut state, &runner, Event::Upgraded);
+                }
+                None => {}
             }
             // Focus reports were off while the program ran; the user is back
             // in this terminal.
