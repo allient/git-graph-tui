@@ -30,19 +30,15 @@ fn right_click(h: &mut Harness, x: u16, y: u16) {
 }
 
 fn menu_labels(h: &Harness) -> Vec<String> {
-    h.state
-        .menu
-        .as_ref()
-        .map(|m| {
-            m.items()
-                .iter()
-                .filter_map(|item| match item {
-                    MenuItem::Entry(e) => Some(e.label.clone()),
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    h.state.menu.as_ref().map_or_default(|m| {
+        m.items()
+            .iter()
+            .filter_map(|item| match item {
+                MenuItem::Entry(e) => Some(e.label.clone()),
+                _ => None,
+            })
+            .collect()
+    })
 }
 
 /// The sample repository (which has one stash) with two more made on HEAD.

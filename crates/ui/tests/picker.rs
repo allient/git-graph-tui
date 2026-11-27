@@ -56,8 +56,7 @@ fn branch_filter_with_a_typed_pattern_below_the_toolbar() {
     let hits = toolbar.render(Rect::new(0, 0, 80, 1), &mut buf, &Theme::default());
     let below = hits
         .button(ggt_ui::ToolbarButton::BranchFilter)
-        .map(|r| Position::new(r.x, r.y + 1))
-        .unwrap_or_default();
+        .map_or_default(|r| Position::new(r.x, r.y + 1));
     let mut picker = Picker::multi("Branches", refs(), &["develop".to_owned()]).with_anchor(below);
     for ch in "feat*".chars() {
         picker.handle_key(Key::Char(ch));

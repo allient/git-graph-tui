@@ -155,19 +155,15 @@ fn default_widths_written_in_the_config_are_not_a_change() {
 }
 
 fn header_menu_labels(h: &Harness) -> Vec<String> {
-    h.state
-        .menu
-        .as_ref()
-        .map(|m| {
-            m.items()
-                .iter()
-                .filter_map(|item| match item {
-                    MenuItem::Entry(e) => Some(e.label.clone()),
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    h.state.menu.as_ref().map_or_default(|m| {
+        m.items()
+            .iter()
+            .filter_map(|item| match item {
+                MenuItem::Entry(e) => Some(e.label.clone()),
+                _ => None,
+            })
+            .collect()
+    })
 }
 
 fn right_click_header(h: &mut Harness, width: u16) {

@@ -281,19 +281,15 @@ fn after_a_menu_choice_from_the_pane_keys_go_back_to_the_graph() {
 
 /// Labels of the open popup menu, `---` for separators.
 fn menu_labels(h: &Harness) -> Vec<String> {
-    h.state
-        .menu
-        .as_ref()
-        .map(|m| {
-            m.items()
-                .iter()
-                .map(|item| match item {
-                    MenuItem::Entry(e) => e.label.clone(),
-                    _ => "---".to_owned(),
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    h.state.menu.as_ref().map_or_default(|m| {
+        m.items()
+            .iter()
+            .map(|item| match item {
+                MenuItem::Entry(e) => e.label.clone(),
+                _ => "---".to_owned(),
+            })
+            .collect()
+    })
 }
 
 fn open_commit_menu(h: &mut Harness) {

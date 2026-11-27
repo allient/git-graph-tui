@@ -120,8 +120,7 @@ fn panel_subjects(h: &Harness) -> Vec<String> {
     h.state
         .rebase
         .as_ref()
-        .map(|v| v.rebase.items.iter().map(|i| i.subject.clone()).collect())
-        .unwrap_or_default()
+        .map_or_default(|v| v.rebase.items.iter().map(|i| i.subject.clone()).collect())
 }
 
 fn message(h: &Harness) -> &str {
